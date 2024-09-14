@@ -1,0 +1,43 @@
+.page {
+  max-width: 1200px;
+  /* border: 1px solid red; */
+  margin: 0 auto;
+  color: #fcf7f5;
+  position: relative;
+  height: 3000px;
+}
+
+.accent {
+  color: #1b3c65;
+}
+
+.hero {
+  text-align: center;
+  font-size: 42px;
+  font-weight: 900;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+}
+
+.hero__description {
+  font-size: 20px;
+  max-width: 55%;
+  margin: 0 auto;
+  filter: opacity(.6);
+  font-weight: 400;
+}
+
+.hero__button {
+  border: none;
+  border-radius: 30px;
+  background-color: #1b3c65;
+  padding: 20px;
+  font-size: 20px;
+  margin-top: 50px;
+  cursor: pointer;
+  transition: background-color .2s ease-in;
+  color: #fcf7f5;
+}
+
+.hero__button:hover {
+  background-color: #65441c;
+}

@@ -1,0 +1,37 @@
+.header {
+  display: flex;
+  max-width: 1400px;
+  margin: 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: #0a0a0a;
+}
+
+.header__logo {
+  width: 130px;
+}
+
+.header__button {
+  border: none;
+  background-color: #1b3c65;
+  padding: 20px;
+  color: #fcf7f5;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: background-color .2s ease-in;
+}
+
+.header__button:hover {
+  background-color: #65441c;
+}
+
+.header__navigation-list {
+  display: flex;
+  padding: 0;
+  list-style-type: none;
+  gap: 13px;
+}
