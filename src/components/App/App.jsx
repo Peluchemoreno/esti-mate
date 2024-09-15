@@ -7,7 +7,7 @@ function App() {
       <div className="page">
         <Header />
         <section className="hero">
-          <h1><span className="accent">Simplify</span> Your Quote Process</h1>
+          <h1 className='hero__title'><span className="accent">Simplify</span> Your Quote Process</h1>
           <p className="hero__description">Seamlessly transform drawings into accurate gutter estimates, improving collaboration and communication at any time from any location.</p>
           <button className="hero__button">Subscribe Now</button>
         </section>
