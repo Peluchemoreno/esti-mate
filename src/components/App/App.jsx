@@ -1,16 +1,22 @@
 import './App.css'
-import Header from '../Header/Header'
+import LandingPage from '../LandingPage/LandingPage'
+import Dashboard from '../Dashboard/Dashboard'
+import Signin from '../Signin/Signin'
+import Signup from '../Signup/Signup'
+import PageNotFound from '../PageNotFound/PageNotFound'
+import { Routes, Route } from 'react-router-dom'
 function App() {
 
   return (
     <>
       <div className="page">
-        <Header />
-        <section className="hero">
-          <h1 className='hero__title'><span className="accent">Simplify</span> Your Quote Process</h1>
-          <p className="hero__description">Seamlessly transform drawings into accurate gutter estimates, improving collaboration and communication at any time from any location.</p>
-          <button className="hero__button">Subscribe Now</button>
-        </section>
+        <Routes>
+          <Route path='*' element={<PageNotFound />} />
+          <Route path='/' element={<LandingPage />} />
+          <Route path='/dashboard' element={<Dashboard />} />
+          <Route path='/signin' element={<Signin />} />
+          <Route path='/signup' element={<Signup />} />
+        </Routes>
       </div>
     </>
   )

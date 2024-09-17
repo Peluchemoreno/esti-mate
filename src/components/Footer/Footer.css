@@ -1,0 +1,20 @@
+.footer {
+  border-top: 1px solid white;
+  padding-top: 10px;
+  margin-top: 50px;
+}
+
+.footer__logo {
+  width: 100px;
+}
+
+.footer__logo-text {
+  display: inline-block;
+  font-size: 22px;
+  margin-left: 20px;
+}
+
+.footer__header {
+  display: flex;
+  align-items: center;
+}

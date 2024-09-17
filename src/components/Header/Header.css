@@ -35,3 +35,9 @@
   list-style-type: none;
   gap: 13px;
 }
+
+.header__button_signin {
+  margin-left: 10px;
+  background-color: transparent;
+  border: 1px solid white;
+}
