@@ -1,9 +1,11 @@
 import './Dashboard.css'
 
-export default function Dashboard(){
+export default function Dashboard({currentUser}){
+
+
   return (
     <div className="page">
-      hello dashboard
+      hello {currentUser.email}
     </div>
   )
 }

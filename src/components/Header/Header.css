@@ -8,7 +8,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background-color: #0a0a0a;
+  background-color: var(--black);
 }
 
 .header__logo {
@@ -17,16 +17,16 @@
 
 .header__button {
   border: none;
-  background-color: #1b3c65;
-  padding: 20px;
-  color: #fcf7f5;
+  background-color: var(--blue-primary);
+  padding: 15px;
+  color: var(--white);
   border-radius: 30px;
   cursor: pointer;
   transition: background-color .2s ease-in;
 }
 
 .header__button:hover {
-  background-color: #65441c;
+  background-color: var(--blue-secondary);
 }
 
 .header__navigation-list {
@@ -39,5 +39,5 @@
 .header__button_signin {
   margin-left: 10px;
   background-color: transparent;
-  border: 1px solid white;
+  border: 1px solid var(--white);
 }

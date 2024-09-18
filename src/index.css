@@ -1,5 +1,12 @@
+:root {
+  --black: #0a0a0a;
+  --white: #fcf7f5;
+  --blue-primary: #1b3c65;
+  --blue-secondary: #1b6165;
+  --orange-secondary: #65441c;
+}
+
 * {
-  /* background-color: #fcf7f5; */
-  background-color: #0a0a0a;
+  background-color: var(--black);
   font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
 }

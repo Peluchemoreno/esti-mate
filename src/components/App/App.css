@@ -1,13 +1,12 @@
 .page {
-  max-width: 1200px;
-  /* border: 1px solid red; */
+  max-width: 1400px;
   margin: 0 auto;
-  color: #fcf7f5;
+  color: var(--white);
   position: relative;
 }
 
 .accent {
-  color: #1b3c65;
+  color: var(--blue-primary);
 }
 
 .hero {
@@ -28,15 +27,15 @@
 .hero__button {
   border: none;
   border-radius: 30px;
-  background-color: #1b3c65;
-  padding: 20px;
+  background-color: var(--blue-primary);
+  padding: 15px;
   font-size: 20px;
   margin-top: 50px;
   cursor: pointer;
   transition: background-color .2s ease-in;
-  color: #fcf7f5;
+  color: var(--white);
 }
 
 .hero__button:hover {
-  background-color: #65441c;
+  background-color: var(--blue-secondary);
 }
