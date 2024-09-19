@@ -1,14 +1,14 @@
 import './PageNotFound.css'
-import { useNavigation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 
 export default function PageNotFound(){
 
-  const navigation = useNavigation()
-  console.log(navigation)
+  const location = useLocation()
+  console.log(location)
 
   return (
     <div className="page-not-found">
-      this page is not found {navigation}
+      this page is not found
     </div>
   )
 }
