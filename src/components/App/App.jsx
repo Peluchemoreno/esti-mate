@@ -41,7 +41,7 @@ function App() {
       <div className="page">
         <CurrentUserContext.Provider value={currentUser}>
         <Routes>
-          {/* <Route path='*' element={<PageNotFound />} /> */}
+          <Route path='*' element={<PageNotFound />} />
           <Route path='/' element={<LandingPage />} />
           <Route path='/dashboard' element={<Dashboard />}>
             <Route path='projects' element={<Projects />}/>
