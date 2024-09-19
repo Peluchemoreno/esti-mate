@@ -12,7 +12,7 @@ export default function Dashboard() {
   const navigator = useNavigate()
 
   function navigateToLandingPage(){
-    navigator('/')
+    navigator('/esti-mate')
   }
 
   return (

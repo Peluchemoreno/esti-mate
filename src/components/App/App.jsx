@@ -21,17 +21,6 @@ function App() {
   const navigate = useNavigate()
   
 
-  /* ------------------------------------------------------------------------------------ */
-  /*                           this is the test for useLocation                           */
-  /* ------------------------------------------------------------------------------------ */
-
-  const location = useLocation()
-  console.log(location)
-
-  /* ------------------------------------------------------------------------------------ */
-  /*                           this is the test for useLocation                           */
-  /* ------------------------------------------------------------------------------------ */
-
   function handleLogin(email, password){
     if (users.some(user => {
       return user.email === email && user.password === password

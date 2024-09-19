@@ -33,7 +33,7 @@ export default function Signin({handleLogin}){
 
   return (
     <>
-    <Link to='/'><img src={logo} alt="sign in header logo" className="signin__header-logo" /></Link>
+    <Link to='/esti-mate'><img src={logo} alt="sign in header logo" className="signin__header-logo" /></Link>
     <div className="signin">
       <h2 className='signin__header'>Login to Esti-Mate</h2>
       <form onSubmit={handleLoginSubmit} className="signin-form">
@@ -46,7 +46,7 @@ export default function Signin({handleLogin}){
         <button type='submit' className="signin__button">Login</button>
       </form>
       <p className="signin__signup-or-forgot-password">Don&apos;t have an account? <Link className='signup-link' to='/signup'>Sign up</Link></p>
-      <Link className='forgotpw-link' to='/'>Forgot password?</Link>
+      <Link className='forgotpw-link' to='/esti-mate'>Forgot password?</Link>
     </div>
     </>
   )
