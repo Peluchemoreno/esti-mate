@@ -1,5 +1,5 @@
 .page {
-  max-width: 1400px;
+  max-width: auto;
   margin: 0 auto;
   color: var(--white);
   position: relative;

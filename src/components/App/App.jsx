@@ -9,6 +9,11 @@ import CurrentUserContext from '../../contexts/CurrentUserContext/CurrentUserCon
 import { useState } from 'react'
 import {users} from '../../utils/constants'
 import { useNavigate } from 'react-router-dom'
+import Projects from '../Projects/Projects'
+import Products from '../Products/Products'
+import Settings from '../Settings/Settings'
+
+
 function App() {
 
   const [currentUser, setCurrentUser] = useState({})
@@ -22,7 +27,7 @@ function App() {
         email,
         password,
       })
-      navigate('/dashboard')
+      navigate('/dashboard/projects')
       return
     } else {
       console.error('incorrect email or password')
@@ -38,7 +43,11 @@ function App() {
         <Routes>
           <Route path='*' element={<PageNotFound />} />
           <Route path='/' element={<LandingPage />} />
-          <Route path='/dashboard' element={<Dashboard currentUser={currentUser} />} />
+          <Route path='/dashboard' element={<Dashboard />}>
+            <Route path='projects' element={<Projects />}/>
+            <Route path='products' element={<Products />}/>
+            <Route path='settings' element={<Settings />}/>
+          </Route>
           <Route path='/signin' element={<Signin handleLogin={handleLogin} />} />
           <Route path='/signup' element={<Signup />} />
         </Routes>
