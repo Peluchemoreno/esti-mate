@@ -12,12 +12,25 @@ import { useNavigate } from 'react-router-dom'
 import Projects from '../Projects/Projects'
 import Products from '../Products/Products'
 import Settings from '../Settings/Settings'
+import { useLocation } from 'react-router-dom'
 
 
 function App() {
 
   const [currentUser, setCurrentUser] = useState({})
   const navigate = useNavigate()
+  
+
+  /* ------------------------------------------------------------------------------------ */
+  /*                           this is the test for useLocation                           */
+  /* ------------------------------------------------------------------------------------ */
+
+  const location = useLocation()
+  console.log(location)
+
+  /* ------------------------------------------------------------------------------------ */
+  /*                           this is the test for useLocation                           */
+  /* ------------------------------------------------------------------------------------ */
 
   function handleLogin(email, password){
     if (users.some(user => {
@@ -42,7 +55,7 @@ function App() {
         <CurrentUserContext.Provider value={currentUser}>
         <Routes>
           <Route path='*' element={<PageNotFound />} />
-          <Route path='/' element={<LandingPage />} />
+          <Route path='/esti-mate' element={<LandingPage />} />
           <Route path='/dashboard' element={<Dashboard />}>
             <Route path='projects' element={<Projects />}/>
             <Route path='products' element={<Products />}/>
