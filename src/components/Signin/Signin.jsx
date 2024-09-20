@@ -20,7 +20,6 @@ export default function Signin({handleLogin}){
   function handleLoginSubmit(e){
     e.preventDefault()
     handleLogin(email, password)
-    resetInputs()
   }
 
   function handleEmailChange(e){
@@ -45,7 +44,7 @@ export default function Signin({handleLogin}){
         </label>
         <button type='submit' className="signin__button">Login</button>
       </form>
-      <p className="signin__signup-or-forgot-password">Don&apos;t have an account? <Link className='signup-link' to='/signup'>Sign up</Link></p>
+      <p className="signin__signup-or-forgot-password">Don&apos;t have an account? <Link className='signup-link' to='/signup'>Sign up.</Link></p>
       <Link className='forgotpw-link' to='/esti-mate'>Forgot password?</Link>
     </div>
     </>

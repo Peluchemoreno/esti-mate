@@ -1,8 +1,16 @@
 import './Projects.css'
 import search from '../../assets/icons/search-icon.svg'
 import ProjectRowData from '../ProjectRowData/ProjectRowData'
+import CurrentUserContext from '../../contexts/CurrentUserContext/CurrentUserContext'
+import CreateProjectModal from '../CreateProjectModal/CreateProjectModal'
+import { useContext, useEffect } from 'react'
+import { useState } from 'react'
 
-export default function Projects(){
+export default function Projects({closeModal, activeModal, setActiveModal}){
+
+  const currentUser = useContext(CurrentUserContext).currentUser;
+  const [projects, setProjects] = useState([])
+
 
   function getDate(){
     const date = new Date()
@@ -10,10 +18,22 @@ export default function Projects(){
     return currentDate
   }
 
+
+
+  function handleProjectSubmit(projectData){
+    setProjects([...projects, projectData])
+  }
+  
+
+  function openCreateProjectModal(){
+    setActiveModal('create-project')
+  }
+
+
   return (
     <div className='projects'>
       <header className="projects__header header">
-        <button className="header__create-project-button">Create Project</button>
+        <button onClick={openCreateProjectModal} className="header__create-project-button">Create Project</button>
         <label htmlFor="search-projects" className='search-projects-label'>
           <input id='search-projects' type="text" className="header__search-projects" placeholder='Search Projects'/>
           <button className="header__search-projects-button"><img className='search-icon' src={search} alt="search button" /></button>
@@ -28,18 +48,18 @@ export default function Projects(){
               </label>
               <span>Project Name</span>
             </th>
-            <th>Owner</th>
+            <th className='project__owner-column'>Owner</th>
             <th className='project__created-column'>Created</th>
           </tr>
         </thead>
         <tbody className="project__table-body">
-          <ProjectRowData projectName='Test Project 1' owner='Test Project Owner' created={getDate()}/>
-          <ProjectRowData projectName='Test Project 2' owner='Test Project Owner' created={getDate()}/>
-          <ProjectRowData projectName='Test Project 3' owner='Test Project Owner' created={getDate()}/>
-          <ProjectRowData projectName='Test Project 4' owner='Test Project Owner' created={getDate()}/>
-          <ProjectRowData projectName='Sheryl Margret' owner='Test Project Owner' created={getDate()}/>
+          {projects.map((project, index) => {
+            return (<ProjectRowData key={index} projectName={project} owner={`${currentUser?.firstName} ${currentUser?.lastName}`} created={(getDate())} />)
+          })}
+
         </tbody>
       </table>
+      <CreateProjectModal isOpen={activeModal === 'create-project'} closeModal={closeModal} handleProjectSubmit={handleProjectSubmit}/>
     </div>
   )
 }

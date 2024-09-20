@@ -28,7 +28,7 @@ export default function Signup(){
         </label>
         <button type='submit' className="signup__form-submit-button button">Sign up</button>
         <Link className='signup__form-back-link' to='/esti-mate'><button className="signup__form-back-button button">Back</button></Link>
-        <p className="signup__already-have-account">Already have an account? <Link className='signin__link' to='/signin'>Login</Link></p>
+        <p className="signup__already-have-account">Already have an account? <Link className='signin__link' to='/signin'>Login.</Link></p>
       </form>
     </div>
   )

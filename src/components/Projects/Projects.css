@@ -69,15 +69,14 @@
 }
 
 .project__table-owner-column {
-  text-align: center;
+  text-align: right;
 }
 
 .project__table-row {
   font-size: 14px;
 }
 
-.project__link {
-  text-decoration: none;
-  color: var(--white);
-  cursor: pointer;
+.project__owner-column {
+  text-align: right;
 }
+

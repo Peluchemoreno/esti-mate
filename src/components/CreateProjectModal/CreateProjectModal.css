@@ -1,0 +1,90 @@
+.modal {
+  background-color: rgba(255, 255, 255, 0.568);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  display: none;
+}
+
+.modal_visible {
+  background-color: rgba(255, 255, 255, 0.568);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-project-form {
+  position: absolute;
+  top: 10%;
+  width: 520px;
+  box-shadow: 0 0 5px black;
+}
+
+.create-project-form__header {
+  border-bottom: 1px solid  rgba(255, 255, 255, .2);
+}
+
+.project-name__input {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.create-project-form__footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, .2);
+}
+
+.create-project-form__body, .create-project-form__header {
+  padding: 20px
+}
+
+.create-project-form__footer {
+  padding: 10px;
+}
+
+.create-project-form__button_cancel, .create-project-form__button_create {
+  border: none;
+  border-radius: 5px;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color .2s ease;
+}
+
+.create-project-form__button_cancel {
+  border: 1px solid var(--white);
+  color: var(--white);
+}
+
+.create-project-form__button_create {
+  margin-left: 10px;
+  background-color: var(--blue-primary);
+  color: var(--white);
+}
+
+.create-project-form__button_create:hover, .create-project-form__button_cancel:hover {
+  background-color: var(--blue-secondary);
+}
+
+.create-project-form__header-text {
+  margin: 0;
+}
+
+.project-name__input {
+  color: var(--white);
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, .2);
+}

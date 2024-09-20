@@ -1,0 +1,10 @@
+.project__table-owner-column, .project__table-created-column {
+  color: rgba(223, 223, 223, 0.7);
+}
+
+.project__link {
+  text-decoration: none;
+  color: var(--white);
+  cursor: pointer;
+  font-weight: bold;
+}

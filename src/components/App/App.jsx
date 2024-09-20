@@ -12,30 +12,36 @@ import { useNavigate } from 'react-router-dom'
 import Projects from '../Projects/Projects'
 import Products from '../Products/Products'
 import Settings from '../Settings/Settings'
-import { useLocation } from 'react-router-dom'
 
 
 function App() {
 
   const [currentUser, setCurrentUser] = useState({})
+  const [activeModal, setActiveModal] = useState('')
   const navigate = useNavigate()
+
   
 
   function handleLogin(email, password){
-    if (users.some(user => {
+
+    let currentUser = users.find(user => {
       return user.email === email && user.password === password
-    })){
+    })
+    if (currentUser){
       setCurrentUser({
-        email,
-        password,
+       currentUser
       })
       navigate('/dashboard/projects')
       return
     } else {
-      console.error('incorrect email or password')
+      console.log(email, password)
+      window.alert('incorrect email or password')
     }
   }
 
+  function closeModal(){
+    setActiveModal('')
+  }
 
 
   return (
@@ -46,7 +52,7 @@ function App() {
           <Route path='*' element={<PageNotFound />} />
           <Route path='/esti-mate' element={<LandingPage />} />
           <Route path='/dashboard' element={<Dashboard />}>
-            <Route path='projects' element={<Projects />}/>
+            <Route path='projects' element={<Projects closeModal={closeModal} activeModal={activeModal} setActiveModal={setActiveModal}/>}/>
             <Route path='products' element={<Products />}/>
             <Route path='settings' element={<Settings />}/>
           </Route>
