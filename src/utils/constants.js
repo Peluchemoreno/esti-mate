@@ -16,6 +16,12 @@ export const users = [
     password: 'password123',
     firstName: "Justin",
     lastName: "Three"
+  }, 
+  {
+    email: 'tyler.smith@fakeemail.com',
+    password: 'password123',
+    firstName: 'Tyler',
+    lastName: 'Smith'
   }
 ]
 
