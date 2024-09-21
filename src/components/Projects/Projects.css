@@ -80,3 +80,6 @@
   text-align: right;
 }
 
+.project__table-body_no-projects {
+  text-align: right;
+}

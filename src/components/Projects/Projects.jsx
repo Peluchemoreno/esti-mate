@@ -53,9 +53,10 @@ export default function Projects({closeModal, activeModal, setActiveModal}){
           </tr>
         </thead>
         <tbody className="project__table-body">
-          {projects.map((project, index) => {
+          {projects.length === 0 ? <tr className='project__table-body_no-projects'><td>You don&apos;t have any projects.</td></tr> : projects.map((project, index) => {
             return (<ProjectRowData key={index} projectName={project} owner={`${currentUser?.firstName} ${currentUser?.lastName}`} created={(getDate())} />)
           })}
+          
 
         </tbody>
       </table>

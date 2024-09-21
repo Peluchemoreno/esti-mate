@@ -19,7 +19,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 1;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -87,4 +87,104 @@
   color: var(--white);
   padding: 5px;
   border: 1px solid rgba(255, 255, 255, .2);
+}
+
+.create-project-form__project-info {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding-bottom: 20px;
+  font-size: 14px;
+}
+
+.create-project-form__title {
+  font-weight: bold;
+}
+
+.create-project-form__drop-down-icon {
+  width: 20px;
+  cursor: pointer;
+  margin-left: 10px;
+  transform: rotate(0deg);
+  transition: transform .2s ease;
+}
+
+.create-project-form__drop-down-icon_flipped {
+  width: 20px;
+  cursor: pointer;
+  margin-left: 10px;
+  transform: rotate(-180deg);
+  transition: transform .2s ease;
+}
+
+.create-project-form__body_extended {
+  max-height: 700px;
+  padding: 0 20px;
+}
+
+.create-project-form__body_not-extended {
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 20px;
+}
+
+.create-project-form__body {
+  transition: max-height .2s ease;
+}
+
+.create-project-form__client-details {
+  margin: 0;
+  margin-bottom: 20px;
+  margin-top: 20px;
+  font-size: 15px;
+}
+
+.create-project-form__client-details-input_name {
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+.create-project-form__input {
+  border: 1px solid rgba(255, 255, 255, .2);
+  padding: 5px;
+  color: var(--white);
+  margin-top: 5px;
+}
+
+.create-project-form__client-details-input_address-street {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.create-project__label {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.client-details__address-separator{
+  display: flex;
+  gap: 10px;
+}
+
+.create-project-form__client-details-input_address-city, .create-project-form__client-details-input_address-county, .create-project-form__client-details-input_address-state, .create-project-form__client-details-input_address-zip {
+  flex-grow: 1;
+  margin-bottom: 10px;
+}
+
+.create-project-form__client-details-input_phone-primary, .create-project-form__client-details-input_phone-alternate, .create-project-form__client-details-input_email {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.client-details__bottom-margin {
+  margin-bottom: 20px;
+}
+
+.create-project-form__client-details-input_phone-alternate {
+  margin-bottom: 30px;
+}
+
+.create-project-form__client-details-input_email {
+  margin-bottom: 30px;
 }
