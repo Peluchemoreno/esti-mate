@@ -4,12 +4,16 @@ import ProjectRowData from '../ProjectRowData/ProjectRowData'
 import CurrentUserContext from '../../contexts/CurrentUserContext/CurrentUserContext'
 import CreateProjectModal from '../CreateProjectModal/CreateProjectModal'
 import { useContext, useEffect } from 'react'
-import { useState } from 'react'
+import {getProjects} from '../../utils/auth'
 
-export default function Projects({closeModal, activeModal, setActiveModal}){
+export default function Projects({closeModal, activeModal, setActiveModal, handleCreateProjectSubmit, projects}){
 
   const currentUser = useContext(CurrentUserContext).currentUser;
-  const [projects, setProjects] = useState([])
+
+  useEffect(()=>{
+    const token = localStorage.getItem('jwt')
+    getProjects(token)
+  }, [activeModal])
 
 
   function getDate(){
@@ -18,11 +22,6 @@ export default function Projects({closeModal, activeModal, setActiveModal}){
     return currentDate
   }
 
-
-
-  function handleProjectSubmit(projectData){
-    setProjects([...projects, projectData])
-  }
   
 
   function openCreateProjectModal(){
@@ -53,14 +52,14 @@ export default function Projects({closeModal, activeModal, setActiveModal}){
           </tr>
         </thead>
         <tbody className="project__table-body">
-          {projects.length === 0 ? <tr className='project__table-body_no-projects'><td>You don&apos;t have any projects.</td></tr> : projects.map((project, index) => {
-            return (<ProjectRowData key={index} projectName={project} owner={`${currentUser?.firstName} ${currentUser?.lastName}`} created={(getDate())} />)
+          {projects.length === 0 ? <tr className='project__table-body_no-projects'><td>You don&apos;t have any projects.</td></tr> : projects.map((project) => {
+            return (<ProjectRowData key={project._id} project={project} owner={`${currentUser?.firstName} ${currentUser?.lastName}`} created={(getDate())}/>)
           })}
           
 
         </tbody>
       </table>
-      <CreateProjectModal isOpen={activeModal === 'create-project'} closeModal={closeModal} handleProjectSubmit={handleProjectSubmit}/>
+      <CreateProjectModal isOpen={activeModal === 'create-project'} closeModal={closeModal} handleCreateProjectSubmitClick={handleCreateProjectSubmit}/>
     </div>
   )
 }

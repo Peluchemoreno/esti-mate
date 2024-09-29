@@ -23,6 +23,7 @@
   color: var(--white);
   font-size: 15px;
   margin-right: 50px;
+  cursor: pointer;
 }
 
 .dashboard__links {

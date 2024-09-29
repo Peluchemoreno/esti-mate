@@ -6,42 +6,78 @@ import Signup from '../Signup/Signup'
 import PageNotFound from '../PageNotFound/PageNotFound'
 import { Routes, Route } from 'react-router-dom'
 import CurrentUserContext from '../../contexts/CurrentUserContext/CurrentUserContext'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {users} from '../../utils/constants'
+import {signin, getUser, createProject, getProjects} from '../../utils/auth'
 import { useNavigate } from 'react-router-dom'
 import Projects from '../Projects/Projects'
 import Products from '../Products/Products'
 import Settings from '../Settings/Settings'
+import Project from '../Project/Project'
 
 
 function App() {
 
   const [currentUser, setCurrentUser] = useState({})
   const [activeModal, setActiveModal] = useState('')
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [projects, setProjects] = useState([])
   const navigate = useNavigate()
 
   
 
-  function handleLogin(email, password){
-
-    let currentUser = users.find(user => {
-      return user.email === email && user.password === password
-    })
-    if (currentUser){
-      setCurrentUser({
-       currentUser
-      })
-      navigate('/dashboard/projects')
+  useEffect(()=>{
+    const token = localStorage.getItem('jwt')
+    if (!token){
       return
-    } else {
-      console.log(email, password)
-      window.alert('incorrect email or password')
     }
+    getUser(token)
+    .then(user => {
+      setCurrentUser(user)
+    }).catch((err) => {
+      console.error(err)
+    })
+
+  }, [])
+
+  useEffect(()=>{
+    const token = localStorage.getItem('jwt')
+    getProjects(token).then(projectArray => {
+      const reverseOrderArray = projectArray.projects.reverse()
+      setProjects([...reverseOrderArray])
+    })
+  }, [])
+
+  function handleLogin(email, password){
+    signin(email, password)
+    .then(data => {
+      getUser(data.token)
+      .then(user => {
+        setCurrentUser(user)
+        navigate('/dashboard/projects')
+      })
+    }).catch(err => {
+      console.error(err)
+    })
+  }
+
+  function handleLogOut(){
+    localStorage.clear()
+  }
+
+  function handleCreateProjectSubmit(projectData){
+    const token = localStorage.getItem('jwt')
+    createProject(projectData, token).
+    then(data => {
+      setProjects([data.data, ...projects])
+    })
   }
 
   function closeModal(){
     setActiveModal('')
   }
+
+  
 
 
   return (
@@ -51,8 +87,9 @@ function App() {
         <Routes>
           <Route path='*' element={<PageNotFound />} />
           <Route path='/esti-mate' element={<LandingPage />} />
-          <Route path='/dashboard' element={<Dashboard />}>
-            <Route path='projects' element={<Projects closeModal={closeModal} activeModal={activeModal} setActiveModal={setActiveModal}/>}/>
+          <Route path='/dashboard' element={<Dashboard handleLogOut={handleLogOut} />}>
+            <Route path='projects' element={<Projects closeModal={closeModal} activeModal={activeModal} setActiveModal={setActiveModal} handleCreateProjectSubmit={handleCreateProjectSubmit} projects={projects}/>}/>
+            <Route path='projects/:projectId' element={<Project projects={projects}/>} />
             <Route path='products' element={<Products />}/>
             <Route path='settings' element={<Settings />}/>
           </Route>

@@ -6,9 +6,8 @@ import { Link, Outlet } from "react-router-dom";
 import dropdown from '../../assets/icons/drop-down.svg'
 import { useNavigate } from "react-router-dom";
 
-export default function Dashboard() {
-  const currentUser = useContext(CurrentUserContext).currentUser;
-
+export default function Dashboard({handleLogOut}) {
+  const currentUser = useContext(CurrentUserContext);
 
   const navigator = useNavigate()
 
@@ -33,7 +32,10 @@ export default function Dashboard() {
             Settings
           </Link>
         </div>
-        <div className="dashboard__account-link" onClick={navigateToLandingPage}>
+        <div className="dashboard__account-link" onClick={()=>{
+          handleLogOut()
+          navigateToLandingPage()
+        }}>
           <p className="dashboard__account-email">{currentUser?.email}</p>
           <img src={dropdown} alt="drop-down" className="dashboard__drop-down-icon" />
         </div>

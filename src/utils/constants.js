@@ -25,3 +25,14 @@ export const users = [
   }
 ]
 
+export const BASE_URL = 'http://127.0.0.1:4000/'
+
+export function processServerResponse(res) {
+  if (res.ok) {
+    return res.json();
+  } else {
+    return Promise.reject((error) => {
+      console.error(error);
+    });
+  }
+}
