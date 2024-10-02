@@ -6,14 +6,16 @@ import CreateProjectModal from '../CreateProjectModal/CreateProjectModal'
 import { useContext, useEffect } from 'react'
 import {getProjects} from '../../utils/auth'
 
-export default function Projects({closeModal, activeModal, setActiveModal, handleCreateProjectSubmit, projects}){
+export default function Projects({closeModal, activeModal, setActiveModal, handleCreateProjectSubmit, projects, setProjects}){
 
   const currentUser = useContext(CurrentUserContext).currentUser;
-
   useEffect(()=>{
     const token = localStorage.getItem('jwt')
-    getProjects(token)
-  }, [activeModal])
+    getProjects(token).then(data => {
+      const reverseOrderArray = data.projects.reverse()
+      setProjects(reverseOrderArray)
+    })
+  }, [])
 
 
   function getDate(){
@@ -53,7 +55,7 @@ export default function Projects({closeModal, activeModal, setActiveModal, handl
         </thead>
         <tbody className="project__table-body">
           {projects.length === 0 ? <tr className='project__table-body_no-projects'><td>You don&apos;t have any projects.</td></tr> : projects.map((project) => {
-            return (<ProjectRowData key={project._id} project={project} owner={`${currentUser?.firstName} ${currentUser?.lastName}`} created={(getDate())}/>)
+            return (<ProjectRowData key={project._id} project={project} owner={`${project.createdBy}`} created={project.createdAt}/>)
           })}
           
 

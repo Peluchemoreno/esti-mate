@@ -34,19 +34,20 @@ function App() {
     getUser(token)
     .then(user => {
       setCurrentUser(user)
+      getProjects(token).then(projectArray => {
+        if (!projectArray){
+          setProjects([])
+          return 
+        } else {
+        const reverseOrderArray = projectArray.projects.reverse()
+        setProjects([...reverseOrderArray])
+        }
+      })
     }).catch((err) => {
       console.error(err)
     })
-
   }, [])
 
-  useEffect(()=>{
-    const token = localStorage.getItem('jwt')
-    getProjects(token).then(projectArray => {
-      const reverseOrderArray = projectArray.projects.reverse()
-      setProjects([...reverseOrderArray])
-    })
-  }, [])
 
   function handleLogin(email, password){
     signin(email, password)
@@ -63,6 +64,7 @@ function App() {
 
   function handleLogOut(){
     localStorage.clear()
+    setCurrentUser({})
   }
 
   function handleCreateProjectSubmit(projectData){
@@ -88,7 +90,7 @@ function App() {
           <Route path='*' element={<PageNotFound />} />
           <Route path='/esti-mate' element={<LandingPage />} />
           <Route path='/dashboard' element={<Dashboard handleLogOut={handleLogOut} />}>
-            <Route path='projects' element={<Projects closeModal={closeModal} activeModal={activeModal} setActiveModal={setActiveModal} handleCreateProjectSubmit={handleCreateProjectSubmit} projects={projects}/>}/>
+            <Route path='projects' element={<Projects closeModal={closeModal} activeModal={activeModal} setActiveModal={setActiveModal} handleCreateProjectSubmit={handleCreateProjectSubmit} projects={projects} setProjects={setProjects}/>}/>
             <Route path='projects/:projectId' element={<Project projects={projects}/>} />
             <Route path='products' element={<Products />}/>
             <Route path='settings' element={<Settings />}/>

@@ -9,7 +9,6 @@ export default function Project({ projects }) {
     return item._id === projectId;
   })[0];
 
-  console.log(project)
   return (
     <>
       <div>this is project <span style={{
