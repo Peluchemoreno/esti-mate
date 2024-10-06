@@ -33,6 +33,16 @@ export default function Diagram({ activeModal, closeModal }) {
 
   function logPosition(e) {}
 
+  function makeCircle(e){
+    const canvas = ref.current;
+    const context = canvas?.getContext('2d')
+    context.moveTo(e.pageX, e.pageY)
+    context.arc(e.pageX, e.pageY, 10, 0, 2 * Math.PI)
+    context.fillStyle = 'black'
+    context.fill()
+
+  }
+
 
   function clearCanvas(){
     const canvas = ref.current;
@@ -62,6 +72,7 @@ export default function Diagram({ activeModal, closeModal }) {
         ref={ref}
         onLoad={()=>{console.log('loaded')}}
         onMouseMoveCapture={logPosition}
+        onClick={makeCircle}
         className="diagram__canvas"
       ></canvas>
     </div>
