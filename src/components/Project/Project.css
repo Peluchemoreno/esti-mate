@@ -1,0 +1,65 @@
+.project {
+  /* border: 1px solid blue; */
+}
+
+.project__header{
+  background-color: transparent;
+  height: 65px;
+  display: flex;
+  align-items: center;
+  padding: 0 25px;
+  border-bottom: 1px solid var(--white);
+}
+
+.project__header-title {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.project__back-icon {
+  width: 20px;
+  cursor: pointer;
+  margin-right: 5px;
+}
+
+.project__body {
+  
+}
+
+.project__body-horizontal-spacer {
+  border-bottom: 1px solid var(--white);
+  margin-top: 20px;
+}
+
+.project__body-create-estimate-section {
+  margin: 0 auto;
+  max-width: 80vw;
+}
+
+
+.create-button {
+  width: 100%;
+  padding: 40px;
+  color: var(--white);
+  font-size: 24px;
+  margin-top: 20px;
+  border: 1px dashed var(--white);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color .2s ease, border .2s ease;
+}
+
+.create-button:hover {
+  background-color: var(--blue-primary);
+}
+
+.project__body-create-diagram-button {
+  margin-top: 0;
+  border: 1px solid var(--white);
+}
+
+.project__body-diagram-header {
+  margin: 30px 0;
+  font-size: 16px;
+}

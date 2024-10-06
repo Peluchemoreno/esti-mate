@@ -14,7 +14,7 @@ export default function ProjectRowData({project, created}) {
         <label className="project__select-checkbox checkbox">
           <input type="checkbox" name="select-project" id="selectProject" />
         </label>
-        <span><Link className="project__link" to={`${project._id}`}>{project.projectName}</Link></span>
+        <span><Link className="project__link" to={`${project._id}`}>{project.projectName.toUpperCase()}</Link></span>
       </td>
       <td className="project__table-owner-column">{currentUser.name}</td>
       <td className="project__table-created-column">{created}</td>

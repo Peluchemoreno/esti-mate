@@ -29,7 +29,8 @@
 .signup__logo, .signup__logo-link {
   width: 100px;
   position: absolute;
-  top: 0;
+  top: 5px;
+  left: 10px;
 }
 
 .signup__header {

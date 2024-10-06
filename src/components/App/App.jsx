@@ -6,7 +6,7 @@ import Signup from '../Signup/Signup'
 import PageNotFound from '../PageNotFound/PageNotFound'
 import { Routes, Route } from 'react-router-dom'
 import CurrentUserContext from '../../contexts/CurrentUserContext/CurrentUserContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, act } from 'react'
 import {users} from '../../utils/constants'
 import {signin, getUser, createProject, getProjects} from '../../utils/auth'
 import { useNavigate } from 'react-router-dom'
@@ -14,6 +14,7 @@ import Projects from '../Projects/Projects'
 import Products from '../Products/Products'
 import Settings from '../Settings/Settings'
 import Project from '../Project/Project'
+import Diagram from '../Diagram/Diagram'
 
 
 function App() {
@@ -91,7 +92,7 @@ function App() {
           <Route path='/esti-mate' element={<LandingPage />} />
           <Route path='/dashboard' element={<Dashboard handleLogOut={handleLogOut} />}>
             <Route path='projects' element={<Projects closeModal={closeModal} activeModal={activeModal} setActiveModal={setActiveModal} handleCreateProjectSubmit={handleCreateProjectSubmit} projects={projects} setProjects={setProjects}/>}/>
-            <Route path='projects/:projectId' element={<Project projects={projects}/>} />
+            <Route path='projects/:projectId' element={<Project activeModal={activeModal} setActiveModal={setActiveModal} projects={projects}/>} />
             <Route path='products' element={<Products />}/>
             <Route path='settings' element={<Settings />}/>
           </Route>
@@ -99,6 +100,7 @@ function App() {
           <Route path='/signup' element={<Signup />} />
         </Routes>
         </CurrentUserContext.Provider>
+        <Diagram activeModal={activeModal} closeModal={closeModal}/>
       </div>
     </>
   )
