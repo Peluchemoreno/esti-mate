@@ -3,6 +3,7 @@
   margin: 0 auto;
   color: var(--white);
   position: relative;
+  background-color: var(--black);
 }
 
 .accent {

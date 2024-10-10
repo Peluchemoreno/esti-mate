@@ -7,6 +7,14 @@
 }
 
 * {
-  background-color: var(--black);
+  
   font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+}
+
+html {
+  background-color: var(--black);
+}
+
+input {
+  background-color: var(--black);
 }

@@ -1,56 +1,59 @@
 import "./Diagram.css";
 import closeIcon from "../../assets/icons/close.svg";
-import { useEffect, useRef } from "react";
+import saveIcon from '../../assets/icons/check.svg';
+import trashIcon from '../../assets/icons/trash.svg'
+import { useEffect, useRef, useState } from "react";
 
 export default function Diagram({ activeModal, closeModal }) {
   const ref = useRef()
+  
+  const [paths, setPaths] = useState([])
 
-  function drawGrid(context){
-    clearCanvas()
+  function drawGrid(){
     const canvas = ref.current;
+    const context = canvas?.getContext('2d' ,{willReadFrequently: true })
     const canvasWidth = canvas?.clientWidth;
-    const canvasHeight = canvas?.clientHeight;
+    const canvasHeight = window.innerHeight;
+
     
     for (let x = 0; x <= canvasWidth; x += 12) {
-      context.fillStyle = '#c2c2c2'
       context.moveTo(x, 0);
       context.lineTo(x, canvasHeight);
     }
-
+    
     for (let y = 0; y <= canvasHeight; y += 12) {
       context.moveTo(0, y);
       context.lineTo(canvasWidth, y);
     }
-    context.stroke()
+    context.fillStyle = '#dfdfdf'
+    context.fillRect(0, 0, canvasWidth, canvasHeight)
   }
   
-  
   useEffect(()=>{
-    const canvas = ref.current;
-    const context = canvas?.getContext('2d')
-    drawGrid(context)
+    drawGrid()
+    console.log('drawing grid')
   }, [])
-
-  function logPosition(e) {}
+  
 
   function makeCircle(e){
     const canvas = ref.current;
-    const context = canvas?.getContext('2d')
+    const context = canvas?.getContext('2d' ,{willReadFrequently: true })
+    context.beginPath()
     context.moveTo(e.pageX, e.pageY)
-    context.arc(e.pageX, e.pageY, 10, 0, 2 * Math.PI)
+    context.arc(e.pageX, e.pageY, 5, 0, 2 * Math.PI)
     context.fillStyle = 'black'
     context.fill()
-
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+    setPaths([...paths, imageData])
   }
 
 
   function clearCanvas(){
     const canvas = ref.current;
-    const context = canvas?.getContext('2d')
-    context.clearRect(0,0,context.canvas.width, context.canvas.height)
-    console.log('clear')
+    const context = canvas?.getContext('2d' ,{willReadFrequently: true })
+    context.clearRect(0,0,canvas.width, canvas.height)
+    setPaths([])
   }
-
 
   return (
     <div
@@ -58,22 +61,29 @@ export default function Diagram({ activeModal, closeModal }) {
         activeModal === "diagram" ? "diagram diagram_visible" : "diagram"
       }
     >
-      <img
-        onClick={()=>{
-          closeModal();
-        }}
-        src={closeIcon}
-        alt="close diagram"
-        className="diagram__close"
-      />
+      <div className="diagram__tools">
+        <img
+          onClick={()=>{
+            closeModal();
+          }}
+          src={closeIcon}
+          alt="close diagram"
+          className="diagram__close diagram__icon"
+        />
+        <img src={saveIcon} alt="save digram" className="diagram__icon diagram__save" onClick={()=>{
+          console.log('saving diagram')
+        }}/>
+        <img src={trashIcon} alt="clear diagram" className="diagram__icon diagram__trash" onClick={clearCanvas} />
+      </div>
+      
       <canvas
         width={window.innerWidth}
         height={window.innerHeight}
         ref={ref}
-        onLoad={()=>{console.log('loaded')}}
-        onMouseMoveCapture={logPosition}
-        onClick={makeCircle}
         className="diagram__canvas"
+        onPointerDown={(e)=>{
+          console.log(e.pageX, e.pageY)
+        }}
       ></canvas>
     </div>
   );

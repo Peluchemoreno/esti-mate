@@ -1,0 +1,11 @@
+.css-1l08p1r-MuiDataGrid-root .MuiDataGrid-container--top [role=row], .css-1l08p1r-MuiDataGrid-root .MuiDataGrid-container--bottom [role=row] {
+  background: transparent !important;
+}
+
+path {
+  fill: var(--white);
+}
+
+.css-19ewyh7-MuiTablePagination-root{
+  color: var(--white) !important;
+}

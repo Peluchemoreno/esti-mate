@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import backIcon from "../../assets/icons/back.svg"
 import { useNavigate } from "react-router-dom";
 
-export default function Project({ projects, activeModal, setActiveModal }) {
+export default function Project({ projects, setActiveModal }) {
   const params = useParams();
   const projectId = params.projectId;
 
