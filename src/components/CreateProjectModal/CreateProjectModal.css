@@ -30,6 +30,7 @@
   top: 10%;
   width: 520px;
   box-shadow: 0 0 5px black;
+  background-color: var(--black);
 }
 
 .create-project-form__header {
@@ -67,6 +68,7 @@
 .create-project-form__button_cancel {
   border: 1px solid var(--white);
   color: var(--white);
+  background-color: transparent;
 }
 
 .create-project-form__button_create {

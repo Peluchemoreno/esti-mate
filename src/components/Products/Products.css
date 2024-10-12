@@ -9,3 +9,25 @@ path {
 .css-19ewyh7-MuiTablePagination-root{
   color: var(--white) !important;
 }
+
+.products__header-title{
+  margin: 10px 0;
+  padding-left: 15px;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.products__add-product-button {
+  margin-left: 15px;
+  border: 1px solid var(--white);
+  background-color: transparent;
+  color: var(--white);
+  padding: 5px 20px;
+  border-radius: 5px;
+  transition: background-color .2s ease;
+  cursor: pointer;
+}
+
+.products__add-product-button:hover {
+  background-color: var(--blue-primary);
+}

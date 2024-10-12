@@ -18,14 +18,6 @@ export default function Projects({closeModal, activeModal, setActiveModal, handl
   }, [])
 
 
-  // function getDate(){
-  //   const date = new Date
-  //   const currentDate = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
-  //   return currentDate
-  // }
-
-  
-
   function openCreateProjectModal(){
     setActiveModal('create-project')
   }
@@ -55,7 +47,7 @@ export default function Projects({closeModal, activeModal, setActiveModal, handl
         </thead>
         <tbody className="project__table-body">
           {projects.length === 0 ? <tr className='project__table-body_no-projects'><td>You don&apos;t have any projects.</td></tr> : projects.map((project) => {
-            return (<ProjectRowData key={project._id} project={project} owner={`${project.createdBy}`} created={project.createdAt}/>)
+            return (<ProjectRowData key={project._id} project={project} owner={`${project.createdBy}`} created={project.createdAt.replace(/T.+/g, '')}/>)
           })}
           
 
