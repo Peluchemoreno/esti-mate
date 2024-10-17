@@ -37,3 +37,64 @@ export function processServerResponse(res) {
     });
   }
 }
+
+/* ------------------------------------------------------------------------------------ */
+/*                                    grid utility functions                                    */
+/* ------------------------------------------------------------------------------------ */
+
+const topHorizontalLineCoords = {x1: 0, y1: 0, x2: 500, y2: 0}
+const leftVerticalLineCoords = {x1: 0, y1: 0, x2: 0, y2: 500}
+
+// coordinates of the start point of line 1 (x1_1, y1_1)
+// coordinates of the end point of line 1 (x1_2, y1_2)
+
+// coordinates of the start point of line 2 (x2_1, y2_1)
+// coordinates of the end point of line 2 (x2_2, y2_2)
+
+
+export function areLinesParallel([x1_1, y1_1],[x1_2, y1_2],[x2_1, y2_1],[x2_2, y2_2]){
+  if (isLineVertical(x1_1, x1_2) && isLineVertical(x2_1, x2_2)){
+    return true
+  }
+
+  if (isLineHorizontal(y1_1, y1_2) && isLineHorizontal(y2_1, y2_2)){
+    return true
+  }
+
+  const slope1 = (y1_2 - y1_1) / (x1_2 - x1_1);
+  const slope2 = (y2_2 - y2_1) / (x2_2 - x2_1);
+  return slope1 === slope2;
+}
+
+export function isLineParallelToTop(x1, y1, x2, y2){
+  const answer = areLinesParallel([topHorizontalLineCoords.x1, topHorizontalLineCoords.y1],[topHorizontalLineCoords.x2, topHorizontalLineCoords.y2], [x1, y1], [x2, y2])
+  if (answer === true){
+    console.log('this line IS parallel to top')
+  } else {
+    console.log('this line is NOT parallel to top')
+  }
+}
+
+export function isLineParallelToSide(x1, y1, x2, y2){
+  const answer = areLinesParallel([leftVerticalLineCoords.x1, leftVerticalLineCoords.y1],[leftVerticalLineCoords.x2, leftVerticalLineCoords.y2], [x1, y1], [x2, y2])
+
+  if (answer === true){
+    console.log('this line IS parallel to side')
+  } else {
+    console.log('this line is NOT parallel to side')
+  }
+}
+
+export function calculateDistance([x1, y1], [x2, y2]){
+  const solution = Math.round(Math.sqrt((x2 - x1)**2+(y2 - y1)**2))
+  return solution
+}
+
+
+function isLineHorizontal(y1, y2){
+  return y1 === y2
+}
+
+function isLineVertical(x1, x2){
+  return x1 === x2
+}
