@@ -26,6 +26,7 @@
   visibility: visible;
   opacity: 1;
   transition: opacity .2s ease, visibility .2s ease;
+  position: absolute;
 }
 
 .diagram__tools{
@@ -40,6 +41,7 @@
   align-items: center;
   gap: 10px;
   padding-top: 5px;
+  user-select: none;
 }
 
 .diagram__close {
@@ -58,7 +60,24 @@
 }
 
 .diagram__trash {
-  background-color: rgb(253, 89, 89);
+  /* background-color: rgb(253, 89, 89); */
+  border: 2px solid var(--black);
   position: absolute;
   bottom: 10px;
+}
+
+.diagram__items {
+  /* background-color: rgb(228, 203, 93); */
+  padding: 3px;
+  border: 2px solid var(--black);
+}
+
+.diagram__line-length-display {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  border: 1px solid black;
+  color: black;
+  padding: 2px 5px;
+  user-select: none;
 }

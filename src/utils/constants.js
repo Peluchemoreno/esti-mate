@@ -24,8 +24,9 @@ export const users = [
     lastName: 'Smith'
   }
 ]
-
-export const BASE_URL = 'http://127.0.0.1:4000/'
+// when testing the app on the network and not on local host run the second baseUrl
+// export const BASE_URL = 'http://127.0.0.1:4000/'
+export const BASE_URL = 'http://192.168.1.212:4000/'
 
 export function processServerResponse(res) {
   if (res.ok) {

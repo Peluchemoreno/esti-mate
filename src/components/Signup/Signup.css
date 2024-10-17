@@ -54,6 +54,7 @@
 .signup__form-back-button {
   margin-bottom: 0;
   border: 1px solid var(--white);
+  background-color: transparent;
 }
 
 .signup__form-submit-button {

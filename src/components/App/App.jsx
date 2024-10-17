@@ -100,7 +100,8 @@ function App() {
           <Route path='/signup' element={<Signup />} />
         </Routes>
         </CurrentUserContext.Provider>
-        <Diagram activeModal={activeModal} closeModal={closeModal}/>
+        {/* <Diagram activeModal={activeModal} closeModal={closeModal}/> */}
+        <Diagram activeModal={activeModal} closeModal={closeModal} />
       </div>
     </>
   )

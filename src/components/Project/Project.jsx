@@ -6,11 +6,13 @@ import { useNavigate } from "react-router-dom";
 export default function Project({ projects, setActiveModal }) {
   const params = useParams();
   const projectId = params.projectId;
+  
 
   const project = projects.filter((item) => {
     return item._id === projectId;
   })[0];
 
+  console.log(project)
   const navigator = useNavigate()
 
   function openDiagramModal(){
