@@ -68,21 +68,12 @@ export function areLinesParallel([x1_1, y1_1],[x1_2, y1_2],[x2_1, y2_1],[x2_2, y
 
 export function isLineParallelToTop(x1, y1, x2, y2){
   const answer = areLinesParallel([topHorizontalLineCoords.x1, topHorizontalLineCoords.y1],[topHorizontalLineCoords.x2, topHorizontalLineCoords.y2], [x1, y1], [x2, y2])
-  if (answer === true){
-    console.log('this line IS parallel to top')
-  } else {
-    console.log('this line is NOT parallel to top')
-  }
+  return answer
 }
 
 export function isLineParallelToSide(x1, y1, x2, y2){
   const answer = areLinesParallel([leftVerticalLineCoords.x1, leftVerticalLineCoords.y1],[leftVerticalLineCoords.x2, leftVerticalLineCoords.y2], [x1, y1], [x2, y2])
-
-  if (answer === true){
-    console.log('this line IS parallel to side')
-  } else {
-    console.log('this line is NOT parallel to side')
-  }
+  return answer
 }
 
 export function calculateDistance([x1, y1], [x2, y2]){

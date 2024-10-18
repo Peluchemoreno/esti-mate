@@ -20,6 +20,9 @@ const Diagram = ({ activeModal, closeModal }) => {
     startY: 0,
     endX: 0,
     endY: 0,
+    isHorizontal: false,
+    isVertical: false,
+    isSelected: false
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
   const [lineLength, setLineLength] = useState(0);
@@ -80,6 +83,9 @@ const Diagram = ({ activeModal, closeModal }) => {
       startY: snapNumberToGrid(offsetY),
       endX: snapNumberToGrid(offsetX),
       endY: snapNumberToGrid(offsetY),
+      isVertical: false,
+      isHorizontal: false,
+      isSelected: false,
     });
     setIsDrawing(true);
   }
@@ -100,24 +106,26 @@ const Diagram = ({ activeModal, closeModal }) => {
   }
 
   // Stop drawing on mouseup
+    // to do:
+      // place measurement on diagram near it's line
+
   function handleMouseUp() {
+    const {startX, startY, endX, endY} = currentLine
     if (isDrawing) {
+      if (isLineParallelToSide(startX, startY, endX, endY)){
+        currentLine.isVertical = true
+        currentLine.isHorizontal = false
+      } else if (isLineParallelToTop(startX, startY, endX, endY)){
+        currentLine.isHorizontal = true
+        currentLine.isVertical = false
+      } else {
+        currentLine.isVertical = false
+        currentLine.isHorizontal = false
+      }
       setLines([...lines, currentLine]); // Save the current line
     }
     console.log(lineLength);
-
-    isLineParallelToTop(
-      currentLine.startX,
-      currentLine.startY,
-      currentLine.endX,
-      currentLine.endY
-    );
-    isLineParallelToSide(
-      currentLine.startX,
-      currentLine.startY,
-      currentLine.endX,
-      currentLine.endY
-    );
+    console.log(currentLine)
     setIsDrawing(false);
   }
 
