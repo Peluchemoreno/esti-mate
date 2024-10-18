@@ -10,7 +10,25 @@ import {
   calculateDistance,
 } from "../../utils/constants";
 
-const Diagram = ({ activeModal, closeModal }) => {
+const Diagram = ({ activeModal, closeModal}) => {
+
+/* ------------------------------------------------------------------------------------ */
+/*                               disable pinch zoom for ios                             */
+/* ------------------------------------------------------------------------------------ */
+  useEffect(() => {
+    function preventZoom(e) {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+  
+    document.addEventListener("touchmove", preventZoom, { passive: false });
+  
+    return () => {
+      document.removeEventListener("touchmove", preventZoom);
+    };
+  }, []);
+
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState("line");

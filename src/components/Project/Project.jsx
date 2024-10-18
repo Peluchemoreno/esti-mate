@@ -2,10 +2,13 @@ import "./Project.css";
 import { useParams } from "react-router-dom";
 import backIcon from "../../assets/icons/back.svg"
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
-export default function Project({ projects, setActiveModal }) {
+export default function Project({ projects, setActiveModal, setDiagramActive }) {
+  console.log(setDiagramActive)
   const params = useParams();
   const projectId = params.projectId;
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 650)
   
 
   const project = projects.filter((item) => {
@@ -16,6 +19,9 @@ export default function Project({ projects, setActiveModal }) {
   const navigator = useNavigate()
 
   function openDiagramModal(){
+    if (isMobile){
+      setDiagramActive(true)
+    }
     setActiveModal('diagram')
   }
 

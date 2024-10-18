@@ -15,6 +15,7 @@ import Products from '../Products/Products'
 import Settings from '../Settings/Settings'
 import Project from '../Project/Project'
 import Diagram from '../Diagram/Diagram'
+import DisablePullToRefresh from '../DisablePullToRefresh/DisablePullToRefresh'
 
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [projects, setProjects] = useState([])
   const navigate = useNavigate()
+  const [diagramActive, setDiagramActive] = useState(false)
 
   
 
@@ -92,7 +94,7 @@ function App() {
           <Route path='/esti-mate' element={<LandingPage />} />
           <Route path='/dashboard' element={<Dashboard handleLogOut={handleLogOut} />}>
             <Route path='projects' element={<Projects closeModal={closeModal} activeModal={activeModal} setActiveModal={setActiveModal} handleCreateProjectSubmit={handleCreateProjectSubmit} projects={projects} setProjects={setProjects}/>}/>
-            <Route path='projects/:projectId' element={<Project activeModal={activeModal} setActiveModal={setActiveModal} projects={projects}/>} />
+            <Route path='projects/:projectId' element={<Project activeModal={activeModal} setActiveModal={setActiveModal} projects={projects} setDiagramActive={setDiagramActive}/>} />
             <Route path='products' element={<Products />}/>
             <Route path='settings' element={<Settings />}/>
           </Route>
@@ -101,7 +103,16 @@ function App() {
         </Routes>
         </CurrentUserContext.Provider>
         {/* <Diagram activeModal={activeModal} closeModal={closeModal}/> */}
-        <Diagram activeModal={activeModal} closeModal={closeModal} />
+        <>
+          {diagramActive ? 
+          <>
+            <DisablePullToRefresh />
+            <Diagram activeModal={activeModal} closeModal={closeModal} />
+          </>
+          :
+            <Diagram activeModal={activeModal} closeModal={closeModal} />
+          }
+        </>
       </div>
     </>
   )
