@@ -39,7 +39,8 @@
   padding: 5px;
   font-size: 14px;
   border: 1px solid var(--white);
-}
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;}
 
 .search-projects-label {
   display: flex;
@@ -82,4 +83,21 @@
 
 .project__table-body_no-projects {
   text-align: right;
+}
+
+@media screen  and (max-width: 650px){
+  .project__table {
+    padding: 0;
+  }
+
+  .checkbox {
+    margin-left: -15px;
+  }
+
+  .project__table-created-column {
+    text-align: right;
+  }
+  .project__created-column {
+    text-align: right;
+  }
 }

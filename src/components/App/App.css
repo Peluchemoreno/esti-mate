@@ -12,14 +12,15 @@
 
 .hero {
   text-align: center;
-  font-size: 42px;
+  font-size: clamp(1rem, 2rem, 3rem);
   font-weight: 900;
   font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
 }
 
 .hero__description {
-  font-size: 20px;
-  max-width: 55%;
+  font-size: clamp(.25rem, 1.2rem, 2rem);
+  /* max-width: 55%; */
+  width: clamp(50%, 70%, 100%);
   margin: 0 auto;
   filter: opacity(.6);
   font-weight: 400;

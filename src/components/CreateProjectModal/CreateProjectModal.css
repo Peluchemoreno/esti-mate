@@ -28,7 +28,8 @@
 .create-project-form {
   position: absolute;
   top: 10%;
-  width: 520px;
+  width: 80%;
+  max-width: 520px;
   box-shadow: 0 0 5px black;
   background-color: var(--black);
 }
@@ -189,4 +190,8 @@
 
 .create-project-form__client-details-input_email {
   margin-bottom: 30px;
+}
+
+@media screen  and (max-width: 650px){
+  
 }

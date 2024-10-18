@@ -1,12 +1,23 @@
 import "./Dashboard.css";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import logo from "../../assets/estimate-nobackground-blue.png";
 import { Link, Outlet } from "react-router-dom";
 import dropdown from '../../assets/icons/drop-down.svg'
 import { useNavigate } from "react-router-dom";
+import hamburgerIcon from '../../assets/icons/hamburgermenu.svg'
 
 export default function Dashboard({handleLogOut}) {
+
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(()=>{
+    console.log(window.innerWidth)
+    if (window.innerWidth < 650){
+      setIsMobile(true)
+    }
+  }, [])
+
   const currentUser = useContext(CurrentUserContext);
 
   const navigator = useNavigate()
@@ -39,6 +50,9 @@ export default function Dashboard({handleLogOut}) {
           <p className="dashboard__account-email">{currentUser?.email}</p>
           <img src={dropdown} alt="drop-down" className="dashboard__drop-down-icon" />
         </div>
+        {isMobile && <div className="dashboard__hamburger-menu-icon-container">
+          <img src={hamburgerIcon} alt="mobile menu" className="dashboard__hadmburger-menu-icon" />
+        </div> }
       </header>
       <Outlet />
     </div>

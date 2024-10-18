@@ -10,6 +10,7 @@
   position: sticky;
   top: 0;
   z-index: 2;
+  background-color: var(--black);
 }
 
 .dashboard__logo {
@@ -40,4 +41,31 @@
 .dashboard__drop-down-icon {
   width: 15px;
   margin-left: 5px;
+}
+
+.dashboard__hadmburger-menu-icon {
+  width: 30px;
+}
+
+
+@media screen  and (max-width: 650px){
+  .dashboard__account-link{
+    display: none;
+  }
+
+  .dashboard__hadmburger-menu-icon {
+    display: block;
+  }
+
+  .dashboard__link {
+    display: none;
+  }
+
+  .dashboard__logo{
+    margin: 0;
+    width: 50px;
+  }
+  .dashboard__header {
+    padding: 10px;
+  }
 }
