@@ -27,8 +27,41 @@ const Diagram = ({ activeModal, closeModal }) => {
   const [lines, setLines] = useState([]); // Array to store all drawn lines
   const [lineLength, setLineLength] = useState(0);
 
+ 
   useEffect(() => {
-    drawGrid();
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+  
+    // Adjust for device pixel ratio
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    context.scale(dpr, dpr);
+  
+    drawGrid(); // Redraw the grid after scaling
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+  
+    // Fallback for touch or mouse events
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseup", handleMouseUp);
+  
+    canvas.addEventListener("touchstart", handleMouseDown);
+    canvas.addEventListener("touchmove", handleMouseMove);
+    canvas.addEventListener("touchend", handleMouseUp);
+  
+    return () => {
+      // Cleanup
+      canvas.removeEventListener("mousedown", handleMouseDown);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseup", handleMouseUp);
+      canvas.removeEventListener("touchstart", handleMouseDown);
+      canvas.removeEventListener("touchmove", handleMouseMove);
+      canvas.removeEventListener("touchend", handleMouseUp);
+    };
   }, []);
 
   useEffect(() => {
@@ -75,9 +108,34 @@ const Diagram = ({ activeModal, closeModal }) => {
   /* ------------------------------------------------------------------------------------ */
 
   // Start drawing on mousedown
-  function handleMouseDown(e) {
-    const { offsetX, offsetY } = e.nativeEvent;
+  // function handleMouseDown(e) {
+  //   const { offsetX, offsetY } = e.nativeEvent;
 
+  //   setCurrentLine({
+  //     startX: snapNumberToGrid(offsetX),
+  //     startY: snapNumberToGrid(offsetY),
+  //     endX: snapNumberToGrid(offsetX),
+  //     endY: snapNumberToGrid(offsetY),
+  //     isVertical: false,
+  //     isHorizontal: false,
+  //     isSelected: false,
+  //   });
+  //   setIsDrawing(true);
+  // }
+  function handleMouseDown(e) {
+    let offsetX, offsetY;
+    if (e.nativeEvent?.touches) {
+      const touch = e.nativeEvent.touches[0]; // Get the first touch point
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      offsetX = touch.clientX - rect.left;
+      offsetY = touch.clientY - rect.top;
+    } else {
+      // Mouse event
+      offsetX = e.offsetX;
+      offsetY = e.offsetY;
+    }
+  
     setCurrentLine({
       startX: snapNumberToGrid(offsetX),
       startY: snapNumberToGrid(offsetY),
@@ -90,16 +148,30 @@ const Diagram = ({ activeModal, closeModal }) => {
     setIsDrawing(true);
   }
 
-  // Update the line while dragging
   function handleMouseMove(e) {
     if (!isDrawing) return;
-
-    const { offsetX, offsetY } = e.nativeEvent;
+    
+    let offsetX, offsetY;
+    if (e.nativeEvent?.touches) {
+      const touch = e.nativeEvent?.touches[0];
+      
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      offsetX = touch.clientX - rect.left;
+      offsetY = touch.clientY - rect.top;
+      
+    } else {
+      // Mouse event
+      offsetX = e.nativeEvent?.offsetX;
+      offsetY = e.nativeEvent?.offsetY;
+    }
+  
     setCurrentLine((prevLine) => ({
       ...prevLine,
       endX: snapNumberToGrid(offsetX),
       endY: snapNumberToGrid(offsetY),
     }));
+    // console.log(currentLine) 
     let pt1 = [currentLine.startX, currentLine.startY];
     let pt2 = [currentLine.endX, currentLine.endY];
     setLineLength(convertToFeet(calculateDistance(pt1, pt2)));
@@ -109,25 +181,36 @@ const Diagram = ({ activeModal, closeModal }) => {
     // to do:
       // place measurement on diagram near it's line
 
-  function handleMouseUp() {
-    const {startX, startY, endX, endY} = currentLine
+  function handleMouseUp(e) {
+    if (e.nativeEvent.touches) {
+      let offsetX, offsetY;
+      const touch = e.nativeEvent?.touches[0];
+      
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      offsetX = touch?.clientX - rect.left;
+      offsetY = touch?.clientY - rect.top;
+    }
+    
+    const updatedLine = { ...currentLine };
     if (isDrawing) {
-      if (isLineParallelToSide(startX, startY, endX, endY)){
+      if (isLineParallelToSide(currentLine.startX, currentLine.startY, currentLine.endX, currentLine.endY)){
         currentLine.isVertical = true
         currentLine.isHorizontal = false
-      } else if (isLineParallelToTop(startX, startY, endX, endY)){
+      } else if (isLineParallelToTop(currentLine.startX, currentLine.startY, currentLine.endX, currentLine.endY)){
         currentLine.isHorizontal = true
         currentLine.isVertical = false
       } else {
         currentLine.isVertical = false
         currentLine.isHorizontal = false
       }
-      setLines([...lines, currentLine]); // Save the current line
+      setLines([...lines, updatedLine]); // Save the current line
     }
-    console.log(lineLength);
-    console.log(currentLine)
+    // console.log(lineLength);
+    // console.log(currentLine)
     setIsDrawing(false);
   }
+
 
   function drawAllLines(ctx) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Clear canvas
@@ -165,6 +248,7 @@ const Diagram = ({ activeModal, closeModal }) => {
     context.clearRect(0, 0, canvas.width, canvas.height);
     setLines([]);
     setLineLength(0);
+    
   }
 
   return (
@@ -217,7 +301,7 @@ const Diagram = ({ activeModal, closeModal }) => {
         onPointerUp={handleMouseUp}
         onTouchStart={handleMouseDown}
         onTouchMove={handleMouseMove}
-        onTouchCancel={handleMouseUp}
+        onTouchEnd={handleMouseUp}
       />
     </div>
   );
