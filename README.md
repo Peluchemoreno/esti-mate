@@ -8,4 +8,8 @@
 ### Mouseup/Touchup
 
 - [x] revert the color of the line back to its original color
-- [] show the length of the line next to the line
+- [ ] show the length of the line next to the line
+
+## Mousedown/Touchstart
+
+- [ ] snap the position of the current start coordinates to the closest existing line
