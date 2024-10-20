@@ -7,7 +7,6 @@ import PageNotFound from "../PageNotFound/PageNotFound";
 import { Routes, Route } from "react-router-dom";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
 import { useState, useEffect, act } from "react";
-import { users } from "../../utils/constants";
 import { signin, getUser, createProject, getProjects } from "../../utils/auth";
 import { useNavigate } from "react-router-dom";
 import Projects from "../Projects/Projects";
@@ -29,10 +28,9 @@ import InfiniteCanvas from "../TestInfiniteCanvas/TestInfiniteCanvas";
 function App() {
   const [currentUser, setCurrentUser] = useState({});
   const [activeModal, setActiveModal] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [projects, setProjects] = useState([]);
   const navigate = useNavigate();
-  const [diagramActive, setDiagramActive] = useState(false);
+  const [mobileDiagramActive, setMobileDiagramActive] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 650);
 
   useEffect(() => {
@@ -118,7 +116,7 @@ function App() {
                     activeModal={activeModal}
                     setActiveModal={setActiveModal}
                     projects={projects}
-                    setDiagramActive={setDiagramActive}
+                    setMobileDiagramActive={setMobileDiagramActive}
                     isMobile={isMobile}
                   />
                 }
@@ -135,7 +133,7 @@ function App() {
         </CurrentUserContext.Provider>
         {/* <Diagram activeModal={activeModal} closeModal={closeModal}/> */}
         <>
-          {diagramActive ? (
+          {mobileDiagramActive ? (
             <>
               <DisablePullToRefresh />
               <Diagram activeModal={activeModal} closeModal={closeModal} isMobile={isMobile} />

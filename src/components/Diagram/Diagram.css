@@ -30,22 +30,6 @@
   overflow: hidden;
 }
 
-/* .diagram__tools{
-  position: absolute;
-  right: 0;
-  height: 100%;
-  width: 40px;
-  border: 1px solid red;
-  background-color: transparent;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding-top: 5px;
-  user-select: none;
-  z-index: 4;
-} */
-
 .diagram__close {
   background-color: rgb(255, 70, 70);
   top: 5px;

@@ -4,16 +4,14 @@ import backIcon from "../../assets/icons/back.svg"
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
-export default function Project({ projects, setActiveModal, setDiagramActive, isMobile }) {
-  // console.log(setDiagramActive)
+export default function Project({ projects, setActiveModal, setMobileDiagramActive, isMobile }) {
+  // console.log(setMobileDiagramActive)
   const params = useParams();
   const projectId = params.projectId;
   
 
-  useEffect(()=>{
-    if (isMobile){
-      window.scrollTo(0, 0)
-    }
+  useEffect(()=>{ 
+    window.scrollTo(0, 0)
   }, [])
 
   const project = projects.filter((item) => {
@@ -25,7 +23,7 @@ export default function Project({ projects, setActiveModal, setDiagramActive, is
 
   function openDiagramModal(){
     if (isMobile){
-      setDiagramActive(true)
+      setMobileDiagramActive(true)
     }
     setActiveModal('diagram')
   }

@@ -33,7 +33,6 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   /*                                     render canvas                                    */
   /* ------------------------------------------------------------------------------------ */
 
-  console.log(isMobile)
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState("line");
@@ -45,7 +44,8 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
     endY: 0,
     isHorizontal: false,
     isVertical: false,
-    isSelected: false
+    isSelected: false,
+    color: 'blue',
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
   const [lineLength, setLineLength] = useState(0);
@@ -136,7 +136,6 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
 
   function handleMouseDown(e) {
     let offsetX, offsetY;
-    console.log(e.target)
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0]; // Get the first touch point
       const canvas = canvasRef.current;
@@ -157,6 +156,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       isVertical: false,
       isHorizontal: false,
       isSelected: false,
+      color: 'black'
     });
     setIsDrawing(true);
   }
@@ -178,12 +178,25 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       offsetX = e.nativeEvent?.offsetX;
       offsetY = e.nativeEvent?.offsetY;
     }
-  
-    setCurrentLine((prevLine) => ({
-      ...prevLine,
-      endX: snapNumberToGrid(offsetX),
-      endY: snapNumberToGrid(offsetY),
-    }));
+    
+    if (isLineParallelToSide(currentLine.startX, currentLine.startY, currentLine.endX, currentLine.endY) || isLineParallelToTop(currentLine.startX, currentLine.startY, currentLine.endX, currentLine.endY)){
+      setCurrentLine((prevLine) => ({
+        ...prevLine,
+        endX: snapNumberToGrid(offsetX),
+        endY: snapNumberToGrid(offsetY),
+        color: 'green'
+      }));
+    } else {
+      setCurrentLine((prevLine) => ({
+        ...prevLine,
+        endX: snapNumberToGrid(offsetX),
+        endY: snapNumberToGrid(offsetY),
+        color: 'black'
+      }));
+    }
+    
+    
+    
     // console.log(currentLine) 
     let pt1 = [currentLine.startX, currentLine.startY];
     let pt2 = [currentLine.endX, currentLine.endY];
@@ -204,6 +217,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       offsetX = touch?.clientX - rect.left;
       offsetY = touch?.clientY - rect.top;
     }
+    currentLine.color = 'black'
     
     const updatedLine = { ...currentLine };
     if (isDrawing) {
@@ -228,11 +242,13 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
 
     // Draw each saved line
     lines.forEach(({ startX, startY, endX, endY }) => {
+      
       drawLine(ctx, startX, startY, endX, endY);
     });
     // Draw the current line if it's being drawn
     if (isDrawing) {
       const { startX, startY, endX, endY } = currentLine;
+      
       drawLine(ctx, startX, startY, endX, endY);
     }
   }
@@ -247,7 +263,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
-    ctx.strokeStyle = "black";
+    ctx.strokeStyle = currentLine.color;
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.closePath();
