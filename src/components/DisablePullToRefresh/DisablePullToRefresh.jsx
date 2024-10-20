@@ -10,11 +10,11 @@ function DisablePullToRefresh() {
       }
     };
 
-    document.addEventListener("touchstart", preventPullToRefresh, { passive: false });
+    // document.addEventListener("touchstart", preventPullToRefresh, { passive: false });
     document.addEventListener("touchmove", preventPullToRefresh, { passive: false });
 
     return () => {
-      document.removeEventListener("touchstart", preventPullToRefresh);
+      // document.removeEventListener("touchstart", preventPullToRefresh);
       document.removeEventListener("touchmove", preventPullToRefresh);
     };
   }, []);
