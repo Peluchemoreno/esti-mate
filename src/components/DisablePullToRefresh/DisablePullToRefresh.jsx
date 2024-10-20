@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
 function DisablePullToRefresh() {
+
+
   useEffect(() => {
     const preventPullToRefresh = (e) => {
       if (window.scrollY === 0) {

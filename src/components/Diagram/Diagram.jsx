@@ -10,25 +10,30 @@ import {
   calculateDistance,
 } from "../../utils/constants";
 
-const Diagram = ({ activeModal, closeModal}) => {
+const Diagram = ({ activeModal, closeModal, isMobile}) => {
 
 /* ------------------------------------------------------------------------------------ */
 /*                               disable pinch zoom for ios                             */
 /* ------------------------------------------------------------------------------------ */
-  useEffect(() => {
-    function preventZoom(e) {
-      if (e.touches.length > 1) {
-        e.preventDefault();
-      }
-    };
+  // useEffect(() => {
+  //   function preventZoom(e) {
+  //     if (e.touches.length > 1) {
+  //       e.preventDefault();
+  //     }
+  //   };
   
-    document.addEventListener("touchmove", preventZoom, { passive: false });
+  //   document.addEventListener("touchmove", preventZoom, { passive: false });
   
-    return () => {
-      document.removeEventListener("touchmove", preventZoom);
-    };
-  }, []);
+  //   return () => {
+  //     document.removeEventListener("touchmove", preventZoom);
+  //   };
+  // }, []);
 
+  /* ------------------------------------------------------------------------------------ */
+  /*                                     render canvas                                    */
+  /* ------------------------------------------------------------------------------------ */
+
+  console.log(isMobile)
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState("line");
@@ -111,37 +116,27 @@ const Diagram = ({ activeModal, closeModal}) => {
     for (let x = 0; x <= canvasWidth; x += gridSize) {
       context.moveTo(x, 0);
       context.lineTo(x, canvasHeight);
+      
     }
 
     for (let y = 0; y <= canvasHeight; y += gridSize) {
       context.moveTo(0, y);
       context.lineTo(canvasWidth, y);
     }
-    context.fillStyle = "#dfdfdf";
-    context.fillRect(0, 0, canvasWidth, canvasHeight);
+    // context.fillStyle = "#dfdfdf";
+    context.strokeStyle = "red";
+    context.stroke()
+    // context.fillRect(0, 0, canvasWidth, canvasHeight);
   }
 
   /* ------------------------------------------------------------------------------------ */
   /*                               event listeners                                        */
   /* ------------------------------------------------------------------------------------ */
 
-  // Start drawing on mousedown
-  // function handleMouseDown(e) {
-  //   const { offsetX, offsetY } = e.nativeEvent;
 
-  //   setCurrentLine({
-  //     startX: snapNumberToGrid(offsetX),
-  //     startY: snapNumberToGrid(offsetY),
-  //     endX: snapNumberToGrid(offsetX),
-  //     endY: snapNumberToGrid(offsetY),
-  //     isVertical: false,
-  //     isHorizontal: false,
-  //     isSelected: false,
-  //   });
-  //   setIsDrawing(true);
-  // }
   function handleMouseDown(e) {
     let offsetX, offsetY;
+    console.log(e.target)
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0]; // Get the first touch point
       const canvas = canvasRef.current;
@@ -224,8 +219,6 @@ const Diagram = ({ activeModal, closeModal}) => {
       }
       setLines([...lines, updatedLine]); // Save the current line
     }
-    // console.log(lineLength);
-    // console.log(currentLine)
     setIsDrawing(false);
   }
 
@@ -270,12 +263,14 @@ const Diagram = ({ activeModal, closeModal}) => {
   }
 
   return (
+    <>
+    
     <div
       className={
         activeModal === "diagram" ? "diagram diagram_visible" : "diagram"
       }
     >
-      <div className="diagram__tools" selec>
+      
         <img
           onClick={() => {
             closeModal();
@@ -306,7 +301,7 @@ const Diagram = ({ activeModal, closeModal}) => {
             console.log("select tool");
           }}
         />
-      </div>
+      
       <div className="diagram__line-length-display">{lineLength}</div>
 
       <canvas
@@ -322,6 +317,7 @@ const Diagram = ({ activeModal, closeModal}) => {
         onTouchEnd={handleMouseUp}
       />
     </div>
+    </>
   );
 };
 

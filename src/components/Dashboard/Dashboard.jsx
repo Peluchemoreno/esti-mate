@@ -12,7 +12,6 @@ export default function Dashboard({handleLogOut}) {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(()=>{
-    console.log(window.innerWidth)
     if (window.innerWidth < 650){
       setIsMobile(true)
     }
