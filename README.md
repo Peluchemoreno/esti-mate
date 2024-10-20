@@ -3,7 +3,7 @@
 ## To-dos
 
 - [x] show a green line when the line is vertical or horizontal
-- [] currently all vertical and horizontal lines turn green >:(
+- [ ] currently all vertical and horizontal lines turn green >:(
 
 ### Mouseup/Touchup
 
