@@ -25,10 +25,17 @@
 }
 
 .project__delete-button {
-  background-color: transparent;
-  color: var(--delete-red);
-  border: none;
+  background-color: var(--delete-red);
+  color: var(--white);
+  border: 1px solid var(--white);
+  border-radius: 5px;
+  padding: 5px;
   cursor: pointer;
+  transition: opacity .2s ease;
+}
+
+.project__delete-button:hover{
+  opacity: .7;
 }
 
 .project__body-horizontal-spacer {

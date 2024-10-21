@@ -10,7 +10,7 @@
 - [ ] when 2 horizontal lines have the same x value or 2 vertical lines have the same y value draw a temporary dotted line to connect the two (QoL for user)
 - [ ] implement tool selection
 - [ ] implement price selection
-- [ ] implement deleting a project
+- [x] implement deleting a project
 - [ ] implement saving a project
 - [ ] implement subscription settings and logout dropdown
 - [ ] build settings page
@@ -18,6 +18,7 @@
 - [ ] build add item modal
 - [ ] build generate estimate 😓
 - [ ] implement project search functionality
+- [ ] implement rename project functionality
 
 ### Mouseup/Touchup
 
