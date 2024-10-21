@@ -8,6 +8,15 @@
 - [ ] mobile version create project modal scrolls weird, need to fix
 - [ ] automatically count and distinguish miters (if any two coordinate points are the same it's a miter)
 - [ ] when 2 horizontal lines have the same x value or 2 vertical lines have the same y value draw a temporary dotted line to connect the two (QoL for user)
+- [ ] implement tool selection
+- [ ] implement price selection
+- [ ] implement deleting a project
+- [ ] implement saving a project
+- [ ] implement subscription settings and logout dropdown
+- [ ] build settings page
+- [ ] add functionality for adding an item to the product page
+- [ ] build add item modal
+- [ ] build generate estimate 😓
 
 ### Mouseup/Touchup
 
