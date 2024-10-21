@@ -49,6 +49,13 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
   const [lineLength, setLineLength] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  const canvasBaseMeasurements = {
+    top: 0,
+    left: 0,
+    width: window.innerWidth,
+    height: window.innerHeight
+  }
 
  
   useEffect(() => {
@@ -61,7 +68,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
     canvas.height = window.innerHeight * dpr;
     context.scale(dpr, dpr);
   
-    drawGrid(); // Redraw the grid after scaling
+    // drawGrid(); // Redraw the grid after scaling
   }, []);
 
   useEffect(() => {
@@ -197,17 +204,17 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
     
     
     
-    // console.log(currentLine) 
     let pt1 = [currentLine.startX, currentLine.startY];
     let pt2 = [currentLine.endX, currentLine.endY];
     setLineLength(convertToFeet(calculateDistance(pt1, pt2)));
   }
 
   // Stop drawing on mouseup
-    // to do:
-      // place measurement on diagram near it's line
-
   function handleMouseUp(e) {
+    const canvas = canvasRef.current
+    const context = canvas.getContext('2d')
+
+    currentLine.color = 'black'
     if (e.nativeEvent.touches) {
       let offsetX, offsetY;
       const touch = e.nativeEvent?.touches[0];
@@ -217,57 +224,108 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       offsetX = touch?.clientX - rect.left;
       offsetY = touch?.clientY - rect.top;
     }
-    currentLine.color = 'black'
     
-    const updatedLine = { ...currentLine };
+    currentLine.midpoint = [(currentLine.startX + currentLine.endX) / 2, (currentLine.startY + currentLine.endY) / 2]
+    currentLine.measurement = lineLength
+
+    
+
     if (isDrawing) {
       if (isLineParallelToSide(currentLine.startX, currentLine.startY, currentLine.endX, currentLine.endY)){
         currentLine.isVertical = true
         currentLine.isHorizontal = false
+        if (currentLine.midpoint[0] >= canvasBaseMeasurements.width / 2){
+          currentLine.position = 'right'
+        } else {
+          currentLine.position = 'left'
+        }
       } else if (isLineParallelToTop(currentLine.startX, currentLine.startY, currentLine.endX, currentLine.endY)){
         currentLine.isHorizontal = true
         currentLine.isVertical = false
+        if (currentLine.midpoint[1] <= canvasBaseMeasurements.height / 2){
+          currentLine.position = 'top'
+        } else {
+          currentLine.position = 'bottom'
+        }
       } else {
         currentLine.isVertical = false
         currentLine.isHorizontal = false
       }
+      const updatedLine = { ...currentLine };
       setLines([...lines, updatedLine]); // Save the current line
     }
+
     setIsDrawing(false);
+    setLineLength(0)
   }
 
+  function placeMeasurement(line, measurement, x, y) {
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    
+    context.font = '900 12px Arial';
+    context.textAlign = 'center';
+  
+    if (line.isHorizontal) {
+      if (line.position === 'top') {
+        context.fillText(measurement.toString() + "'", x, y - (gridSize / 1.5));
+      } else if (line.position === 'bottom') {
+        context.fillText(measurement.toString() + "'", x, y + (gridSize * 1.5));
+      }
+    }
+  
+    if (line.isVertical) {
+      if (line.position === 'left') {
+        context.fillText(measurement.toString() + "'", x - (gridSize / 0.75), y);
+      } else if (line.position === 'right') {
+        context.fillText(measurement.toString() + "'", x + (gridSize * 1.25), y);
+      }
+    }
+  }
+  
 
   function drawAllLines(ctx) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Clear canvas
-
-    // Draw each saved line
-    lines.forEach(({ startX, startY, endX, endY }) => {
-      
-      drawLine(ctx, startX, startY, endX, endY);
+    
+    // Redraw the grid before drawing lines
+    // drawGrid();
+    
+    // Draw each saved line using its own properties
+    lines.forEach((line) => {
+      drawLine(ctx, line);
     });
+  
     // Draw the current line if it's being drawn
     if (isDrawing) {
-      const { startX, startY, endX, endY } = currentLine;
-      
-      drawLine(ctx, startX, startY, endX, endY);
+      drawLine(ctx, currentLine); // Draw current line in-progress
     }
   }
+  
 
-  // Draw a line on the canvas
-  function drawLine(ctx, x1, y1, x2, y2) {
-    x1 = Math.round(x1 / gridSize) * gridSize;
-    y1 = Math.round(y1 / gridSize) * gridSize;
-    x2 = Math.round(x2 / gridSize) * gridSize;
-    y2 = Math.round(y2 / gridSize) * gridSize;
-
+  function drawLine(ctx, line) {
+    const { startX, startY, endX, endY, midpoint, measurement, color, isHorizontal, isVertical, position } = line;
+  
+    // Snap coordinates to the grid
+    const x1 = Math.round(startX / gridSize) * gridSize;
+    const y1 = Math.round(startY / gridSize) * gridSize;
+    const x2 = Math.round(endX / gridSize) * gridSize;
+    const y2 = Math.round(endY / gridSize) * gridSize;
+  
+    // Draw the line
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
-    ctx.strokeStyle = currentLine.color;
+    ctx.strokeStyle = color; // Use the line's specific color
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.closePath();
+  
+    // Place the measurement if available
+    if (midpoint && measurement) {
+      placeMeasurement(line, measurement, midpoint[0], midpoint[1]);
+    }
   }
+  
 
   function clearCanvas() {
     const canvas = canvasRef.current;
@@ -318,7 +376,8 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
           }}
         />
       
-      <div className="diagram__line-length-display">{lineLength}</div>
+      <div className="diagram__line-length-display">Current line length: {lineLength}'</div>
+      {/* <div className="diagram__window-width-display">{windowWidth}</div> */}
 
       <canvas
         ref={canvasRef}

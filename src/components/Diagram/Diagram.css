@@ -74,6 +74,17 @@
   user-select: none;
 }
 
+.diagram__window-width-display {
+  font-family: Arial, Helvetica, sans-serif;
+  position: absolute;
+  top: 35px;
+  left: 5px;
+  border: 1px solid black;
+  color: black;
+  padding: 2px 5px;
+  user-select: none;
+}
+
 @media screen and (max-width: 650px) {
 
   .diagram {
