@@ -211,9 +211,6 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
 
   // Stop drawing on mouseup
   function handleMouseUp(e) {
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
-
     currentLine.color = 'black'
     if (e.nativeEvent.touches) {
       let offsetX, offsetY;
@@ -363,12 +360,17 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
           alt="save digram"
           className="diagram__icon diagram__save"
           onClick={() => {
+            const canvas = canvasRef.current
+            const context = canvas.getContext('2d')
             console.log("saving diagram");
             let totalFootage = 0
             lines.forEach(line => {
               totalFootage += line.measurement
             })
             console.log(`${totalFootage}'`)
+            console.log(lines)
+            // lines[0].startX = 0
+            // drawAllLines(context)
           }}
         />
         <img
