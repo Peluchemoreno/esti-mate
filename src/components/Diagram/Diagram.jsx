@@ -49,7 +49,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
   const [lineLength, setLineLength] = useState(0);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  const [totalFootage, setTotalFootage] = useState(0)
   const canvasBaseMeasurements = {
     top: 0,
     left: 0,
@@ -281,6 +281,10 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
         context.fillText(measurement.toString() + "'", x + (gridSize * 1.25), y);
       }
     }
+
+    if (!line.isVertical && !line.isHorizontal){
+      context.fillText(measurement.toString() + "'", x, y - (gridSize / 1.5));
+    }
   }
   
 
@@ -303,7 +307,8 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   
 
   function drawLine(ctx, line) {
-    const { startX, startY, endX, endY, midpoint, measurement, color, isHorizontal, isVertical, position } = line;
+    const { startX, startY, endX, endY, midpoint, measurement, color} = line;
+
   
     // Snap coordinates to the grid
     const x1 = Math.round(startX / gridSize) * gridSize;
@@ -359,6 +364,11 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
           className="diagram__icon diagram__save"
           onClick={() => {
             console.log("saving diagram");
+            let totalFootage = 0
+            lines.forEach(line => {
+              totalFootage += line.measurement
+            })
+            console.log(`${totalFootage}'`)
           }}
         />
         <img
@@ -377,7 +387,6 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
         />
       
       <div className="diagram__line-length-display">Current line length: {lineLength}'</div>
-      {/* <div className="diagram__window-width-display">{windowWidth}</div> */}
 
       <canvas
         ref={canvasRef}
