@@ -3,17 +3,23 @@ import search from '../../assets/icons/search-icon.svg'
 import ProjectRowData from '../ProjectRowData/ProjectRowData'
 import CurrentUserContext from '../../contexts/CurrentUserContext/CurrentUserContext'
 import CreateProjectModal from '../CreateProjectModal/CreateProjectModal'
-import { useContext, useEffect } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import {getProjects} from '../../utils/auth'
 
 export default function Projects({closeModal, activeModal, setActiveModal, handleCreateProjectSubmit, projects, setProjects}){
 
   const currentUser = useContext(CurrentUserContext).currentUser;
+  console.log(projects)
+
   useEffect(()=>{
     const token = localStorage.getItem('jwt')
     getProjects(token).then(data => {
+      if (data.length === 0){
+        setProjects([])
+      } else {
       const reverseOrderArray = data.projects.reverse()
       setProjects(reverseOrderArray)
+      }
     })
   }, [])
 
@@ -25,6 +31,9 @@ export default function Projects({closeModal, activeModal, setActiveModal, handl
 
   return (
     <div className='projects'>
+      <h3 className="projects__header-title">
+        Projects
+      </h3>
       <header className="projects__header header">
         <button onClick={openCreateProjectModal} className="header__create-project-button">Create Project</button>
         <label htmlFor="search-projects" className='search-projects-label'>

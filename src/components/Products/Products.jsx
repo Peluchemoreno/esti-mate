@@ -43,6 +43,7 @@ export default function Products() {
   });
 
   return (
+    <>
     <div className="products">
       <div className="products__header">
         <h3 className="products__header-title">
@@ -119,5 +120,7 @@ export default function Products() {
         />
       </Box>
     </div>
+    {/* <input type="color" name="" id="" /> */}
+    </>
   );
 }

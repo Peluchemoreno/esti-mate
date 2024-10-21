@@ -17,6 +17,7 @@
 - [ ] add functionality for adding an item to the product page
 - [ ] build add item modal
 - [ ] build generate estimate 😓
+- [ ] implement project search functionality
 
 ### Mouseup/Touchup
 

@@ -85,6 +85,12 @@
   text-align: right;
 }
 
+.projects__header-title {
+  margin: 0;
+  margin-left: 20px;
+  font-size: 20px;
+}
+
 @media screen  and (max-width: 650px){
   .project__table {
     padding: 0;

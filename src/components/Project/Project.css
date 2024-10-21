@@ -9,6 +9,7 @@
   align-items: center;
   padding: 0 25px;
   border-bottom: 1px solid var(--white);
+  justify-content: space-between;
 }
 
 .project__header-title {
@@ -23,8 +24,11 @@
   margin-right: 5px;
 }
 
-.project__body {
-  
+.project__delete-button {
+  background-color: transparent;
+  color: var(--delete-red);
+  border: none;
+  cursor: pointer;
 }
 
 .project__body-horizontal-spacer {
