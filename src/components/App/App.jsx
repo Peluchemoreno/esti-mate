@@ -20,7 +20,7 @@ import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 /*                                  testinfinitecanvas                                  */
 /* ------------------------------------------------------------------------------------ */
 
-import InfiniteCanvas from "../TestInfiniteCanvas/TestInfiniteCanvas";
+// import InfiniteCanvas from "../TestInfiniteCanvas/TestInfiniteCanvas";
 /* ------------------------------------------------------------------------------------ */
 /*                                  testinfinitecanvas                                  */
 /* ------------------------------------------------------------------------------------ */
@@ -121,7 +121,7 @@ function App() {
                   />
                 }
               />
-              <Route path="products" element={<Products />} />
+              <Route path="products" element={<Products activeModal={activeModal} setActiveModal={setActiveModal} closeModal={closeModal}/>} />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route
@@ -131,7 +131,6 @@ function App() {
             <Route path="/signup" element={<Signup />} />
           </Routes>
         </CurrentUserContext.Provider>
-        {/* <Diagram activeModal={activeModal} closeModal={closeModal}/> */}
         <>
           {mobileDiagramActive ? (
             <>

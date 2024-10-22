@@ -9,7 +9,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  display: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .2s ease, visibility .2s ease;
 }
 
 .modal_visible {
@@ -23,6 +25,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  visibility: visible;
+  opacity: 1;
+  transition: opacity .2s ease, visibility .2s ease;
 }
 
 .create-project-form {
@@ -47,15 +52,16 @@
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid rgba(255, 255, 255, .2);
+  padding: 10px;
 }
 
 .create-project-form__body, .create-project-form__header {
   padding: 20px
 }
 
-.create-project-form__footer {
+/* .create-project-form__footer {
   padding: 10px;
-}
+} */
 
 .create-project-form__button_cancel, .create-project-form__button_create {
   border: none;

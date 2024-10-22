@@ -1,0 +1,121 @@
+.add-item-form {
+  position: absolute;
+  top: 10%;
+  width: 80%;
+  max-width: 520px;
+  box-shadow: 0 0 5px black;
+  background-color: var(--black);
+}
+
+.add-item-form__header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.add-item-name__input {
+  width: 100%;
+  margin-top: 10px;
+}
+
+
+.add-item-form__header-text {
+  margin: 0;
+}
+
+.add-item-form__header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.add-item-form__body,
+.add-item-form__header {
+  padding: 20px;
+}
+
+.add-item-form__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.add-item-form__footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px;
+}
+
+.add-item-form__button_cancel,
+.add-item-form__button_create {
+  border: none;
+  border-radius: 5px;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.add-item-form__button_cancel {
+  border: 1px solid var(--white);
+  color: var(--white);
+  background-color: transparent;
+}
+
+.add-item-form__button_create {
+  margin-left: 10px;
+  background-color: var(--blue-primary);
+  color: var(--white);
+}
+
+.add-item-form__input {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 5px;
+  color: var(--white);
+  margin-top: 5px;
+}
+
+.add-item__label {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.add-item__label:last-of-type {
+  margin: 0;
+}
+
+.add-item__price-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.add-item-price__input {
+  width: 30%;
+  text-align: right;
+}
+
+.add-item__color-select {
+  width: 30%;
+  height: 40px;
+}
+
+.add-item__visual-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.add-item__quantity-select-label{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.add-item__quantity-select {
+  width: 30%;
+  background-color: transparent;
+  color: var(--white);
+  padding: 5px;
+}
+
+.add-item__select-option {
+  color: black;
+}

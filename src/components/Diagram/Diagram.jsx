@@ -364,13 +364,13 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
             const context = canvas.getContext('2d')
             console.log("saving diagram");
             let totalFootage = 0
+            // let miters = 0
             lines.forEach(line => {
               totalFootage += line.measurement
             })
             console.log(`${totalFootage}'`)
             console.log(lines)
-            // lines[0].startX = 0
-            // drawAllLines(context)
+            
           }}
         />
         <img

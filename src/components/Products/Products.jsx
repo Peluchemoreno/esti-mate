@@ -2,9 +2,10 @@ import "./Products.css";
 import { DataGrid, gridClasses, GridToolbar } from "@mui/x-data-grid";
 import { Box } from "@mui/material/";
 import { useState } from "react";
+import AddProductModal from "../AddProductModal/AddProductModal";
 
 
-export default function Products() {
+export default function Products({activeModal, setActiveModal, closeModal}) {
   const [tableData, setTableData] = useState({
     rows: [
       { id: 1, col1: `6" K-Style`, col2: 'red' , col3: "Length/Feet", col4: '$12.15'},
@@ -42,6 +43,11 @@ export default function Products() {
     ],
   });
 
+
+  function handleAddItemClick(){
+    setActiveModal('add-item')
+  }
+
   return (
     <>
     <div className="products">
@@ -49,7 +55,7 @@ export default function Products() {
         <h3 className="products__header-title">
         Products
         </h3>
-        <button className="products__add-product-button">+ Item</button>
+        <button className="products__create-item-button" onClick={handleAddItemClick}>+ Item</button>
       </div>
       <Box
         sx={{
@@ -120,7 +126,7 @@ export default function Products() {
         />
       </Box>
     </div>
-    {/* <input type="color" name="" id="" /> */}
+    <AddProductModal activeModal={activeModal} closeModal={closeModal}/>
     </>
   );
 }
