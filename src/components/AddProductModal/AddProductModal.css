@@ -119,3 +119,7 @@
 .add-item__select-option {
   color: black;
 }
+
+.add-item-form__button_create:hover, .add-item-form__button_cancel:hover {
+  background-color: var(--blue-secondary);
+}

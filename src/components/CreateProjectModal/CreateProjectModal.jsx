@@ -1,7 +1,6 @@
 import { cloneElement, useEffect, useState } from "react";
 import "./CreateProjectModal.css";
 import dropdown from "../../assets/icons/drop-down.svg";
-import { useNavigate } from "react-router-dom";
 
 export default function CreateProjectModal({
   isOpen,
@@ -19,8 +18,6 @@ export default function CreateProjectModal({
   const [primaryPhoneNumber, setPrimaryPhoneNumber] = useState("");
   const [secondaryPhoneNumber, setSecondaryPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
-  const [projectData, setProjectData] = useState({})
-  const navigator = useNavigate();
 
   function handleProjectNameChange(e) {
     setProjectName(e.target.value);

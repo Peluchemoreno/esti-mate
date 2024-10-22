@@ -1,20 +1,52 @@
 import { useState } from 'react'
 import './AddProductModal.css'
 
-export default function AddProductModal({activeModal, closeModal}){
+export default function AddProductModal({activeModal, closeModal, submitItem}){
 
   const [itemName, setItemName] = useState('')
+  const [itemVisualColor, setItemVisualColor] = useState('#000000')
+  const [quantityUnit, setQuantityUnit] = useState('length-feet')
+  const [itemPrice, setItemPrice] = useState('')
 
   function handleItemNameChange(e){
     setItemName(e.target.value)
   }
 
-  function handleCreateItemSubmit(){
-    console.log('creating item')
+  function handleItemVisualColorChange(e){
+    setItemVisualColor(e.target.value)
   }
 
-  function handleCloseModal(){
+  function handleQuantityUnitChange(e){
+    setQuantityUnit(e.target.value)
+  }
+
+  function handlePriceChange(e){
+    setItemPrice(e.target.value)
+  }
+
+  function resetInputs(e){
+    setItemName(e.target.value)
+    setItemVisualColor('#000000')
+    setQuantityUnit('length-feet')
+    setItemPrice(e.target.value)
+  }
+
+  function handleCloseModal(e){
+    resetInputs(e)
     closeModal()
+  }
+
+  function handleCreateItemSubmit(e){
+    e.preventDefault()
+    const itemData = {
+      itemName,
+      itemVisualColor,
+      quantityUnit,
+      itemPrice
+    }
+    resetInputs(e)
+    closeModal()
+    submitItem(itemData)
   }
 
   return (
@@ -39,18 +71,18 @@ export default function AddProductModal({activeModal, closeModal}){
           </label>
           <label htmlFor="visual" className="add-item__label add-item__visual-label">
             <div>Visual</div>
-            <input type="color" className='add-item__color-select'/>
+            <input type="color" className='add-item__color-select' onChange={handleItemVisualColorChange} value={itemVisualColor}/>
           </label>
           <label htmlFor="quantity" className="add-item__label add-item__quantity-select-label">
             <div>Quantity</div>
-            <select name="quantity-select" id="quantity" className='add-item__quantity-select'>
+            <select name="quantity-select" id="quantity" className='add-item__quantity-select' onChange={handleQuantityUnitChange} value={quantityUnit}>
               <option className='add-item__select-option' value="length-feet">Length/Feet</option>
               <option className='add-item__select-option' value="unit-per">Unit/Per</option>
             </select>
           </label>
           <label htmlFor="price" className="add-item__label add-item__price-label">
             <div>Price</div>
-            <input type="text" placeholder='0.00' className='add-item-price__input add-item-form__input'/>
+            <input type="text" placeholder='0.00' className='add-item-price__input add-item-form__input' onChange={handlePriceChange} value={itemPrice}/>
           </label>
 
         </div>
