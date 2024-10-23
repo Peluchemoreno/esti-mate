@@ -47,3 +47,7 @@ path {
 .products__create-item-button:hover{
   background-color: var(--blue-secondary);
 }
+
+.MuiDataGrid-cell.MuiDataGrid-cell--textLeft {
+  padding: 0px !important;
+}
