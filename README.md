@@ -19,6 +19,7 @@
 - [ ] build generate estimate 😓
 - [ ] implement project search functionality
 - [ ] implement rename project functionality
+- [ ] implement edit items on row click
 
 ### Mouseup/Touchup
 
