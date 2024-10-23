@@ -14,8 +14,8 @@
 - [ ] implement saving a project
 - [ ] implement subscription settings and logout dropdown
 - [ ] build settings page
-- [ ] add functionality for adding an item to the product page
-- [ ] build add item modal
+- [x] add functionality for adding an item to the product page
+- [x] build add item modal
 - [ ] build generate estimate 😓
 - [ ] implement project search functionality
 - [ ] implement rename project functionality
