@@ -90,6 +90,7 @@
 .add-item-price__input {
   width: 30%;
   text-align: right;
+  margin-left: 10px;
 }
 
 .add-item__color-select {
@@ -122,4 +123,11 @@
 
 .add-item-form__button_create:hover, .add-item-form__button_cancel:hover {
   background-color: var(--blue-secondary);
+}
+
+.add-item__price-dollar-sign {
+  margin-left: auto;
+  font-weight: normal;
+  font-size: 18px;
+  align-self: flex-end;
 }

@@ -51,7 +51,7 @@ export default function AddProductModal({activeModal, closeModal, submitItem}){
 
   return (
     <div className={activeModal === 'add-item' ? 'modal modal_visible' : 'modal'}>
-      <form className="add-item-form">
+      <form onSubmit={handleCreateItemSubmit} className="add-item-form">
       <header className="add-item-form__header">
           <h3 className="add-item-form__header-text">
             Create New Item
@@ -67,6 +67,7 @@ export default function AddProductModal({activeModal, closeModal, submitItem}){
               onChange={handleItemNameChange}
               value={itemName}
               placeholder='5" K-Style'
+              required
             />
           </label>
           <label htmlFor="visual" className="add-item__label add-item__visual-label">
@@ -82,7 +83,10 @@ export default function AddProductModal({activeModal, closeModal, submitItem}){
           </label>
           <label htmlFor="price" className="add-item__label add-item__price-label">
             <div>Price</div>
-            <input type="text" placeholder='0.00' className='add-item-price__input add-item-form__input' onChange={handlePriceChange} value={itemPrice}/>
+            
+            <span className='add-item__price-dollar-sign'>$</span>
+            <input type="text" placeholder='0.00' className='add-item-price__input add-item-form__input' onChange={handlePriceChange} value={itemPrice} required/>
+            
           </label>
 
         </div>
@@ -95,7 +99,7 @@ export default function AddProductModal({activeModal, closeModal, submitItem}){
             Cancel
           </button>
           <button
-            onClick={handleCreateItemSubmit}
+            
             type="submit"
             className="add-item-form__button_create"
           >

@@ -100,7 +100,7 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
           paddingLeft: 1
         }}>
           <div className="cell-data">
-            {params.vaule === undefined ? '$0.00' : params.value}
+            {params.value}
           </div>
         </Box>
       )
