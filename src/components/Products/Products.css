@@ -51,3 +51,7 @@ path {
 .MuiDataGrid-cell.MuiDataGrid-cell--textLeft {
   padding: 0px !important;
 }
+
+.cell-data {
+ padding-left: 10px;
+}

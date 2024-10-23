@@ -23,6 +23,21 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
       headerName: "Name",
       width: 150,
       headerClassName: "products__column-header",
+      renderCell: (params) =>(
+        <Box sx ={{
+          width: '100%',
+          height: '100%',
+          backgroundColor: params.value,
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: "flex-start",
+        }}>
+          <div className="cell-data">
+            {params.value}
+          </div>
+        </Box>
+      )
     },
     {
       field: "col2",
@@ -38,9 +53,11 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: "flex-start",
-          
+          paddingLeft: 1
         }}>
-          {params.value}
+          <div className="cell-data">
+            {params.value}
+          </div>
         </Box>
       )
     },
@@ -49,12 +66,44 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
       headerName: "Quantity",
       width: 150,
       headerClassName: "products__column-header",
+      renderCell: (params) =>(
+        <Box sx ={{
+          width: '100%',
+          height: '100%',
+          backgroundColor: params.value,
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: "flex-start",
+          paddingLeft: 1
+        }}>
+          <div className="cell-data">
+            {params.value}
+          </div>
+        </Box>
+      )
     },
     {
       field: "col4",
       headerName: "Price",
       width: 150,
       headerClassName: "products__column-header",
+      renderCell: (params) =>(
+        <Box sx={{
+          width: '100%',
+          height: '100%',
+          backgroundColor: params.value,
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: "flex-start",
+          paddingLeft: 1
+        }}>
+          <div className="cell-data">
+            {params.vaule === undefined ? '$0.00' : params.value}
+          </div>
+        </Box>
+      )
     },
   ])
 
@@ -65,15 +114,17 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
     setActiveModal('add-item')
   }
 
+  function openEditItem(item){
+
+  }
+
   function handleCreateItemSubmit(itemData){
     console.log(itemData)
-    // setTableData({})
-    // console.log(tableData.rows)
     setTableRows([...tableRows, {
       id: `${tableRows.length + 1}`,
       col1: itemData.itemName,
       col2: itemData.itemVisualColor,
-      col3: `${itemData.quantityUnit}` === 'length/feet' ? 'Length/Feet' : "Unit/Per",
+      col3: `${itemData.quantityUnit === 'length-feet' ? 'Length/Feet' : 'Unit/Per'}` ,
       col4: `$${itemData.itemPrice}`,
     }])
   }
@@ -94,20 +145,13 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
           "&.products__column-header":{
             bgcolor: 'transparent'
           },
-          [.${gridClasses.cell}.spaced]:{
-
-          }
+          
           
         }}
       >
         <DataGrid
           rows={tableRows}
           columns={tableColumns}
-          getCellClassName={(params) => {
-            if (params.field !== 'col2'){
-              return 'spaced'
-            }
-          }}
           sx={{
             color: "white",
           }}
