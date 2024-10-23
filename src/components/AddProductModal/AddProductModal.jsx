@@ -24,11 +24,11 @@ export default function AddProductModal({activeModal, closeModal, submitItem}){
     setItemPrice(e.target.value)
   }
 
-  function resetInputs(e){
-    setItemName(e.target.value)
+  function resetInputs(){
+    setItemName('')
     setItemVisualColor('#000000')
     setQuantityUnit('length-feet')
-    setItemPrice(e.target.value)
+    setItemPrice('')
   }
 
   function handleCloseModal(e){
@@ -44,7 +44,7 @@ export default function AddProductModal({activeModal, closeModal, submitItem}){
       quantityUnit,
       itemPrice
     }
-    resetInputs(e)
+    resetInputs()
     closeModal()
     submitItem(itemData)
   }

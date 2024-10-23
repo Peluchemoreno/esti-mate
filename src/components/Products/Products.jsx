@@ -120,6 +120,9 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
 
   function handleCreateItemSubmit(itemData){
     console.log(itemData)
+    if (!itemData.itemPrice.includes('.')){
+      itemData.itemPrice += '.00'
+    }
     setTableRows([...tableRows, {
       id: `${tableRows.length + 1}`,
       col1: itemData.itemName,
