@@ -5,7 +5,7 @@ export default function AddProductModal({activeModal, closeModal, submitItem}){
 
   const [itemName, setItemName] = useState('')
   const [itemVisualColor, setItemVisualColor] = useState('#000000')
-  const [quantityUnit, setQuantityUnit] = useState('')
+  const [quantityUnit, setQuantityUnit] = useState('length-feet')
   const [itemPrice, setItemPrice] = useState('')
 
   function handleItemNameChange(e){

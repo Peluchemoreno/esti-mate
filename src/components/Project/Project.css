@@ -20,7 +20,7 @@
   margin-right: 5px;
 }
 
-.project__delete-button {
+.project__delete-button, .edit-product-delete-button {
   background-color: var(--delete-red);
   color: var(--white);
   border: 1px solid var(--white);
@@ -30,7 +30,7 @@
   transition: opacity .2s ease;
 }
 
-.project__delete-button:hover{
+.project__delete-button:hover, .edit-product-delete-button:hover{
   opacity: .7;
 }
 

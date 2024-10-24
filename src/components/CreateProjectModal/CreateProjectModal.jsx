@@ -1,4 +1,4 @@
-import { cloneElement, useEffect, useState } from "react";
+import { useState } from "react";
 import "./CreateProjectModal.css";
 import dropdown from "../../assets/icons/drop-down.svg";
 

@@ -1,3 +1,5 @@
+/* these classes also apply to the edit product modal (sorry im lazy) */
+
 .add-item-form {
   position: absolute;
   top: 10%;
@@ -63,6 +65,12 @@
   background-color: var(--blue-primary);
   color: var(--white);
 }
+
+.add-item-form__button_create:disabled {
+  filter: grayscale(1);
+  cursor:auto;
+}
+
 
 .add-item-form__input {
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -130,4 +138,13 @@
   font-weight: normal;
   font-size: 18px;
   align-self: flex-end;
+}
+
+.add-item-form__button_create:disabled {
+  filter: grayscale(1);
+  cursor:auto;
+}
+
+.add-item-form__button_create:disabled:hover {
+  background-color: var(--blue-primary);
 }
