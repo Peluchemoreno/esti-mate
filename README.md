@@ -15,7 +15,7 @@
 - [x] implement rename project functionality
 - [x] implement edit items on row click
 - [ ] handle all console errors
-- [ ] when I update an item and revert it back the item gets deleted 😡
+- [ ] when I delete final decimal place in the price of an item and revert it back the item gets deleted 😡
 
 ### Mouseup/Touchup
 
