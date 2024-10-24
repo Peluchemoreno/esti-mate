@@ -12,7 +12,7 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
  
  
   const [tableRows, setTableRows] = useState([])
-  const [currentItem, setCurrentItem] = useState(null)
+  const [currentItem, setCurrentItem] = useState()
 
   const [tableColumns, setTableColumns] = useState([
     {
@@ -23,6 +23,8 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
       renderCell: (params) =>(
         <Box 
         onClick={()=>{
+          console.log(currentItem)
+          console.log(params.row)
           handleEditItemClick(params.row)
         }} 
         sx ={{

@@ -43,10 +43,11 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
       name: itemName,
       visual: itemVisualColor,
       quantity: quantityUnit,
-      price: `$${itemPrice}`,
+      price: `$${parseFloat(itemPrice).toFixed(2).toString()}`,
       productId: product._id
     }
     updateProduct(productData, token)
+
     closeModal()
   }
 
@@ -56,6 +57,7 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
       productId: product._id
     }
     deleteProduct(productData, token)
+    closeModal()
   }
 
   function isUpdateButtonDisabled(){
@@ -134,7 +136,7 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
           </label>
         </div>
         <div className="add-item-form__footer">
-          <button onClick={handleItemDeleteClick} className="edit-product-delete-button">Delete product</button>
+          <button type="button" onClick={handleItemDeleteClick} className="edit-product-delete-button">Delete product</button>
           <div>
             <button
               onClick={handleCloseModal}
