@@ -15,7 +15,7 @@
 - [x] implement rename project functionality
 - [x] implement edit items on row click
 - [ ] handle all console errors
-- [ ] when I submit the update form with the enter button it deletes the item 😡
+- [x] when I submit the update form with the enter button it deletes the item 😡
 
 ### Mouseup/Touchup
 
