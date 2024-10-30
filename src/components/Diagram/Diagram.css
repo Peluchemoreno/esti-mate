@@ -85,6 +85,12 @@
   user-select: none;
 }
 
+.diagram__select-product {
+  position: absolute;
+  right: 5px;
+  top: 110px;
+}
+
 @media screen and (max-width: 650px) {
 
   .diagram {

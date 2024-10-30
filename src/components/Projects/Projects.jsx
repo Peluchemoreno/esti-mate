@@ -8,8 +8,6 @@ import {getProjects} from '../../utils/auth'
 
 export default function Projects({closeModal, activeModal, setActiveModal, handleCreateProjectSubmit, projects, setProjects}){
 
-  const currentUser = useContext(CurrentUserContext).currentUser;
-  console.log(projects)
 
   useEffect(()=>{
     const token = localStorage.getItem('jwt')

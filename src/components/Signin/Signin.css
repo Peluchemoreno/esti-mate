@@ -9,7 +9,7 @@
 .signin-form {
   display: flex;
   flex-direction: column;
-  width: 80%;
+  width: 70%;
 }
 
 .input {
@@ -73,4 +73,10 @@
 
 .signin__link:hover {
   color: var(--blue-secondary);
+}
+
+@media screen and (max-width: 650px) {
+  .signin-form {
+    width: 80%;
+  }
 }

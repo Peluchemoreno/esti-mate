@@ -117,7 +117,6 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
     .then(data => {
       const productList = data.products
       setTableRows(productList)
-
     })
   }, [activeModal])
 
