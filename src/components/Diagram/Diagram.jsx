@@ -9,6 +9,7 @@ import {
   isLineParallelToSide,
   calculateDistance,
 } from "../../utils/constants";
+import { getProducts } from "../../utils/api";
 
 const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
   /* ------------------------------------------------------------------------------------ */
@@ -56,6 +57,21 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
   };
   const [productsVisible, setProductsVisible] = useState(true);
   const [tool, setTool] = useState('');
+  const [products, setProducts] = useState([])
+  const [selectedProduct, setSelectedProduct] = useState({})
+ 
+  useEffect(()=>{
+    console.log('render')
+    const token = localStorage.getItem('jwt')
+    getProducts(token)
+    .then(data => {
+      const products = data.products
+      setProducts(products)
+      console.log(products[0])
+      // debugger
+      setTool(products[0].name)
+    })
+  }, [])
 
 
   useEffect(() => {
@@ -101,6 +117,7 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
     drawAllLines(ctx); // Redraw all lines whenever currentLine or lines change
   }, [currentLine, lines, isDrawing]);
 
+
   /* ------------------------------------------------------------------------------------ */
   /*                            tightly coupled grid functions                            */
   /* ------------------------------------------------------------------------------------ */
@@ -114,26 +131,26 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
     return Math.round(number / gridSize) * gridSize;
   }
 
-  function drawGrid() {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d", { willReadFrequently: true });
-    const canvasWidth = canvas?.clientWidth;
-    const canvasHeight = window.innerHeight;
+  // function drawGrid() {
+  //   const canvas = canvasRef.current;
+  //   const context = canvas?.getContext("2d", { willReadFrequently: true });
+  //   const canvasWidth = canvas?.clientWidth;
+  //   const canvasHeight = window.innerHeight;
 
-    for (let x = 0; x <= canvasWidth; x += gridSize) {
-      context.moveTo(x, 0);
-      context.lineTo(x, canvasHeight);
-    }
+  //   for (let x = 0; x <= canvasWidth; x += gridSize) {
+  //     context.moveTo(x, 0);
+  //     context.lineTo(x, canvasHeight);
+  //   }
 
-    for (let y = 0; y <= canvasHeight; y += gridSize) {
-      context.moveTo(0, y);
-      context.lineTo(canvasWidth, y);
-    }
-    // context.fillStyle = "#dfdfdf";
-    context.strokeStyle = "red";
-    context.stroke();
-    // context.fillRect(0, 0, canvasWidth, canvasHeight);
-  }
+  //   for (let y = 0; y <= canvasHeight; y += gridSize) {
+  //     context.moveTo(0, y);
+  //     context.lineTo(canvasWidth, y);
+  //   }
+  //   // context.fillStyle = "#dfdfdf";
+  //   context.strokeStyle = "red";
+  //   context.stroke();
+  //   // context.fillRect(0, 0, canvasWidth, canvasHeight);
+  // }
 
   /* ------------------------------------------------------------------------------------ */
   /*                               event listeners                                        */
@@ -175,6 +192,7 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
   /* ------------------------------------------------------------------------------------ */
 
   function handleMouseDown(e) {
+    console.log(`tool: ${tool}`)
     let offsetX, offsetY;
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0];
@@ -186,9 +204,8 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
       offsetX = e.offsetX;
       offsetY = e.offsetY;
     }
-  
-    const selectedProduct = productList.find(product => product.name === tool);
-  
+    // console.log(selectedProduct)
+    
     setCurrentLine({
       startX: snapNumberToGrid(offsetX),
       startY: snapNumberToGrid(offsetY),
@@ -197,7 +214,7 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
       isVertical: false,
       isHorizontal: false,
       isSelected: false,
-      color: "black",
+      color: 'black',
       product: selectedProduct, // Directly assign the selected product object here
     });
     setIsDrawing(true);
@@ -257,8 +274,8 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
   // Stop drawing on mouseup
   function handleMouseUp(e) {
     console.log(currentLine)
-    console.log(tool)
-    currentLine.color = currentLine.product.visual
+    // currentLine.color = selectedProduct.visual
+    currentLine.color = 'black'
     if (e.nativeEvent.touches) {
       let offsetX, offsetY;
       const touch = e.nativeEvent?.touches[0];
@@ -368,7 +385,7 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
 
   function drawLine(ctx, line) {
     const { startX, startY, endX, endY, midpoint, measurement, color, product } = line;
-    console.log(product)
+    // console.log(product)
     // Snap coordinates to the grid
     const x1 = Math.round(startX / gridSize) * gridSize;
     const y1 = Math.round(startY / gridSize) * gridSize;
@@ -400,6 +417,7 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
 
   function handleToolSelectChange(e){
     setTool(e.target.value)
+    console.log(tool)
   }
 
   return (
@@ -449,8 +467,8 @@ const Diagram = ({ activeModal, closeModal, isMobile, productList }) => {
             setProductsVisible(true);
           }}
         />
-        <select value={tool} onChange={handleToolSelectChange} className="diagram__select-product" name="select product dropdown" id="select-product-dropdown">
-          {productList.map(product => {
+        <select value={tool} onChange={handleToolSelectChange} className="diagram__select-product" name="select product dropdown" id="select-product-dropdown" defaultValue={products[0]?.name}>
+          {products.map(product => {
             return (
               <option style={{
                 backgroundColor: `${product.visual}`

@@ -54,7 +54,9 @@ function App() {
           }
           getProducts(token)
           .then((data)=>{
-            setProducts(data.products)
+            const products = data.products
+            setProducts(products)
+            console.log(products)
           })
         });
       })
@@ -64,11 +66,19 @@ function App() {
   }, []);
 
   function handleLogin(email, password) {
+    
     signin(email, password)
       .then((data) => {
-        getUser(data.token).then((user) => {
+        const token = data.token
+        getUser(token).then((user) => {
           setCurrentUser(user);
-          navigate("/dashboard/projects");
+          getProducts(token)
+          .then(data => {
+            const products = data.products
+            setProducts(products)
+            console.log(products) 
+            navigate("/dashboard/projects");
+          })
         });
       })
       .catch((err) => {
