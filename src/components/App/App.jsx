@@ -31,7 +31,6 @@ function App() {
   const [currentUser, setCurrentUser] = useState({});
   const [activeModal, setActiveModal] = useState("");
   const [projects, setProjects] = useState([]);
-  const [products, setProducts] = useState([]);
   const navigate = useNavigate();
   const [mobileDiagramActive, setMobileDiagramActive] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 650);
@@ -52,12 +51,6 @@ function App() {
             const reverseOrderArray = projectArray.projects.reverse();
             setProjects([...reverseOrderArray]);
           }
-          getProducts(token)
-          .then((data)=>{
-            const products = data.products
-            setProducts(products)
-            console.log(products)
-          })
         });
       })
       .catch((err) => {
@@ -72,13 +65,7 @@ function App() {
         const token = data.token
         getUser(token).then((user) => {
           setCurrentUser(user);
-          getProducts(token)
-          .then(data => {
-            const products = data.products
-            setProducts(products)
-            console.log(products) 
-            navigate("/dashboard/projects");
-          })
+          navigate("/dashboard/projects");
         });
       })
       .catch((err) => {
@@ -154,11 +141,9 @@ function App() {
             <>
               <DisablePullToRefresh />
               <Diagram activeModal={activeModal} closeModal={closeModal} isMobile={isMobile} />
-              {/* <InfiniteCanvas activeModal={activeModal} closeModal={closeModal} isMobile={isMobile}/> */}
             </>
           ) : (
-            <Diagram activeModal={activeModal} closeModal={closeModal} isMobile={isMobile} productList={products}/>
-            // <InfiniteCanvas activeModal={activeModal} closeModal={closeModal} isMobile={isMobile}/>
+            <Diagram activeModal={activeModal} closeModal={closeModal} isMobile={isMobile}/>
           )}
         </>
       </div>
