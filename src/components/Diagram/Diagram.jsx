@@ -68,7 +68,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       setProducts(products)
       setTool(products[0].name)
     })
-  }, [])
+  }, [activeModal])
 
 
   useEffect(() => {
@@ -185,6 +185,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
 
 
   function handleMouseDown(e) {
+    console.log(products)
     let offsetX, offsetY;
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0];
