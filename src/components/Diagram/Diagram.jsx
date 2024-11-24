@@ -67,6 +67,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       const products = data.products
       setProducts(products)
       setTool(products[0].name)
+      setSelectedProduct(products[0])
     })
   }, [activeModal])
 
@@ -185,7 +186,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
 
 
   function handleMouseDown(e) {
-    console.log(products)
+    const currentProduct = products.find(product => product.name === tool)
     let offsetX, offsetY;
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0];
@@ -197,7 +198,6 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       offsetX = e.offsetX;
       offsetY = e.offsetY;
     }
-    // console.log(selectedProduct)
     
     setCurrentLine({
       startX: snapNumberToGrid(offsetX),
@@ -208,7 +208,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       isHorizontal: false,
       isSelected: false,
       color: 'black',
-      product: selectedProduct, // Directly assign the selected product object here
+      product: currentProduct, // Directly assign the selected product object here
     });
     setIsDrawing(true);
   }
@@ -267,8 +267,6 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   // Stop drawing on mouseup
   function handleMouseUp(e) {
     const currentProduct = products?.find(product => product.name === tool)
-    
-
     if (e.nativeEvent?.touches) {
       let offsetX, offsetY;
       const touch = e.nativeEvent?.touches[0];
@@ -320,11 +318,13 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
         currentLine.isVertical = false;
         currentLine.isHorizontal = false;
       }
-      currentLine.product = currentProduct
-      currentLine.color = currentProduct?.visual
-      const updatedLine = { ...currentLine };
+      // currentLine.product = currentProduct
+      currentLine.color = currentProduct?.visual      
+      const updatedLine = JSON.parse(JSON.stringify(currentLine));
+      updatedLine.currentProduct = currentProduct
+
+      console.log(updatedLine)
       setLines([...lines, updatedLine]); // Save the current line
-      console.log(lines)
     }
 
     setIsDrawing(false);
@@ -409,9 +409,31 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   }
 
   function handleToolSelectChange(e){
-    setTool(e.target.value)
-    console.log(tool)
+    const selectedTool = e.target.value
+    setTool(selectedTool)
+    const currentProduct = products.find(product => product.name === selectedTool)
+    setSelectedProduct(currentProduct)
   }
+
+  function saveDiagram(){
+    console.log("saving diagram");
+    let totalFootage = 0;
+    let price = 0;
+    // let miters = 0
+    lines.forEach((line) => {
+      totalFootage += line.measurement;
+      price += (convertToPriceInCents(line.currentProduct.price) * line.measurement)
+    });
+  
+    console.log(`${totalFootage}'`);
+    console.log(lines);
+    console.log('$' + (price * .01).toFixed(2))
+  }
+
+  function convertToPriceInCents(string){
+    return parseInt(string.replace('$', '').replace('.', ''))
+  }
+
 
   return (
     <>
@@ -432,18 +454,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
           src={saveIcon}
           alt="save digram"
           className="diagram__icon diagram__save"
-          onClick={() => {
-            const canvas = canvasRef.current;
-            const context = canvas.getContext("2d");
-            console.log("saving diagram");
-            let totalFootage = 0;
-            // let miters = 0
-            lines.forEach((line) => {
-              totalFootage += line.measurement;
-            });
-            console.log(`${totalFootage}'`);
-            console.log(lines);
-          }}
+          onClick={saveDiagram}
         />
         <img
           src={trashIcon}
