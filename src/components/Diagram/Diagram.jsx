@@ -57,8 +57,8 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   };
   const [productsVisible, setProductsVisible] = useState(true);
   const [tool, setTool] = useState('');
+  const [unitPerTools, setUnitPerTools] = useState([])
   const [products, setProducts] = useState([])
-  const [selectedProduct, setSelectedProduct] = useState({})
  
   useEffect(()=>{
     const token = localStorage.getItem('jwt')
@@ -67,7 +67,6 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       const products = data.products
       setProducts(products)
       setTool(products[0].name)
-      setSelectedProduct(products[0])
     })
   }, [activeModal])
 
@@ -187,6 +186,26 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
 
   function handleMouseDown(e) {
     const currentProduct = products.find(product => product.name === tool)
+    
+
+    if (currentProduct.quantity === 'unit-per'){
+      let offsetX, offsetY;
+      if (e.nativeEvent?.touches) {
+        const touch = e.nativeEvent.touches[0];
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        offsetX = touch.clientX - rect.left;
+        offsetY = touch.clientY - rect.top;
+      } else {
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+      }
+
+  
+      // write logic for using tools that dont require drawing, only placing
+
+    }
+
     let offsetX, offsetY;
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0];
@@ -208,7 +227,7 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
       isHorizontal: false,
       isSelected: false,
       color: 'black',
-      product: currentProduct, // Directly assign the selected product object here
+      // product: currentProduct, // Directly assign the selected product object here
     });
     setIsDrawing(true);
   }
@@ -318,9 +337,8 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
         currentLine.isVertical = false;
         currentLine.isHorizontal = false;
       }
-      // currentLine.product = currentProduct
       currentLine.color = currentProduct?.visual      
-      const updatedLine = JSON.parse(JSON.stringify(currentLine));
+      const updatedLine = {...currentLine};
       updatedLine.currentProduct = currentProduct
 
       console.log(updatedLine)
@@ -411,8 +429,8 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
   function handleToolSelectChange(e){
     const selectedTool = e.target.value
     setTool(selectedTool)
-    const currentProduct = products.find(product => product.name === selectedTool)
-    setSelectedProduct(currentProduct)
+    // const currentProduct = products.find(product => product.name === selectedTool)
+    // setSelectedProduct(currentProduct)
   }
 
   function saveDiagram(){
