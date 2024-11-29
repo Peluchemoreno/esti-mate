@@ -10,10 +10,10 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
   const [itemPrice, setItemPrice] = useState("");
 
   useEffect(() => {
-    setItemName(product?.name);
-    setItemVisualColor(product?.visual);
-    setQuantityUnit(product?.quantity);
-    setItemPrice(product?.price.replace('$', ''));
+    setItemName(product?.name || 'defualt name');
+    setItemVisualColor(product?.visual || "#000000");
+    setQuantityUnit(product?.quantity || "length-feet");
+    setItemPrice(product?.price.replace('$', '') || "$0.00");
   }, [product, activeModal]);
 
   function handleItemNameChange(e) {

@@ -23,9 +23,8 @@ export default function Products({activeModal, setActiveModal, closeModal}) {
       renderCell: (params) =>(
         <Box 
         onClick={()=>{
-          console.log(currentItem)
-          console.log(params.row)
-          handleEditItemClick(params.row)
+          const selectedItem = params.row;
+          handleEditItemClick(selectedItem)
         }} 
         sx ={{
           width: '100%',

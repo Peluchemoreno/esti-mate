@@ -188,23 +188,23 @@ const Diagram = ({ activeModal, closeModal, isMobile}) => {
     const currentProduct = products.find(product => product.name === tool)
     
 
-    if (currentProduct.quantity === 'unit-per'){
-      let offsetX, offsetY;
-      if (e.nativeEvent?.touches) {
-        const touch = e.nativeEvent.touches[0];
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        offsetX = touch.clientX - rect.left;
-        offsetY = touch.clientY - rect.top;
-      } else {
-        offsetX = e.offsetX;
-        offsetY = e.offsetY;
-      }
+    // if (currentProduct?.quantity === 'unit-per'){
+    //   let offsetX, offsetY;
+    //   if (e.nativeEvent?.touches) {
+    //     const touch = e.nativeEvent.touches[0];
+    //     const canvas = canvasRef.current;
+    //     const rect = canvas.getBoundingClientRect();
+    //     offsetX = touch.clientX - rect.left;
+    //     offsetY = touch.clientY - rect.top;
+    //   } else {
+    //     offsetX = e.offsetX;
+    //     offsetY = e.offsetY;
+    //   }
 
   
-      // write logic for using tools that dont require drawing, only placing
+    //   // write logic for using tools that dont require drawing, only placing
 
-    }
+    // }
 
     let offsetX, offsetY;
     if (e.nativeEvent?.touches) {
