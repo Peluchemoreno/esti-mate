@@ -1,0 +1,49 @@
+{
+  "hash": "96f0ba87",
+  "configHash": "74d9fc07",
+  "lockfileHash": "d52f10c0",
+  "browserHash": "6a867a89",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "8739478b",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "3545885d",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.js",
+      "file": "react-router-dom.js",
+      "fileHash": "c08200c6",
+      "needsInterop": false
+    },
+    "@mui/x-data-grid": {
+      "src": "../../node_modules/@mui/x-data-grid/index.js",
+      "file": "@mui_x-data-grid.js",
+      "fileHash": "2a9daca1",
+      "needsInterop": false
+    },
+    "@mui/material/": {
+      "src": "../../node_modules/@mui/material/index.js",
+      "file": "@mui_material_.js",
+      "fileHash": "6ab979c4",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-ZJVQPAUE": {
+      "file": "chunk-ZJVQPAUE.js"
+    },
+    "chunk-L2Q2RVSC": {
+      "file": "chunk-L2Q2RVSC.js"
+    },
+    "chunk-DDNM7ENY": {
+      "file": "chunk-DDNM7ENY.js"
+    }
+  }
+}
