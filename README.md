@@ -16,7 +16,7 @@
 - [x] implement edit items on row click
 - [ ] handle all console errors
 - [x] when I submit the update form with the enter button it deletes the item 😡
-- [ ] testing adding an item
+
 ### Mouseup/Touchup
 
 ### Mousedown/Touchstart
