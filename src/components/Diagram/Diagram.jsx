@@ -8,6 +8,7 @@ import {
   isLineParallelToTop,
   isLineParallelToSide,
   calculateDistance,
+  isLineNearPoint,
 } from "../../utils/constants";
 import { getProducts } from "../../utils/api";
 
@@ -59,6 +60,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
   const [tool, setTool] = useState("");
   const [unitPerTools, setUnitPerTools] = useState([]);
   const [products, setProducts] = useState([]);
+  const [selectedLine, setSelectedLine] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -79,8 +81,8 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
     canvas.height = window.innerHeight * dpr;
     context.scale(dpr, dpr);
 
-    // drawGrid(); // Redraw the grid after scaling
-  }, []);
+    drawGrid(context); // Redraw the grid after scaling
+  }, [window.innerWidth, window.innerHeight]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -110,11 +112,41 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
     const ctx = canvas.getContext("2d");
 
     drawAllLines(ctx); // Redraw all lines whenever currentLine or lines change
-  }, [currentLine, lines, isDrawing]);
+  }, [currentLine, lines, isDrawing, selectedLine]);
+
+  useEffect(() => {
+    // console.log(lines);
+    console.log(selectedLine);
+  }, [lines, selectedLine]);
 
   /* ------------------------------------------------------------------------------------ */
   /*                            tightly coupled grid functions                            */
   /* ------------------------------------------------------------------------------------ */
+  function drawGrid(ctx) {
+    const { width, height } = ctx.canvas;
+    const gridSize = 10; // Adjust grid size as needed
+
+    // ctx.strokeStyle = "#ddd"; // Light gray grid lines
+    ctx.strokeStyle = "#ccc";
+    ctx.lineWidth = 1;
+
+    // Draw vertical grid lines
+    for (let x = 0; x < width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+
+    // Draw horizontal grid lines
+    for (let y = 0; y < height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+  }
+
   function convertToFeet(distance) {
     const feet = Math.round(distance / gridSize);
 
@@ -130,9 +162,8 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
   /* ------------------------------------------------------------------------------------ */
 
   function handleMouseDown(e) {
-    const currentProduct = products.find((product) => product.name === tool);
-
     let offsetX, offsetY;
+
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0];
       const canvas = canvasRef.current;
@@ -149,6 +180,27 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
         snapNumberToGrid(e.offsetX),
         snapNumberToGrid(e.offsetY),
       ]);
+    }
+
+    if (tool === "select") {
+      // log the line that intersects within the point
+      console.log(tool);
+      lines.forEach((line) => {
+        if (
+          isLineNearPoint(
+            line.startX,
+            line.startY,
+            line.endX,
+            line.endY,
+            snapNumberToGrid(e.offsetX),
+            snapNumberToGrid(e.offsetY),
+            5
+          )
+        ) {
+          console.log(line);
+        }
+        // console.log(line);
+      });
     }
 
     setCurrentLine({
@@ -200,7 +252,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
         ...prevLine,
         endX: snapNumberToGrid(offsetX),
         endY: snapNumberToGrid(offsetY),
-        color: "green",
+        color: "#14c414",
       }));
     } else {
       setCurrentLine((prevLine) => ({
@@ -219,6 +271,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
   // Stop drawing on mouseup
   function handleMouseUp(e) {
     const currentProduct = products?.find((product) => product.name === tool);
+
     if (e.nativeEvent?.touches) {
       let offsetX, offsetY;
       const touch = e.nativeEvent?.touches[0];
@@ -270,6 +323,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
         currentLine.isVertical = false;
         currentLine.isHorizontal = false;
       }
+
       currentLine.color = currentProduct?.visual;
       const updatedLine = { ...currentLine };
       updatedLine.currentProduct = currentProduct;
@@ -311,7 +365,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
 
   function drawAllLines(ctx) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Clear canvas
-
+    drawGrid(ctx);
     // Draw each saved line or product using its own properties
     lines.forEach((line) => {
       line.product = currentLine[0];
@@ -449,6 +503,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
             );
           })}
           <option value="downspout">Downspout</option>
+          <option value="select">Select</option>
         </select>
 
         <div className="diagram__line-length-display">
