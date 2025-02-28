@@ -69,6 +69,11 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
       setProducts(products);
       setTool(products[0].name);
     });
+
+    setLines((prevLines) =>
+      prevLines.map((line) => ({ ...line, isSelected: false }))
+    );
+    setSelectedLine({});
   }, [activeModal]);
 
   useEffect(() => {
@@ -115,9 +120,10 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
   }, [currentLine, lines, isDrawing, selectedLine]);
 
   useEffect(() => {
-    // console.log(lines);
-    console.log(selectedLine);
-  }, [lines, selectedLine]);
+    // Deselect all lines when the tool changes
+    setLines((prevLines) => prevLines.map(line => ({ ...line, isSelected: false })));
+    setSelectedLine({});
+  }, [tool]);
 
   /* ------------------------------------------------------------------------------------ */
   /*                            tightly coupled grid functions                            */
@@ -163,6 +169,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
 
   function handleMouseDown(e) {
     let offsetX, offsetY;
+    let foundLine = null;
 
     if (e.nativeEvent?.touches) {
       const touch = e.nativeEvent.touches[0];
@@ -180,45 +187,64 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
         snapNumberToGrid(e.offsetX),
         snapNumberToGrid(e.offsetY),
       ]);
-    }
+    } else if (tool === "select") {
+      console.log("Selecting mode active");
 
-    if (tool === "select") {
-      // log the line that intersects within the point
-      console.log(tool);
-      lines.forEach((line) => {
+      // Reset all lines to not be selected
+      const updatedLines = lines.map((line) => ({
+        ...line,
+        isSelected: false,
+      }));
+
+      updatedLines.forEach((line) => {
         if (
           isLineNearPoint(
             line.startX,
             line.startY,
             line.endX,
             line.endY,
-            snapNumberToGrid(e.offsetX),
-            snapNumberToGrid(e.offsetY),
+            snapNumberToGrid(e.pageX),
+            snapNumberToGrid(e.pageY),
             5
           )
         ) {
-          console.log(line);
+          foundLine = { ...line, isSelected: true };
         }
-        // console.log(line);
       });
-    }
 
-    setCurrentLine({
-      startX: snapNumberToGrid(offsetX),
-      startY: snapNumberToGrid(offsetY),
-      endX: snapNumberToGrid(offsetX),
-      endY: snapNumberToGrid(offsetY),
-      isVertical: false,
-      isHorizontal: false,
-      isSelected: false,
-      color: "black",
-      // product: currentProduct, // Directly assign the selected product object here
-    });
-    setIsDrawing(true);
+      if (foundLine) {
+        setLines(
+          updatedLines.map((line) =>
+            line.startX === foundLine.startX && line.startY === foundLine.startY
+              ? foundLine
+              : line
+          )
+        );
+        setSelectedLine(foundLine);
+        console.log("Selected line:", foundLine);
+        console.log(lines);
+      } else {
+        console.log("No line found near click");
+        setSelectedLine({});
+      }
+    } else {
+      setCurrentLine({
+        startX: snapNumberToGrid(offsetX),
+        startY: snapNumberToGrid(offsetY),
+        endX: snapNumberToGrid(offsetX),
+        endY: snapNumberToGrid(offsetY),
+        isVertical: false,
+        isHorizontal: false,
+        isSelected: false,
+        color: "black",
+      });
+      setIsDrawing(true);
+      console.log(foundLine);
+    }
   }
 
   function handleMouseMove(e) {
-    if (!isDrawing || tool === "downspout") return;
+    if (!isDrawing || tool === "downspout" || tool === "select") return;
 
     let offsetX, offsetY;
     if (e.nativeEvent?.touches) {
@@ -271,6 +297,11 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
   // Stop drawing on mouseup
   function handleMouseUp(e) {
     const currentProduct = products?.find((product) => product.name === tool);
+    if (tool === "select") {
+      console.log("mouseup select");
+      setIsDrawing(false);
+      return;
+    }
 
     if (e.nativeEvent?.touches) {
       let offsetX, offsetY;
@@ -341,6 +372,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
 
     context.font = "900 12px Arial";
     context.textAlign = "center";
+    context.fillStyle = "black";
 
     if (line.isHorizontal) {
       if (line.position === "top") {
@@ -387,7 +419,7 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
       midpoint,
       measurement,
       color,
-      product,
+      isSelected,
     } = line;
     // console.log(product)
     // Snap coordinates to the grid
@@ -400,10 +432,26 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
-    ctx.strokeStyle = color; // Use the line's specific color
+    if (isSelected) {
+      ctx.strokeStyle = "orange";
+      ctx.fillStyle = "orange";
+    } else {
+      ctx.strokeStyle = color; // Use the line's specific color
+    }
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.closePath();
+
+    if (isSelected) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.arc(x1, y1, gridSize / 2, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.moveTo(x2, y2);
+      ctx.arc(x2, y2, gridSize / 2, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    }
 
     // Place the measurement if available
     if (midpoint && measurement) {

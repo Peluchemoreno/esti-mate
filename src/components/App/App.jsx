@@ -18,15 +18,6 @@ import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import { getProducts } from "../../utils/api";
 
-/* ------------------------------------------------------------------------------------ */
-/*                                  testinfinitecanvas                                  */
-/* ------------------------------------------------------------------------------------ */
-
-// import InfiniteCanvas from "../TestInfiniteCanvas/TestInfiniteCanvas";
-/* ------------------------------------------------------------------------------------ */
-/*                                  testinfinitecanvas                                  */
-/* ------------------------------------------------------------------------------------ */
-
 function App() {
   const [currentUser, setCurrentUser] = useState({});
   const [activeModal, setActiveModal] = useState("");
@@ -59,10 +50,9 @@ function App() {
   }, []);
 
   function handleLogin(email, password) {
-    
     signin(email, password)
       .then((data) => {
-        const token = data.token
+        const token = data.token;
         getUser(token).then((user) => {
           setCurrentUser(user);
           navigate("/dashboard/projects");
@@ -89,14 +79,13 @@ function App() {
     setActiveModal("");
   }
 
-
   return (
     <>
       <div className="page">
         <CurrentUserContext.Provider value={currentUser}>
           <Routes>
             <Route path="*" element={<PageNotFound />} />
-            <Route path="/esti-mate" element={<LandingPage />} />
+            <Route path="/" element={<LandingPage />} />
             <Route
               path="/dashboard"
               element={<Dashboard handleLogOut={handleLogOut} />}
@@ -126,7 +115,16 @@ function App() {
                   />
                 }
               />
-              <Route path="products" element={<Products activeModal={activeModal} setActiveModal={setActiveModal} closeModal={closeModal}/>} />
+              <Route
+                path="products"
+                element={
+                  <Products
+                    activeModal={activeModal}
+                    setActiveModal={setActiveModal}
+                    closeModal={closeModal}
+                  />
+                }
+              />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route
@@ -140,10 +138,18 @@ function App() {
           {mobileDiagramActive ? (
             <>
               <DisablePullToRefresh />
-              <Diagram activeModal={activeModal} closeModal={closeModal} isMobile={isMobile} />
+              <Diagram
+                activeModal={activeModal}
+                closeModal={closeModal}
+                isMobile={isMobile}
+              />
             </>
           ) : (
-            <Diagram activeModal={activeModal} closeModal={closeModal} isMobile={isMobile}/>
+            <Diagram
+              activeModal={activeModal}
+              closeModal={closeModal}
+              isMobile={isMobile}
+            />
           )}
         </>
       </div>
