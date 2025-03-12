@@ -10,31 +10,12 @@ import {
   calculateDistance,
   isLineNearPoint,
 } from "../../utils/constants";
-import { getProducts } from "../../utils/api";
+import { getProducts, addDiagramToProject } from "../../utils/api";
+import { useParams } from "react-router-dom";
 
-const Diagram = ({ activeModal, closeModal, isMobile }) => {
-  /* ------------------------------------------------------------------------------------ */
-  /*                               disable pinch zoom for ios                             */
-  /* ------------------------------------------------------------------------------------ */
-  // useEffect(() => {
-  //   function preventZoom(e) {
-  //     if (e.touches.length > 1) {
-  //       e.preventDefault();
-  //     }
-  //   };
-
-  //   document.addEventListener("touchmove", preventZoom, { passive: false });
-
-  //   return () => {
-  //     document.removeEventListener("touchmove", preventZoom);
-  //   };
-  // }, []);
-
-  // console.log(productList)
-
-  /* ------------------------------------------------------------------------------------ */
-  /*                                     render canvas                                    */
-  /* ------------------------------------------------------------------------------------ */
+const Diagram = ({ activeModal, closeModal, isMobile, currentProjectId }) => {
+  const params = useParams();
+  console.log(params);
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [gridSize, setGridSize] = useState(10);
@@ -61,6 +42,10 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
   const [unitPerTools, setUnitPerTools] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedLine, setSelectedLine] = useState({});
+
+  useEffect(() => {
+    console.log(currentProjectId);
+  }, [activeModal]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -121,7 +106,9 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
 
   useEffect(() => {
     // Deselect all lines when the tool changes
-    setLines((prevLines) => prevLines.map(line => ({ ...line, isSelected: false })));
+    setLines((prevLines) =>
+      prevLines.map((line) => ({ ...line, isSelected: false }))
+    );
     setSelectedLine({});
   }, [tool]);
 
@@ -476,6 +463,13 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
 
   function saveDiagram() {
     console.log("saving diagram");
+    const token = localStorage.getItem("jwt");
+
+    const canvas = canvasRef.current;
+    const imageData = canvas.toDataURL("image/png");
+    localStorage.setItem("testImage", imageData);
+    // capture a base64url of the canvas
+    // save that url to the database
     let totalFootage = 0;
     let price = 0;
     // let miters = 0
@@ -484,10 +478,21 @@ const Diagram = ({ activeModal, closeModal, isMobile }) => {
       price +=
         convertToPriceInCents(line.currentProduct.price) * line.measurement;
     });
+    const totalPrice = "$" + (price * 0.01).toFixed(2);
+    const data = {
+      lines,
+      imageData,
+      totalFootage,
+      price: totalPrice,
+    };
 
     console.log(`${totalFootage}'`);
     console.log(lines);
     console.log("$" + (price * 0.01).toFixed(2));
+    addDiagramToProject(currentProjectId, token, data);
+
+    clearCanvas();
+    closeModal();
   }
 
   function convertToPriceInCents(string) {

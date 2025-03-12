@@ -71,3 +71,16 @@
   margin: 30px 0;
   font-size: 16px;
 }
+
+.project__drawing {
+  background-color: white;
+  margin-top: 20px;
+}
+
+.project__diagram-container {
+  /* border: 1px solid red; */
+  margin: 0 auto;
+  max-width: 80vw;
+  display: flex;
+  justify-content: space-between;
+}

@@ -16,15 +16,17 @@ import Settings from "../Settings/Settings";
 import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
-import { getProducts } from "../../utils/api";
+import { addDiagramToProject, getProducts } from "../../utils/api";
 
 function App() {
   const [currentUser, setCurrentUser] = useState({});
   const [activeModal, setActiveModal] = useState("");
+  const [currentProjectId, setCurrentProjectId] = useState("");
   const [projects, setProjects] = useState([]);
   const navigate = useNavigate();
   const [mobileDiagramActive, setMobileDiagramActive] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 650);
+  const [projectDiagrams, setProjectDiagrams] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -41,6 +43,7 @@ function App() {
           } else {
             const reverseOrderArray = projectArray.projects.reverse();
             setProjects([...reverseOrderArray]);
+            console.log(projectArray.projects);
           }
         });
       })
@@ -73,6 +76,11 @@ function App() {
     createProject(projectData, token).then((data) => {
       setProjects([data.data, ...projects]);
     });
+  }
+
+  function handleAddDiagramToProject(data) {
+    // addDiagramToProject(projectId, token, data);
+    return data;
   }
 
   function closeModal() {
@@ -112,6 +120,8 @@ function App() {
                     projects={projects}
                     setMobileDiagramActive={setMobileDiagramActive}
                     isMobile={isMobile}
+                    setCurrentProjectId={setCurrentProjectId}
+                    projectDiagrams={projectDiagrams}
                   />
                 }
               />
@@ -142,6 +152,7 @@ function App() {
                 activeModal={activeModal}
                 closeModal={closeModal}
                 isMobile={isMobile}
+                currentProjectId={currentProjectId}
               />
             </>
           ) : (
@@ -149,6 +160,7 @@ function App() {
               activeModal={activeModal}
               closeModal={closeModal}
               isMobile={isMobile}
+              currentProjectId={currentProjectId}
             />
           )}
         </>
