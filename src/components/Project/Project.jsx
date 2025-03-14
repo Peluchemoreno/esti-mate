@@ -12,11 +12,23 @@ export default function Project({
   isMobile,
   setCurrentProjectId,
   activeModal,
-  projectDiagrams,
+  diagrams,
+  setDiagrams,
 }) {
   // console.log(setMobileDiagramActive)
   const params = useParams();
   const projectId = params.projectId;
+
+  const [dummyState, setDummyState] = useState(0);
+
+  // Function to force re-render
+  function forceUpdate() {
+    setDummyState(dummyState + 1);
+  }
+
+  let project = projects.filter((item) => {
+    return item._id === projectId;
+  })[0];
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -24,12 +36,8 @@ export default function Project({
 
   useEffect(() => {
     setCurrentProjectId(projectId);
-    console.log();
+    forceUpdate();
   }, [activeModal]);
-
-  const project = projects.filter((item) => {
-    return item._id === projectId;
-  })[0];
 
   // console.log(project)
   const navigator = useNavigate();
@@ -89,9 +97,13 @@ export default function Project({
               ? project.diagrams.map((diagram, index) => {
                   return (
                     <div
-                      key={index}
+                      key={diagram._id}
                       className="project__drawing"
                       alt="Diagram image"
+                      onClick={() => {
+                        console.log(diagram);
+                        console.log(diagram._id);
+                      }}
                       style={{
                         width: "200px",
                         height: "200px",

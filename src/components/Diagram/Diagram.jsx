@@ -10,12 +10,20 @@ import {
   calculateDistance,
   isLineNearPoint,
 } from "../../utils/constants";
-import { getProducts, addDiagramToProject } from "../../utils/api";
+import { getProducts } from "../../utils/api";
 import { useParams } from "react-router-dom";
 
-const Diagram = ({ activeModal, closeModal, isMobile, currentProjectId }) => {
+const Diagram = ({
+  activeModal,
+  closeModal,
+  isMobile,
+  currentProjectId,
+  addDiagramToProject,
+  setDiagrams,
+  setKey,
+}) => {
   const params = useParams();
-  console.log(params);
+
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [gridSize, setGridSize] = useState(10);
@@ -42,10 +50,6 @@ const Diagram = ({ activeModal, closeModal, isMobile, currentProjectId }) => {
   const [unitPerTools, setUnitPerTools] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedLine, setSelectedLine] = useState({});
-
-  useEffect(() => {
-    console.log(currentProjectId);
-  }, [activeModal]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -462,37 +466,37 @@ const Diagram = ({ activeModal, closeModal, isMobile, currentProjectId }) => {
   }
 
   function saveDiagram() {
-    console.log("saving diagram");
     const token = localStorage.getItem("jwt");
 
     const canvas = canvasRef.current;
     const imageData = canvas.toDataURL("image/png");
-    localStorage.setItem("testImage", imageData);
-    // capture a base64url of the canvas
-    // save that url to the database
+
     let totalFootage = 0;
     let price = 0;
-    // let miters = 0
+
     lines.forEach((line) => {
       totalFootage += line.measurement;
       price +=
         convertToPriceInCents(line.currentProduct.price) * line.measurement;
     });
+
     const totalPrice = "$" + (price * 0.01).toFixed(2);
+
     const data = {
-      lines,
+      lines: [...lines], // ✅ This forces a React re-render
       imageData,
       totalFootage,
       price: totalPrice,
     };
 
-    console.log(`${totalFootage}'`);
-    console.log(lines);
-    console.log("$" + (price * 0.01).toFixed(2));
-    addDiagramToProject(currentProjectId, token, data);
+    setDiagrams((prevDiagrams) => [...prevDiagrams, data]);
 
     clearCanvas();
     closeModal();
+    setKey((previousKey) => {
+      return previousKey + 1;
+    });
+    return addDiagramToProject(currentProjectId, token, data);
   }
 
   function convertToPriceInCents(string) {
@@ -518,7 +522,11 @@ const Diagram = ({ activeModal, closeModal, isMobile, currentProjectId }) => {
           src={saveIcon}
           alt="save digram"
           className="diagram__icon diagram__save"
-          onClick={saveDiagram}
+          onClick={() => {
+            saveDiagram().then((data) => {
+              setDiagrams((previousData) => [...previousData, data]);
+            });
+          }}
         />
         <img
           src={trashIcon}

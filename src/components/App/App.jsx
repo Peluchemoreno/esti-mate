@@ -26,7 +26,8 @@ function App() {
   const navigate = useNavigate();
   const [mobileDiagramActive, setMobileDiagramActive] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 650);
-  const [projectDiagrams, setProjectDiagrams] = useState([]);
+  const [diagrams, setDiagrams] = useState([]);
+  const [key, setKey] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -43,7 +44,6 @@ function App() {
           } else {
             const reverseOrderArray = projectArray.projects.reverse();
             setProjects([...reverseOrderArray]);
-            console.log(projectArray.projects);
           }
         });
       })
@@ -51,6 +51,11 @@ function App() {
         console.error(err);
       });
   }, []);
+
+  useEffect(() => {
+    console.log("diagrams chagned");
+    console.log(diagrams);
+  }, [diagrams]);
 
   function handleLogin(email, password) {
     signin(email, password)
@@ -76,11 +81,6 @@ function App() {
     createProject(projectData, token).then((data) => {
       setProjects([data.data, ...projects]);
     });
-  }
-
-  function handleAddDiagramToProject(data) {
-    // addDiagramToProject(projectId, token, data);
-    return data;
   }
 
   function closeModal() {
@@ -121,10 +121,13 @@ function App() {
                     setMobileDiagramActive={setMobileDiagramActive}
                     isMobile={isMobile}
                     setCurrentProjectId={setCurrentProjectId}
-                    projectDiagrams={projectDiagrams}
+                    diagrams={diagrams} // Pass diagrams state as a prop
+                    setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
+                    key={key}
                   />
                 }
               />
+
               <Route
                 path="products"
                 element={
@@ -153,6 +156,10 @@ function App() {
                 closeModal={closeModal}
                 isMobile={isMobile}
                 currentProjectId={currentProjectId}
+                addDiagramToProject={addDiagramToProject}
+                setDiagrams={setDiagrams}
+                setKey={setKey}
+                keyValue={key}
               />
             </>
           ) : (
@@ -161,6 +168,10 @@ function App() {
               closeModal={closeModal}
               isMobile={isMobile}
               currentProjectId={currentProjectId}
+              addDiagramToProject={addDiagramToProject}
+              setDiagrams={setDiagrams}
+              setKey={setKey}
+              keyValue={key}
             />
           )}
         </>
