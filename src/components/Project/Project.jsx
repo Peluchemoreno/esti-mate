@@ -3,7 +3,11 @@ import { useParams } from "react-router-dom";
 import backIcon from "../../assets/icons/back.svg";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { addDiagramToProject, deleteProject } from "../../utils/api";
+import {
+  addDiagramToProject,
+  deleteProject,
+  retrieveProjectDiagrams,
+} from "../../utils/api";
 
 export default function Project({
   projects,
@@ -18,13 +22,8 @@ export default function Project({
   // console.log(setMobileDiagramActive)
   const params = useParams();
   const projectId = params.projectId;
-
   const [dummyState, setDummyState] = useState(0);
-
-  // Function to force re-render
-  function forceUpdate() {
-    setDummyState(dummyState + 1);
-  }
+  const [diagramData, setDiagramData] = useState([]);
 
   let project = projects.filter((item) => {
     return item._id === projectId;
@@ -35,8 +34,15 @@ export default function Project({
   }, []);
 
   useEffect(() => {
+    const token = localStorage.getItem("jwt");
+
+    retrieveProjectDiagrams(projectId, token).then((diagrams) => {
+      setDiagramData(diagrams);
+    });
+  }, [diagrams]);
+
+  useEffect(() => {
     setCurrentProjectId(projectId);
-    forceUpdate();
   }, [activeModal]);
 
   // console.log(project)
@@ -93,29 +99,28 @@ export default function Project({
             </button>
           </div>
           <div className="project__diagram-container">
-            {project?.diagrams
-              ? project.diagrams.map((diagram, index) => {
-                  return (
-                    <div
-                      key={diagram._id}
-                      className="project__drawing"
-                      alt="Diagram image"
-                      onClick={() => {
-                        console.log(diagram);
-                        console.log(diagram._id);
-                      }}
-                      style={{
-                        width: "200px",
-                        height: "200px",
-                        backgroundImage: `url(${diagram.imageData})`, // Correct usage
-                        backgroundSize: "500px 500px", // Ensure it's properly formatted
-                        backgroundPosition: "50% 50%", // Center the zoomed-in portion
-                        backgroundRepeat: "no-repeat",
-                      }}
-                    ></div>
-                  );
-                })
-              : "No Diagrams"}
+            {diagramData.length > 0 ? (
+              diagramData.map((diagram, index) => (
+                <div
+                  key={index}
+                  className="project__drawing"
+                  alt="Diagram image"
+                  onClick={() => {
+                    console.log(diagram);
+                  }}
+                  style={{
+                    width: "200px",
+                    height: "200px",
+                    backgroundImage: `url(${diagram.imageData})`,
+                    backgroundSize: "500px 500px",
+                    backgroundPosition: "50% 50%",
+                    backgroundRepeat: "no-repeat",
+                  }}
+                ></div>
+              ))
+            ) : (
+              <p>No Diagrams</p>
+            )}
           </div>
         </div>
       </div>

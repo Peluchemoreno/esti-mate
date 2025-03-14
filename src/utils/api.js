@@ -26,7 +26,20 @@ export function addDiagramToProject(projectId, token, data) {
   })
     .then(processServerResponse)
     .then((response) => {
-      console.log(response);
+      return response;
+    });
+}
+
+export function retrieveProjectDiagrams(projectId, token) {
+  return fetch(BASE_URL + `dashboard/projects/${projectId}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then(processServerResponse)
+    .then((response) => {
       return response;
     });
 }

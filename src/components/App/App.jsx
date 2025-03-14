@@ -27,7 +27,6 @@ function App() {
   const [mobileDiagramActive, setMobileDiagramActive] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 650);
   const [diagrams, setDiagrams] = useState([]);
-  const [key, setKey] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -51,11 +50,6 @@ function App() {
         console.error(err);
       });
   }, []);
-
-  useEffect(() => {
-    console.log("diagrams chagned");
-    console.log(diagrams);
-  }, [diagrams]);
 
   function handleLogin(email, password) {
     signin(email, password)
@@ -85,6 +79,15 @@ function App() {
 
   function closeModal() {
     setActiveModal("");
+  }
+
+  useEffect(() => {
+    console.log(diagrams);
+  }, [diagrams]);
+
+  function handlePassDiagramData(data) {
+    console.log(data);
+    setDiagrams((prevDiagrams) => [...prevDiagrams, data]);
   }
 
   return (
@@ -123,7 +126,6 @@ function App() {
                     setCurrentProjectId={setCurrentProjectId}
                     diagrams={diagrams} // Pass diagrams state as a prop
                     setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
-                    key={key}
                   />
                 }
               />
@@ -158,8 +160,7 @@ function App() {
                 currentProjectId={currentProjectId}
                 addDiagramToProject={addDiagramToProject}
                 setDiagrams={setDiagrams}
-                setKey={setKey}
-                keyValue={key}
+                handlePassDiagramData={handlePassDiagramData}
               />
             </>
           ) : (
@@ -170,8 +171,7 @@ function App() {
               currentProjectId={currentProjectId}
               addDiagramToProject={addDiagramToProject}
               setDiagrams={setDiagrams}
-              setKey={setKey}
-              keyValue={key}
+              handlePassDiagramData={handlePassDiagramData}
             />
           )}
         </>

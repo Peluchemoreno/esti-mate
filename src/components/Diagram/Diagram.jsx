@@ -19,8 +19,7 @@ const Diagram = ({
   isMobile,
   currentProjectId,
   addDiagramToProject,
-  setDiagrams,
-  setKey,
+  handlePassDiagramData,
 }) => {
   const params = useParams();
 
@@ -230,7 +229,6 @@ const Diagram = ({
         color: "black",
       });
       setIsDrawing(true);
-      console.log(foundLine);
     }
   }
 
@@ -489,14 +487,12 @@ const Diagram = ({
       price: totalPrice,
     };
 
-    setDiagrams((prevDiagrams) => [...prevDiagrams, data]);
-
     clearCanvas();
     closeModal();
-    setKey((previousKey) => {
-      return previousKey + 1;
+
+    addDiagramToProject(currentProjectId, token, data).then((data) => {
+      handlePassDiagramData(data);
     });
-    return addDiagramToProject(currentProjectId, token, data);
   }
 
   function convertToPriceInCents(string) {
@@ -523,9 +519,10 @@ const Diagram = ({
           alt="save digram"
           className="diagram__icon diagram__save"
           onClick={() => {
-            saveDiagram().then((data) => {
-              setDiagrams((previousData) => [...previousData, data]);
-            });
+            // saveDiagram().then((data) => {
+            //   setDiagrams((previousData) => [...previousData, data]);
+            // });
+            saveDiagram();
           }}
         />
         <img
