@@ -3,26 +3,25 @@ import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserCon
 import { useContext, useEffect, useState } from "react";
 import logo from "../../assets/estimate-nobackground-blue.png";
 import { Link, Outlet } from "react-router-dom";
-import dropdown from '../../assets/icons/drop-down.svg'
+import dropdown from "../../assets/icons/drop-down.svg";
 import { useNavigate } from "react-router-dom";
-import hamburgerIcon from '../../assets/icons/hamburgermenu.svg'
+import hamburgerIcon from "../../assets/icons/hamburgermenu.svg";
 
-export default function Dashboard({handleLogOut}) {
+export default function Dashboard({ handleLogOut }) {
+  const [isMobile, setIsMobile] = useState(false);
 
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(()=>{
-    if (window.innerWidth < 650){
-      setIsMobile(true)
+  useEffect(() => {
+    if (window.innerWidth < 650) {
+      setIsMobile(true);
     }
-  }, [])
+  }, []);
 
   const currentUser = useContext(CurrentUserContext);
 
-  const navigator = useNavigate()
+  const navigator = useNavigate();
 
-  function navigateToLandingPage(){
-    navigator('/esti-mate')
+  function navigateToLandingPage() {
+    navigator("/");
   }
 
   return (
@@ -42,16 +41,29 @@ export default function Dashboard({handleLogOut}) {
             Settings
           </Link>
         </div>
-        <div className="dashboard__account-link" onClick={()=>{
-          handleLogOut()
-          navigateToLandingPage()
-        }}>
+        <div
+          className="dashboard__account-link"
+          onClick={() => {
+            handleLogOut();
+            navigateToLandingPage();
+          }}
+        >
           <p className="dashboard__account-email">{currentUser?.email}</p>
-          <img src={dropdown} alt="drop-down" className="dashboard__drop-down-icon" />
+          <img
+            src={dropdown}
+            alt="drop-down"
+            className="dashboard__drop-down-icon"
+          />
         </div>
-        {isMobile && <div className="dashboard__hamburger-menu-icon-container">
-          <img src={hamburgerIcon} alt="mobile menu" className="dashboard__hadmburger-menu-icon" />
-        </div> }
+        {isMobile && (
+          <div className="dashboard__hamburger-menu-icon-container">
+            <img
+              src={hamburgerIcon}
+              alt="mobile menu"
+              className="dashboard__hadmburger-menu-icon"
+            />
+          </div>
+        )}
       </header>
       <Outlet />
     </div>

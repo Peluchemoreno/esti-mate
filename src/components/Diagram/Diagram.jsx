@@ -20,6 +20,8 @@ const Diagram = ({
   currentProjectId,
   addDiagramToProject,
   handlePassDiagramData,
+  selectedDiagram,
+  setSelectedDiagram,
 }) => {
   const params = useParams();
 
@@ -49,6 +51,56 @@ const Diagram = ({
   const [unitPerTools, setUnitPerTools] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedLine, setSelectedLine] = useState({});
+
+  // useEffect(() => {
+  //   const canvas = canvasRef.current;
+  //   const ctx = canvas.getContext("2d");
+
+  //   const newLines = selectedDiagram?.lines;
+  //   if (newLines !== undefined) {
+  //     console.log("selected diagram: ", newLines);
+  //     newLines?.forEach((line) => {
+  //       console.log("drawing line: ", line);
+  //       drawLine(ctx, line);
+  //     });
+  //   }
+  // }, [selectedDiagram, activeModal]);
+
+  // useEffect(() => {
+  //   const canvas = canvasRef.current;
+  //   const ctx = canvas?.getContext("2d");
+
+  //   if (!ctx) return;
+
+  //   ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before drawing
+
+  //   const newLines = selectedDiagram?.lines;
+  //   if (newLines) {
+  //     console.log("selected diagram: ", newLines);
+  //     newLines.forEach((line) => {
+  //       console.log("drawing line: ", line);
+  //       drawLine(ctx, line);
+  //     });
+  //   }
+  // }, [selectedDiagram, activeModal]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+
+    if (!ctx) return;
+
+    // setTimeout(() => {
+    //   selectedDiagram?.lines?.forEach((line) => {
+    //     drawLine(ctx, line);
+    //   });
+    // }, 0);
+    selectedDiagram?.lines?.forEach((line) => {
+      drawLine(ctx, line);
+    });
+
+    setLines(selectedDiagram.lines || []);
+  }, [selectedDiagram]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -384,6 +436,15 @@ const Diagram = ({
     }
   }
 
+  function renderSelectedDiagram(ctx, diagram) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Clear canvas
+    drawGrid(ctx);
+    diagram?.forEach((line) => {
+      console.log(line);
+      drawLine(ctx, line);
+    });
+  }
+
   function drawAllLines(ctx) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Clear canvas
     drawGrid(ctx);
@@ -489,6 +550,7 @@ const Diagram = ({
 
     clearCanvas();
     closeModal();
+    setSelectedDiagram({});
 
     addDiagramToProject(currentProjectId, token, data).then((data) => {
       handlePassDiagramData(data);
@@ -509,6 +571,7 @@ const Diagram = ({
         <img
           onClick={() => {
             closeModal();
+            setSelectedDiagram({});
           }}
           src={closeIcon}
           alt="close diagram"

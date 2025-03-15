@@ -17,7 +17,7 @@ export default function Project({
   setCurrentProjectId,
   activeModal,
   diagrams,
-  setDiagrams,
+  handleEditDiagram,
 }) {
   // console.log(setMobileDiagramActive)
   const params = useParams();
@@ -53,6 +53,11 @@ export default function Project({
       setMobileDiagramActive(true);
     }
     setActiveModal("diagram");
+  }
+
+  function editDiagram(diagram) {
+    setActiveModal("diagram");
+    handleEditDiagram(diagram);
   }
 
   function handleDeleteProject() {
@@ -107,6 +112,7 @@ export default function Project({
                   alt="Diagram image"
                   onClick={() => {
                     console.log(diagram);
+                    editDiagram(diagram);
                   }}
                   style={{
                     width: "200px",

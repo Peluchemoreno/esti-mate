@@ -27,6 +27,7 @@ function App() {
   const [mobileDiagramActive, setMobileDiagramActive] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 650);
   const [diagrams, setDiagrams] = useState([]);
+  const [selectedDiagram, setSelectedDiagram] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -90,6 +91,10 @@ function App() {
     setDiagrams((prevDiagrams) => [...prevDiagrams, data]);
   }
 
+  function handleEditDiagram(diagram) {
+    setSelectedDiagram(diagram);
+  }
+
   return (
     <>
       <div className="page">
@@ -126,6 +131,7 @@ function App() {
                     setCurrentProjectId={setCurrentProjectId}
                     diagrams={diagrams} // Pass diagrams state as a prop
                     setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
+                    handleEditDiagram={handleEditDiagram}
                   />
                 }
               />
@@ -161,6 +167,8 @@ function App() {
                 addDiagramToProject={addDiagramToProject}
                 setDiagrams={setDiagrams}
                 handlePassDiagramData={handlePassDiagramData}
+                selectedDiagram={selectedDiagram}
+                setSelectedDiagram={setSelectedDiagram}
               />
             </>
           ) : (
@@ -172,6 +180,8 @@ function App() {
               addDiagramToProject={addDiagramToProject}
               setDiagrams={setDiagrams}
               handlePassDiagramData={handlePassDiagramData}
+              selectedDiagram={selectedDiagram}
+              setSelectedDiagram={setSelectedDiagram}
             />
           )}
         </>
