@@ -542,12 +542,13 @@ const Diagram = ({
     const totalPrice = "$" + (price * 0.01).toFixed(2);
 
     const data = {
-      lines: [...lines], // ✅ This forces a React re-render
+      lines: [...lines],
       imageData,
       totalFootage,
       price: totalPrice,
     };
 
+    console.log(totalPrice);
     clearCanvas();
     closeModal();
     setSelectedDiagram({});

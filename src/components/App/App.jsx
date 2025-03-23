@@ -79,6 +79,7 @@ function App() {
   }
 
   function closeModal() {
+    console.log("closing");
     setActiveModal("");
   }
 
@@ -132,6 +133,7 @@ function App() {
                     diagrams={diagrams} // Pass diagrams state as a prop
                     setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
                     handleEditDiagram={handleEditDiagram}
+                    closeModal={closeModal}
                   />
                 }
               />

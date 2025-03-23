@@ -8,6 +8,8 @@ import {
   deleteProject,
   retrieveProjectDiagrams,
 } from "../../utils/api";
+import { EstimatePDFButton, EstimatePDF } from "../EstimatePDF/EstimatePDF";
+import EstimateModal from "../EstimateModal/EstimateModal";
 
 export default function Project({
   projects,
@@ -18,16 +20,24 @@ export default function Project({
   activeModal,
   diagrams,
   handleEditDiagram,
+  closeModal,
 }) {
   // console.log(setMobileDiagramActive)
   const params = useParams();
   const projectId = params.projectId;
-  const [dummyState, setDummyState] = useState(0);
+  const [testData, setTestData] = useState({
+    customerName: "John Doe",
+    address: "123 Main St, City, State",
+    gutterType: "Aluminum",
+    length: 50,
+    totalCost: 500,
+  });
   const [diagramData, setDiagramData] = useState([]);
 
   let project = projects.filter((item) => {
     return item._id === projectId;
   })[0];
+  console.log(project);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -91,9 +101,21 @@ export default function Project({
         </div>
         <div className="project__body">
           <div className="project__body-create-estimate-section">
-            <button className="project__body-create-estimate-button create-button">
+            <EstimateModal
+              isOpen={activeModal === "estimate-modal"}
+              onClose={closeModal}
+              estimate={testData}
+              project={project}
+            />
+            <button
+              onClick={() => {
+                setActiveModal("estimate-modal");
+              }}
+              className="project__body-create-estimate-button create-button"
+            >
               Generate Estimate
             </button>
+
             <div className="project__body-horizontal-spacer"></div>
             <h2 className="project__body-diagram-header">Diagram</h2>
             <button
