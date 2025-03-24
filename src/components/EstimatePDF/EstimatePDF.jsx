@@ -1,4 +1,4 @@
-import { grid } from "@mui/system";
+import { selectClasses } from "@mui/material";
 import {
   Document,
   Page,
@@ -8,6 +8,7 @@ import {
   PDFViewer,
   PDFDownloadLink,
 } from "@react-pdf/renderer";
+import { useEffect } from "react";
 
 const styles = StyleSheet.create({
   page: { padding: 20 },
@@ -31,7 +32,10 @@ function getCurrentDate() {
   return `${month}-${day}-${year}`;
 }
 
-function EstimatePDF({ estimate, project, selectedDiagram }) {
+function EstimatePDF({ project, selectedDiagram, activeModal }) {
+  useEffect(() => {
+    console.log(selectedDiagram);
+  }, [activeModal, selectedDiagram]);
   return (
     <Document>
       <Page style={styles.page}>
@@ -157,7 +161,7 @@ function EstimatePDF({ estimate, project, selectedDiagram }) {
                 <Text
                   style={[styles.smallerText, styles.bold, { paddingTop: 2 }]}
                 >
-                  {selectedDiagram.price}
+                  {selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
                 </Text>
               </View>
             </View>
@@ -198,7 +202,13 @@ function EstimatePDF({ estimate, project, selectedDiagram }) {
 function EstimatePDFButton({ estimate }) {
   return (
     <PDFDownloadLink
-      document={<EstimatePDF estimate={estimate} />}
+      document={
+        <EstimatePDF
+          estimate={estimate}
+          selectedDiagram={selectedDiagram}
+          project={project}
+        />
+      }
       fileName="estimate.pdf"
     >
       {({ loading }) => (loading ? "Generating PDF..." : "Download Estimate")}

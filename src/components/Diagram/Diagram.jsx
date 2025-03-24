@@ -526,6 +526,10 @@ const Diagram = ({
   }
 
   function saveDiagram() {
+    if (lines.length === 0) {
+      closeModal();
+      return;
+    }
     const token = localStorage.getItem("jwt");
 
     const canvas = canvasRef.current;
@@ -559,9 +563,9 @@ const Diagram = ({
     } else {
       addDiagramToProject(currentProjectId, token, data).then((data) => {
         handlePassDiagramData(data);
+        setSelectedDiagram({});
       });
 
-      setSelectedDiagram({});
       closeModal();
     }
   }
@@ -579,8 +583,9 @@ const Diagram = ({
       >
         <img
           onClick={() => {
-            closeModal();
             setSelectedDiagram({});
+            console.log(selectedDiagram);
+            closeModal();
           }}
           src={closeIcon}
           alt="close diagram"

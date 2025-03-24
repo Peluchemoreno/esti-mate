@@ -29,6 +29,7 @@ function App() {
   const [diagrams, setDiagrams] = useState([]);
   const [selectedDiagram, setSelectedDiagram] = useState({});
   const [originalDiagram, setOriginalDiagram] = useState({});
+  const [currentDiagram, setCurrentDiagram] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -80,13 +81,9 @@ function App() {
   }
 
   function closeModal() {
-    console.log("closing");
+    setCurrentDiagram({});
     setActiveModal("");
   }
-
-  useEffect(() => {
-    console.log(diagrams);
-  }, [diagrams]);
 
   function handlePassDiagramData(data) {
     console.log(data);
@@ -94,7 +91,8 @@ function App() {
   }
 
   function handleEditDiagram(diagram) {
-    setSelectedDiagram(diagram);
+    // setSelectedDiagram(diagram);
+    setCurrentDiagram(diagram);
     setOriginalDiagram(diagram);
   }
 
@@ -136,6 +134,7 @@ function App() {
                     setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
                     handleEditDiagram={handleEditDiagram}
                     closeModal={closeModal}
+                    currentDiagram={currentDiagram}
                   />
                 }
               />
@@ -171,9 +170,9 @@ function App() {
                 addDiagramToProject={addDiagramToProject}
                 setDiagrams={setDiagrams}
                 handlePassDiagramData={handlePassDiagramData}
-                selectedDiagram={selectedDiagram}
-                setSelectedDiagram={setSelectedDiagram}
+                selectedDiagram={currentDiagram}
                 originalDiagram={originalDiagram}
+                setSelectedDiagram={setCurrentDiagram}
               />
             </>
           ) : (
@@ -185,8 +184,8 @@ function App() {
               addDiagramToProject={addDiagramToProject}
               setDiagrams={setDiagrams}
               handlePassDiagramData={handlePassDiagramData}
-              selectedDiagram={selectedDiagram}
-              setSelectedDiagram={setSelectedDiagram}
+              selectedDiagram={currentDiagram}
+              setSelectedDiagram={setCurrentDiagram}
               originalDiagram={originalDiagram}
             />
           )}

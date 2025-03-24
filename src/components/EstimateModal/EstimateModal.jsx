@@ -1,6 +1,7 @@
 import Modal from "react-modal";
 import { PDFViewer } from "@react-pdf/renderer";
 import { EstimatePDF } from "../EstimatePDF/EstimatePDF";
+import { useEffect } from "react";
 
 Modal.setAppElement("#root"); // Required for accessibility
 
@@ -10,6 +11,7 @@ const EstimateModal = ({
   estimate,
   project,
   selectedDiagram,
+  activeModal,
 }) => {
   return (
     <Modal
@@ -30,9 +32,11 @@ const EstimateModal = ({
       <h2>Estimate Preview</h2>
       <PDFViewer width="100%" height="500px">
         <EstimatePDF
+          key={selectedDiagram?._id}
           estimate={estimate}
           project={project}
           selectedDiagram={selectedDiagram}
+          activeModal={activeModal}
         />
       </PDFViewer>
       <button onClick={onClose} style={{ marginTop: "20px" }}>

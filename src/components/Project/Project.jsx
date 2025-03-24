@@ -40,14 +40,16 @@ export default function Project({
   let project = projects.filter((item) => {
     return item._id === projectId;
   })[0];
-  console.log(project);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
   useEffect(() => {
-    setSelectedDiagram({});
+    console.log(activeModal === "");
+    if (activeModal === "") {
+      setSelectedDiagram({});
+    }
   }, [activeModal]);
 
   useEffect(() => {
@@ -93,7 +95,7 @@ export default function Project({
   }
 
   function handleSelectDiagram(diagram) {
-    if (selectedDiagram) {
+    if (selectedDiagram._id) {
       if (selectedDiagram._id === diagram._id) {
         setSelectedDiagram({});
         return;
@@ -207,6 +209,7 @@ export default function Project({
         estimate={testData}
         project={project}
         selectedDiagram={selectedDiagram}
+        activeModal={activeModal}
       />
     </>
   );
