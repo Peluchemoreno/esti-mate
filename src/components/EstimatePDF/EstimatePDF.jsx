@@ -22,7 +22,16 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "bold" },
 });
 
-function EstimatePDF({ estimate, project }) {
+function getCurrentDate() {
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, "0");
+  const month = String(today.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+  const year = today.getFullYear();
+
+  return `${month}-${day}-${year}`;
+}
+
+function EstimatePDF({ estimate, project, selectedDiagram }) {
   return (
     <Document>
       <Page style={styles.page}>
@@ -107,7 +116,7 @@ function EstimatePDF({ estimate, project }) {
                 >
                   Estimate Date:
                 </Text>
-                <Text style={[styles.smallerText]}>01-21-2020</Text>
+                <Text style={[styles.smallerText]}>{getCurrentDate()}</Text>
               </View>
               <View
                 style={{
@@ -148,7 +157,7 @@ function EstimatePDF({ estimate, project }) {
                 <Text
                   style={[styles.smallerText, styles.bold, { paddingTop: 2 }]}
                 >
-                  $1236.12
+                  {selectedDiagram.price}
                 </Text>
               </View>
             </View>

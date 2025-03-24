@@ -28,6 +28,7 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 650);
   const [diagrams, setDiagrams] = useState([]);
   const [selectedDiagram, setSelectedDiagram] = useState({});
+  const [originalDiagram, setOriginalDiagram] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -94,6 +95,7 @@ function App() {
 
   function handleEditDiagram(diagram) {
     setSelectedDiagram(diagram);
+    setOriginalDiagram(diagram);
   }
 
   return (
@@ -171,6 +173,7 @@ function App() {
                 handlePassDiagramData={handlePassDiagramData}
                 selectedDiagram={selectedDiagram}
                 setSelectedDiagram={setSelectedDiagram}
+                originalDiagram={originalDiagram}
               />
             </>
           ) : (
@@ -184,6 +187,7 @@ function App() {
               handlePassDiagramData={handlePassDiagramData}
               selectedDiagram={selectedDiagram}
               setSelectedDiagram={setSelectedDiagram}
+              originalDiagram={originalDiagram}
             />
           )}
         </>

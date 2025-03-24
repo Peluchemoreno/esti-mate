@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   addDiagramToProject,
+  deleteDiagram,
   deleteProject,
   retrieveProjectDiagrams,
 } from "../../utils/api";
@@ -21,6 +22,7 @@ export default function Project({
   diagrams,
   handleEditDiagram,
   closeModal,
+  setDiagrams,
 }) {
   // console.log(setMobileDiagramActive)
   const params = useParams();
@@ -33,6 +35,7 @@ export default function Project({
     totalCost: 500,
   });
   const [diagramData, setDiagramData] = useState([]);
+  const [selectedDiagram, setSelectedDiagram] = useState({});
 
   let project = projects.filter((item) => {
     return item._id === projectId;
@@ -42,6 +45,10 @@ export default function Project({
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    setSelectedDiagram({});
+  }, [activeModal]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -77,6 +84,24 @@ export default function Project({
     });
   }
 
+  function handleDeleteDiagram(diagram) {
+    const token = localStorage.getItem("jwt");
+    deleteDiagram(project._id, diagram._id, token).then((diagrams) => {
+      setDiagrams(diagrams);
+      setSelectedDiagram({});
+    });
+  }
+
+  function handleSelectDiagram(diagram) {
+    if (selectedDiagram) {
+      if (selectedDiagram._id === diagram._id) {
+        setSelectedDiagram({});
+        return;
+      }
+    }
+    setSelectedDiagram(diagram);
+  }
+
   return (
     <>
       <div className="project">
@@ -101,14 +126,12 @@ export default function Project({
         </div>
         <div className="project__body">
           <div className="project__body-create-estimate-section">
-            <EstimateModal
-              isOpen={activeModal === "estimate-modal"}
-              onClose={closeModal}
-              estimate={testData}
-              project={project}
-            />
             <button
               onClick={() => {
+                if (!selectedDiagram._id) {
+                  alert("Please select a diagram first");
+                  return;
+                }
                 setActiveModal("estimate-modal");
               }}
               className="project__body-create-estimate-button create-button"
@@ -118,29 +141,55 @@ export default function Project({
 
             <div className="project__body-horizontal-spacer"></div>
             <h2 className="project__body-diagram-header">Diagram</h2>
-            <button
-              onClick={openDiagramModal}
-              className="project__body-create-diagram-button create-button"
-            >
-              Create Diagram
-            </button>
+            {selectedDiagram._id ? (
+              <>
+                <div className="project__button-split">
+                  <button
+                    onClick={() => {
+                      editDiagram(selectedDiagram);
+                    }}
+                    className="project__body-create-diagram-button create-button"
+                  >
+                    Edit Diagram
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleDeleteDiagram(selectedDiagram);
+                    }}
+                    className="project__delete-diagram-button"
+                  >
+                    Delete Diagram
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={openDiagramModal}
+                className="project__body-create-diagram-button create-button"
+              >
+                Create Diagram
+              </button>
+            )}
           </div>
           <div className="project__diagram-container">
             {diagramData.length > 0 ? (
               diagramData.map((diagram, index) => (
                 <div
                   key={index}
-                  className="project__drawing"
+                  className={`${
+                    diagram._id === selectedDiagram._id
+                      ? "project__drawing_selected"
+                      : "project__drawing"
+                  }`}
                   alt="Diagram image"
                   onClick={() => {
-                    console.log(diagram);
-                    editDiagram(diagram);
+                    handleSelectDiagram(diagram);
                   }}
                   style={{
                     width: "200px",
                     height: "200px",
                     backgroundImage: `url(${diagram.imageData})`,
-                    backgroundSize: "500px 500px",
+                    backgroundSize: "300px 300px",
                     backgroundPosition: "50% 50%",
                     backgroundRepeat: "no-repeat",
                   }}
@@ -152,6 +201,13 @@ export default function Project({
           </div>
         </div>
       </div>
+      <EstimateModal
+        isOpen={activeModal === "estimate-modal"}
+        onClose={closeModal}
+        estimate={testData}
+        project={project}
+        selectedDiagram={selectedDiagram}
+      />
     </>
   );
 }

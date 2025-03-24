@@ -22,6 +22,7 @@ const Diagram = ({
   handlePassDiagramData,
   selectedDiagram,
   setSelectedDiagram,
+  originalDiagram,
 }) => {
   const params = useParams();
 
@@ -551,11 +552,18 @@ const Diagram = ({
     console.log(totalPrice);
     clearCanvas();
     closeModal();
-    setSelectedDiagram({});
+    if (JSON.stringify(data.lines) === JSON.stringify(originalDiagram.lines)) {
+      setSelectedDiagram({});
+      closeModal();
+      return;
+    } else {
+      addDiagramToProject(currentProjectId, token, data).then((data) => {
+        handlePassDiagramData(data);
+      });
 
-    addDiagramToProject(currentProjectId, token, data).then((data) => {
-      handlePassDiagramData(data);
-    });
+      setSelectedDiagram({});
+      closeModal();
+    }
   }
 
   function convertToPriceInCents(string) {

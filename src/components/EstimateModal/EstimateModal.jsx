@@ -4,7 +4,13 @@ import { EstimatePDF } from "../EstimatePDF/EstimatePDF";
 
 Modal.setAppElement("#root"); // Required for accessibility
 
-const EstimateModal = ({ isOpen, onClose, estimate, project }) => {
+const EstimateModal = ({
+  isOpen,
+  onClose,
+  estimate,
+  project,
+  selectedDiagram,
+}) => {
   return (
     <Modal
       isOpen={isOpen}
@@ -23,7 +29,11 @@ const EstimateModal = ({ isOpen, onClose, estimate, project }) => {
     >
       <h2>Estimate Preview</h2>
       <PDFViewer width="100%" height="500px">
-        <EstimatePDF estimate={estimate} project={project} />
+        <EstimatePDF
+          estimate={estimate}
+          project={project}
+          selectedDiagram={selectedDiagram}
+        />
       </PDFViewer>
       <button onClick={onClose} style={{ marginTop: "20px" }}>
         Close

@@ -75,6 +75,17 @@
 .project__drawing {
   background-color: white;
   margin-top: 20px;
+  cursor: pointer;
+}
+
+.project__drawing_selected{
+  background-color: white;
+  margin-top: 20px;
+  /* border: 4px solid red;
+  */
+   border: 4px solid rgb(255, 0, 0);
+   cursor: pointer;
+   box-shadow: 0 0 10px rgb(255, 0, 0);
 }
 
 .project__diagram-container {
@@ -84,4 +95,16 @@
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
+}
+
+.project__button-split{
+  display: flex;
+}
+
+.project__delete-diagram-button {
+  background-color: var(--delete-red);
+  border: none;
+  color: var(--white);
+  border: 1px solid var(--white);
+  cursor: pointer;
 }

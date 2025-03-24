@@ -15,6 +15,20 @@ export function deleteProject(projectId, token) {
     });
 }
 
+export function deleteDiagram(projectId, diagramId, token) {
+  return fetch(BASE_URL + `dashboard/projects/${projectId}/${diagramId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then(processServerResponse)
+    .then((response) => {
+      return response;
+    });
+}
+
 export function addDiagramToProject(projectId, token, data) {
   return fetch(BASE_URL + `dashboard/projects/${projectId}`, {
     method: "PATCH",
