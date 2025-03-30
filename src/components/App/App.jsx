@@ -8,7 +8,7 @@ import { Routes, Route } from "react-router-dom";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
 import { useState, useEffect, act } from "react";
 import { signin, getUser, createProject, getProjects } from "../../utils/auth";
-// import { createProject, getProjects } from "../../utils/api";
+
 import { useNavigate } from "react-router-dom";
 import Projects from "../Projects/Projects";
 import Products from "../Products/Products";
