@@ -1,7 +1,9 @@
 import Modal from "react-modal";
 import { PDFViewer } from "@react-pdf/renderer";
 import { EstimatePDF } from "../EstimatePDF/EstimatePDF";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { BASE_URL } from "../../utils/constants";
+import { getCompanyLogo } from "../../utils/auth";
 
 Modal.setAppElement("#root"); // Required for accessibility
 
@@ -12,7 +14,37 @@ const EstimateModal = ({
   project,
   selectedDiagram,
   activeModal,
+  currentUser,
 }) => {
+  const [logoUrl, setLogoUrl] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("jwt");
+
+    fetch(`${BASE_URL}users/${currentUser._id}/logo`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => res.blob())
+      .then((blob) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result); // ✅ use full result, untouched
+          reader.onerror = reject;
+          reader.readAsDataURL(blob); // ✅ will auto-include proper MIME
+        });
+      })
+      .then((base64Image) => {
+        console.log(
+          "Base64 image preview (first 100 chars):",
+          base64Image.slice(0, 100)
+        );
+        setLogoUrl(base64Image); // no string splitting!
+      })
+      .catch((err) => console.error("Failed to fetch and convert logo:", err));
+  }, [activeModal]);
+
   return (
     <Modal
       isOpen={isOpen}
@@ -37,6 +69,8 @@ const EstimateModal = ({
           project={project}
           selectedDiagram={selectedDiagram}
           activeModal={activeModal}
+          currentUser={currentUser}
+          logoUrl={logoUrl}
         />
       </PDFViewer>
       <button onClick={onClose} style={{ marginTop: "20px" }}>

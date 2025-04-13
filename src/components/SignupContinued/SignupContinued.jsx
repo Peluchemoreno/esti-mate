@@ -1,16 +1,9 @@
 import "./SignupContinued.css";
 import { Link, useNavigate } from "react-router-dom";
-import logo from "../../assets/estimate-nobackground-blue.png";
-import { useContext, useEffect, useState } from "react";
-import { signin, signUp } from "../../utils/auth";
-import { uploadLogo } from "../../utils/auth";
-import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
+import estimateLogo from "../../assets/estimate-nobackground-blue.png";
+import { useEffect, useState } from "react";
 
-export default function SignupContinued({
-  userData,
-  handleLogin,
-  handleSignUp,
-}) {
+export default function SignupContinued({ userData, handleSignUp }) {
   useEffect(() => {
     console.log(userData);
   }, []);
@@ -34,10 +27,6 @@ export default function SignupContinued({
     console.log(userData.email, userData.password, logo);
 
     handleSignUp(userData, logo);
-    // signUp(userData).then(() => {
-    //   // Upload logo after signup
-    //   handleLogin(userData.email, userData.password);
-    // });
   }
 
   useEffect(() => {
@@ -47,7 +36,7 @@ export default function SignupContinued({
     <>
       <Link to="/">
         <img
-          src={logo}
+          src={estimateLogo}
           alt="sign in header logo"
           className="signin__header-logo__form-cont"
         />

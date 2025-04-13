@@ -106,8 +106,7 @@ const Diagram = ({
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     getProducts(token).then((data) => {
-      if (products) {
-        console.log(products);
+      if (data.products) {
         const products = data.products;
         setProducts(products);
         setTool(products[0].name);
@@ -594,7 +593,6 @@ const Diagram = ({
         <img
           onClick={() => {
             setSelectedDiagram({});
-            console.log(selectedDiagram);
             closeModal();
           }}
           src={closeIcon}

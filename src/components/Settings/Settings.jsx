@@ -4,12 +4,8 @@ import { getCompanyLogo } from "../../utils/auth";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
 import CompanyLogo from "../CompanyLogo/CompanyLogo";
 
-export default function Settings() {
+export default function Settings({ currentUser }) {
   const [token, setToken] = useState("");
-  const currentUser = useContext(CurrentUserContext);
-  useEffect(() => {
-    console.log(currentUser);
-  });
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     setToken(token);
@@ -19,7 +15,7 @@ export default function Settings() {
   return (
     <div className="settings">
       <h3 className="settings__header-title">Settings</h3>
-      <CompanyLogo token={token}></CompanyLogo>
+      <CompanyLogo token={token} currentUser={currentUser}></CompanyLogo>
     </div>
   );
 }

@@ -1,27 +1,9 @@
-export const users = [
+export const starterItems = [
   {
-    email: "justin@email.com",
-    password: "password123",
-    firstName: "Justin",
-    lastName: "One",
-  },
-  {
-    email: "justin1@email.com",
-    password: "password123",
-    firstName: "Justin",
-    lastName: "Two",
-  },
-  {
-    email: "justin2@email.com",
-    password: "password123",
-    firstName: "Justin",
-    lastName: "Three",
-  },
-  {
-    email: "tyler.smith@fakeemail.com",
-    password: "password123",
-    firstName: "Tyler",
-    lastName: "Smith",
+    name: '5" K-Style',
+    visual: "#000000",
+    price: "$8.00",
+    quantity: "length-feet",
   },
 ];
 // when testing the app on the network and not on local host run the second baseUrl

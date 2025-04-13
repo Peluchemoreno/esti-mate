@@ -15,7 +15,7 @@ import {
   uploadLogo,
   signUp,
 } from "../../utils/auth";
-// import { createProject, getProjects } from "../../utils/api";
+import { starterItems } from "../../utils/constants";
 import { useNavigate } from "react-router-dom";
 import Projects from "../Projects/Projects";
 import Products from "../Products/Products";
@@ -24,7 +24,7 @@ import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
-import { addDiagramToProject } from "../../utils/api";
+import { addDiagramToProject, createProduct } from "../../utils/api";
 
 function App() {
   const [currentUser, setCurrentUser] = useState({});
@@ -83,6 +83,7 @@ function App() {
       signin(email, password).then((data) => {
         const token = data.token;
         uploadLogo(logo, token);
+        createProduct(starterItems[0], token);
         getUser(token).then((user) => {
           setCurrentUser(user);
           navigate("/dashboard/projects");
@@ -162,6 +163,7 @@ function App() {
                     handleEditDiagram={handleEditDiagram}
                     closeModal={closeModal}
                     currentDiagram={currentDiagram}
+                    currentUser={currentUser}
                   />
                 }
               />
@@ -176,7 +178,10 @@ function App() {
                   />
                 }
               />
-              <Route path="settings" element={<Settings />} />
+              <Route
+                path="settings"
+                element={<Settings currentUser={currentUser} />}
+              />
             </Route>
             <Route
               path="/signin"

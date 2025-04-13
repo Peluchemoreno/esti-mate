@@ -23,6 +23,7 @@ export default function Project({
   handleEditDiagram,
   closeModal,
   setDiagrams,
+  currentUser,
 }) {
   // console.log(setMobileDiagramActive)
   const params = useParams();
@@ -210,6 +211,7 @@ export default function Project({
         project={project}
         selectedDiagram={selectedDiagram}
         activeModal={activeModal}
+        currentUser={currentUser}
       />
     </>
   );

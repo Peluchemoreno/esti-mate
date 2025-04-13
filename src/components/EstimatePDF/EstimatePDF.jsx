@@ -1,14 +1,13 @@
-import { selectClasses } from "@mui/material";
 import {
   Document,
   Page,
   Text,
   View,
   StyleSheet,
-  PDFViewer,
   PDFDownloadLink,
+  Image,
 } from "@react-pdf/renderer";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const styles = StyleSheet.create({
   page: { padding: 20 },
@@ -32,10 +31,25 @@ function getCurrentDate() {
   return `${month}-${day}-${year}`;
 }
 
-function EstimatePDF({ project, selectedDiagram, activeModal }) {
+function EstimatePDF({
+  project,
+  selectedDiagram,
+  activeModal,
+  currentUser,
+  logoUrl,
+}) {
+  const [token, setToken] = useState("");
+
   useEffect(() => {
     console.log(selectedDiagram);
   }, [activeModal, selectedDiagram]);
+
+  useEffect(() => {
+    console.log(currentUser);
+    const token = localStorage.getItem("jwt");
+    setToken(token);
+  }, []);
+
   return (
     <Document>
       <Page style={styles.page}>
@@ -169,7 +183,7 @@ function EstimatePDF({ project, selectedDiagram, activeModal }) {
           <View
             style={{
               position: "absolute",
-              top: -40,
+              top: -70,
               display: "flex",
               alignItems: "center",
               flexDirection: "row",
@@ -177,21 +191,29 @@ function EstimatePDF({ project, selectedDiagram, activeModal }) {
           >
             <View
               style={{
-                height: 100,
-                width: 100,
-                backgroundColor: "grey",
+                backgroundColor: "transparent",
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
               }}
             >
-              <Text>Company Logo Here</Text>
+              {/* <Text>Company Logo Here</Text> */}
+              {logoUrl && (
+                <Image
+                  src={logoUrl}
+                  style={{
+                    width: 200,
+                    height: 200,
+                    objectFit: "contain",
+                  }}
+                />
+              )}
             </View>
-            <View>
+            {/* <View>
               <Text style={{ fontSize: 16, padding: 5, maxWidth: 150 }}>
-                Company Name Here
+                {currentUser.companyName}
               </Text>
-            </View>
+            </View> */}
           </View>
         </View>
       </Page>
