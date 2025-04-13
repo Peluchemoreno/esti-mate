@@ -106,9 +106,19 @@ const Diagram = ({
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     getProducts(token).then((data) => {
-      const products = data.products;
-      setProducts(products);
-      setTool(products[0].name);
+      if (products) {
+        console.log(products);
+        const products = data.products;
+        setProducts(products);
+        setTool(products[0].name);
+      } else {
+        setProducts({
+          name: "Test",
+          visual: "#badbad",
+          price: "0.00",
+          quantity: "length/feet",
+        });
+      }
     });
 
     setLines((prevLines) =>

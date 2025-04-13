@@ -1,0 +1,10 @@
+.signup__form-cont {
+  border: 1px solid var(--white);
+  margin: 0 auto;
+}
+
+.signin__header-logo__form-cont {
+  width: 100px;
+  margin-top: 10px;
+  margin-left: 20px;
+}

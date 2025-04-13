@@ -7,7 +7,14 @@ import PageNotFound from "../PageNotFound/PageNotFound";
 import { Routes, Route } from "react-router-dom";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
 import { useState, useEffect, act } from "react";
-import { signin, getUser, createProject, getProjects } from "../../utils/auth";
+import {
+  signin,
+  getUser,
+  createProject,
+  getProjects,
+  uploadLogo,
+  signUp,
+} from "../../utils/auth";
 // import { createProject, getProjects } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import Projects from "../Projects/Projects";
@@ -16,7 +23,8 @@ import Settings from "../Settings/Settings";
 import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
-import { addDiagramToProject, getProducts } from "../../utils/api";
+import SignupContinued from "../SignupContinued/SignupContinued";
+import { addDiagramToProject } from "../../utils/api";
 
 function App() {
   const [currentUser, setCurrentUser] = useState({});
@@ -30,6 +38,7 @@ function App() {
   const [selectedDiagram, setSelectedDiagram] = useState({});
   const [originalDiagram, setOriginalDiagram] = useState({});
   const [currentDiagram, setCurrentDiagram] = useState({});
+  const [userData, setUserData] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -68,6 +77,20 @@ function App() {
       });
   }
 
+  function handleSignUp(userData, logo) {
+    const { email, password } = userData;
+    signUp(userData).then(() => {
+      signin(email, password).then((data) => {
+        const token = data.token;
+        uploadLogo(logo, token);
+        getUser(token).then((user) => {
+          setCurrentUser(user);
+          navigate("/dashboard/projects");
+        });
+      });
+    });
+  }
+
   function handleLogOut() {
     localStorage.clear();
     setCurrentUser({});
@@ -94,6 +117,10 @@ function App() {
     // setSelectedDiagram(diagram);
     setCurrentDiagram(diagram);
     setOriginalDiagram(diagram);
+  }
+
+  function continueSignup(data) {
+    setUserData(data);
   }
 
   return (
@@ -155,7 +182,21 @@ function App() {
               path="/signin"
               element={<Signin handleLogin={handleLogin} />}
             />
-            <Route path="/signup" element={<Signup />} />
+            <Route
+              path="/signup"
+              element={<Signup handleSignupContinue={continueSignup} />}
+            />
+            <Route
+              path="/signup/cont"
+              element={
+                <SignupContinued
+                  userData={userData}
+                  setUserData={setUserData}
+                  handleLogin={handleLogin}
+                  handleSignUp={handleSignUp}
+                />
+              }
+            />
           </Routes>
         </CurrentUserContext.Provider>
         <>
