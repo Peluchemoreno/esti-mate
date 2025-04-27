@@ -10,10 +10,11 @@ export default function SignupContinued({ userData, handleSignUp }) {
 
   const [companyName, setCompanyName] = useState("");
   const [logo, setLogo] = useState(null);
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
 
   function handleCompanyNameChange(e) {
     setCompanyName(e.target.value);
-    console.log(companyName);
   }
 
   function handleFileChange(e) {
@@ -22,11 +23,18 @@ export default function SignupContinued({ userData, handleSignUp }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-
-    userData.companyName = companyName;
-    console.log(userData.email, userData.password, logo);
+    userData = { ...userData, companyName, companyAddress, companyPhone };
+    console.log(userData);
 
     handleSignUp(userData, logo);
+  }
+
+  function handleChangeCompanyAddress(e) {
+    setCompanyAddress(e.target.value);
+  }
+
+  function handleChangeCompanyPhone(e) {
+    setCompanyPhone(e.target.value);
   }
 
   useEffect(() => {
@@ -54,8 +62,32 @@ export default function SignupContinued({ userData, handleSignUp }) {
             id="companyName"
           />
         </label>
-        <label htmlFor="companyLogo">
+        <label htmlFor="companyAddress" className="signup__form-label">
+          Business Address *
           <input
+            required
+            type="text"
+            className="signup__form-input signup__form-input_firstName input"
+            onChange={handleChangeCompanyAddress}
+            value={companyAddress}
+            id="companyAddress"
+          />
+        </label>
+        <label htmlFor="companyPhone" className="signup__form-label">
+          Business Phone Number *
+          <input
+            required
+            type="text"
+            className="signup__form-input signup__form-input_firstName input"
+            onChange={handleChangeCompanyPhone}
+            value={companyPhone}
+            id="companyPhone"
+          />
+        </label>
+        <label htmlFor="companyLogo" className="signup__form-label">
+          Company Logo * (.png, .jpeg, or .jpg)
+          <input
+            className="signup__form-logo-upload"
             type="file"
             name="companyLogo"
             id="companyLogo"
@@ -64,7 +96,12 @@ export default function SignupContinued({ userData, handleSignUp }) {
           />
         </label>
 
-        <button type="submit">Next</button>
+        <button type="submit" className="signin__button signin-cont__button">
+          Sign Up
+        </button>
+        <Link to={"/signup"}>
+          <button className="signup__form-back-button button">Back</button>
+        </Link>
       </form>
     </>
   );

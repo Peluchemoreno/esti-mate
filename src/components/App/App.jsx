@@ -63,6 +63,10 @@ function App() {
       });
   }, []);
 
+  useEffect(() => {
+    console.log(starterItems);
+  }, []);
+
   function handleLogin(email, password) {
     signin(email, password)
       .then((data) => {
@@ -79,11 +83,14 @@ function App() {
 
   function handleSignUp(userData, logo) {
     const { email, password } = userData;
+
     signUp(userData).then(() => {
       signin(email, password).then((data) => {
         const token = data.token;
         uploadLogo(logo, token);
-        createProduct(starterItems[0], token);
+        starterItems.forEach((item) => {
+        createProduct(item, token);
+        });
         getUser(token).then((user) => {
           setCurrentUser(user);
           navigate("/dashboard/projects");

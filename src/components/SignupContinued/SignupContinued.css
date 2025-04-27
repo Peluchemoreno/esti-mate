@@ -1,5 +1,5 @@
 .signup__form-cont {
-  border: 1px solid var(--white);
+  /* border: 1px solid var(--white); */
   margin: 0 auto;
 }
 
@@ -7,4 +7,17 @@
   width: 100px;
   margin-top: 10px;
   margin-left: 20px;
+}
+
+.signup__form-logo-upload {
+  display: block;
+  margin-top: 10px;
+  border: 1px solid var(--white);
+  width: 100%;
+  padding: 5px;
+  border-radius: 5px;
+}
+
+.signin-cont__button {
+  margin-bottom: 20px;
 }

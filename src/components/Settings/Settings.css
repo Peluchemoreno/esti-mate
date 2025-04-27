@@ -3,3 +3,16 @@
   margin: 10px 0;
   margin-left: 20px;
 }
+
+.settings__body {
+  width: 70%;
+  margin: 0 auto;
+}
+
+.settings__label {
+  border: 1px solid green;
+}
+
+.settings__input {
+ border: 1px solid red; 
+}

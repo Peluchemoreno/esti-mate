@@ -143,12 +143,12 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
       <div className="products">
         <div className="products__header">
           <h3 className="products__header-title">Products</h3>
-          <button
+          {/*<button
             className="products__create-item-button"
             onClick={handleAddItemClick}
           >
             + Item
-          </button>
+          </button>*/}
         </div>
         <Box
           sx={{

@@ -42,6 +42,7 @@ function EstimatePDF({
 
   useEffect(() => {
     console.log(selectedDiagram);
+    console.log(currentUser);
   }, [activeModal, selectedDiagram]);
 
   useEffect(() => {
@@ -57,10 +58,10 @@ function EstimatePDF({
         <View style={{}}>
           <View style={[styles.section, { paddingBottom: 40 }]}>
             <Text style={[styles.text, styles.bold, { textAlign: "right" }]}>
-              {project.clientName}
+              {currentUser.companyName}
             </Text>
             <Text style={[styles.text, { textAlign: "right" }]}>
-              {project.address}
+              {currentUser.companyAddress}
             </Text>
             <Text
               style={[
@@ -68,7 +69,7 @@ function EstimatePDF({
                 { textAlign: "right", color: "#444", marginTop: 10 },
               ]}
             >
-              {project.primaryPhoneNumber}
+              {currentUser.companyPhone}
             </Text>
           </View>
           <View
@@ -202,8 +203,8 @@ function EstimatePDF({
                 <Image
                   src={logoUrl}
                   style={{
-                    width: 200,
-                    height: 200,
+                    width: 150,
+                    height: 150,
                     objectFit: "contain",
                   }}
                 />

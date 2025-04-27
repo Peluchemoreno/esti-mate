@@ -107,9 +107,13 @@ const Diagram = ({
     const token = localStorage.getItem("jwt");
     getProducts(token).then((data) => {
       if (data.products) {
+        console.log(data.products);
         const products = data.products;
-        setProducts(products);
-        setTool(products[0].name);
+        const filteredProducts = products.filter((product) => {
+          return product.listed === true;
+        });
+        setProducts(filteredProducts);
+        setTool(filteredProducts[0]?.name);
       } else {
         setProducts({
           name: "Test",
@@ -632,7 +636,7 @@ const Diagram = ({
           id="select-product-dropdown"
           defaultValue={products[0]?.name}
         >
-          {products.map((product) => {
+          {products?.map((product) => {
             return (
               <option
                 style={{

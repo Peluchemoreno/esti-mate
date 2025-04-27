@@ -16,8 +16,6 @@ export default function Signup({ handleSignupContinue }) {
 
   function handleSignup(e) {
     e.preventDefault();
-    // console.log("signing up");
-    // console.log("populating startup items");
 
     const data = {
       firstName,
@@ -103,7 +101,7 @@ export default function Signup({ handleSignupContinue }) {
         <button type="submit" className="signup__form-submit-button button">
           Next
         </button>
-        <Link className="signup__form-back-link" to="/esti-mate">
+        <Link className="signup__form-back-link" to="/">
           <button className="signup__form-back-button button">Back</button>
         </Link>
         <p className="signup__already-have-account">
