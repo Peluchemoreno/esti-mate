@@ -11,7 +11,9 @@
   justify-content: center;
   visibility: hidden;
   opacity: 0;
-  transition: opacity .2s ease, visibility .2s ease;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease;
 }
 
 .modal_visible {
@@ -27,10 +29,13 @@
   justify-content: center;
   visibility: visible;
   opacity: 1;
-  transition: opacity .2s ease, visibility .2s ease;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease;
 }
 
-.create-project-form {
+.create-project-form,
+.downspout-modal__form {
   position: absolute;
   top: 10%;
   width: 80%;
@@ -40,7 +45,7 @@
 }
 
 .create-project-form__header {
-  border-bottom: 1px solid  rgba(255, 255, 255, .2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .project-name__input {
@@ -51,22 +56,23 @@
 .create-project-form__footer {
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid rgba(255, 255, 255, .2);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
   padding: 10px;
 }
 
-.create-project-form__body, .create-project-form__header {
-  padding: 20px
+.create-project-form__body,
+.create-project-form__header {
+  padding: 20px;
 }
 
-
-.create-project-form__button_cancel, .create-project-form__button_create {
+.create-project-form__button_cancel,
+.create-project-form__button_create {
   border: none;
   border-radius: 5px;
   padding: 10px;
   cursor: pointer;
   font-size: 14px;
-  transition: background-color .2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .create-project-form__button_cancel {
@@ -81,7 +87,8 @@
   color: var(--white);
 }
 
-.create-project-form__button_create:hover, .create-project-form__button_cancel:hover {
+.create-project-form__button_create:hover,
+.create-project-form__button_cancel:hover {
   background-color: var(--blue-secondary);
 }
 
@@ -92,7 +99,7 @@
 .project-name__input {
   color: var(--white);
   padding: 5px;
-  border: 1px solid rgba(255, 255, 255, .2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .create-project-form__project-info {
@@ -113,7 +120,7 @@
   cursor: pointer;
   margin-left: 10px;
   transform: rotate(0deg);
-  transition: transform .2s ease;
+  transition: transform 0.2s ease;
 }
 
 .create-project-form__drop-down-icon_flipped {
@@ -121,7 +128,7 @@
   cursor: pointer;
   margin-left: 10px;
   transform: rotate(-180deg);
-  transition: transform .2s ease;
+  transition: transform 0.2s ease;
 }
 
 .create-project-form__body_extended {
@@ -136,7 +143,7 @@
 }
 
 .create-project-form__body {
-  transition: max-height .2s ease;
+  transition: max-height 0.2s ease;
 }
 
 .create-project-form__client-details {
@@ -152,7 +159,7 @@
 }
 
 .create-project-form__input {
-  border: 1px solid rgba(255, 255, 255, .2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 5px;
   color: var(--white);
   margin-top: 5px;
@@ -168,17 +175,22 @@
   font-size: 16px;
 }
 
-.client-details__address-separator{
+.client-details__address-separator {
   display: flex;
   gap: 10px;
 }
 
-.create-project-form__client-details-input_address-city, .create-project-form__client-details-input_address-county, .create-project-form__client-details-input_address-state, .create-project-form__client-details-input_address-zip {
+.create-project-form__client-details-input_address-city,
+.create-project-form__client-details-input_address-county,
+.create-project-form__client-details-input_address-state,
+.create-project-form__client-details-input_address-zip {
   flex-grow: 1;
   margin-bottom: 10px;
 }
 
-.create-project-form__client-details-input_phone-primary, .create-project-form__client-details-input_phone-alternate, .create-project-form__client-details-input_email {
+.create-project-form__client-details-input_phone-primary,
+.create-project-form__client-details-input_phone-alternate,
+.create-project-form__client-details-input_email {
   width: 100%;
   margin-bottom: 10px;
 }
@@ -195,6 +207,5 @@
   margin-bottom: 30px;
 }
 
-@media screen  and (max-width: 650px){
-  
+@media screen and (max-width: 650px) {
 }

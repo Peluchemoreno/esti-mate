@@ -36,10 +36,6 @@ const EstimateModal = ({
         });
       })
       .then((base64Image) => {
-        console.log(
-          "Base64 image preview (first 100 chars):",
-          base64Image.slice(0, 100)
-        );
         setLogoUrl(base64Image); // no string splitting!
       })
       .catch((err) => console.error("Failed to fetch and convert logo:", err));

@@ -8,16 +8,16 @@ export const starterItems = [
   },
   {
     name: '5" K-Style Miter',
-    visual: '#000000',
-    price: '$10.00',
-    quantity: 'unit-per',
+    visual: "#000000",
+    price: "$10.00",
+    quantity: "unit-per",
     listed: false,
   },
   {
     name: '6" K-Style Miter',
-    visual: '#000000',
-    price: '$10.00',
-    quantity: 'unit-per',
+    visual: "#000000",
+    price: "$10.00",
+    quantity: "unit-per",
     listed: false,
   },
 
@@ -30,9 +30,9 @@ export const starterItems = [
   },
   {
     name: '5" Straight Face Miter',
-    visual: '#000000',
-    price: '$10.00',
-    quantity: 'unit-per',
+    visual: "#000000",
+    price: "$10.00",
+    quantity: "unit-per",
     listed: false,
   },
   {
@@ -44,58 +44,58 @@ export const starterItems = [
   },
   {
     name: '6" Straight Face',
-    visual: '#53f1ac',
-    price: '$11.00',
-    quantity: 'length-feet',
+    visual: "#53f1ac",
+    price: "$11.00",
+    quantity: "length-feet",
     listed: true,
   },
   {
     name: '6" Straight Face Miter',
-    visual: '#000000',
-    price: '$10.00',
-    quantity: 'unit-per',
+    visual: "#000000",
+    price: "$10.00",
+    quantity: "unit-per",
     listed: false,
   },
   {
     name: '5" Box Gutter',
     visual: "#32ff1b",
-    price: '$14.00',
-    quantity: 'length-feet',
+    price: "$14.00",
+    quantity: "length-feet",
     listed: true,
   },
   {
     name: '5" Box Miter',
-    visual: '#000000',
-    price: '$4.00',
-    quantity: 'unit-per',
+    visual: "#000000",
+    price: "$4.00",
+    quantity: "unit-per",
     listed: false,
   },
   {
     name: '6" Box Gutter',
-    visual: '#9f3fa5',
-    price: '$11.00',
-    quantity: 'length-feet',
+    visual: "#9f3fa5",
+    price: "$11.00",
+    quantity: "length-feet",
     listed: true,
   },
   {
     name: '6" Box Miter',
-    visual: '#000000',
-    price: '$10.00',
-    quantity: 'unit-per',
+    visual: "#000000",
+    price: "$10.00",
+    quantity: "unit-per",
     listed: false,
   },
   {
-    name: 'Custom Gutter',
-    visual: '#3b1afc',
-    price: '$15.00',
-    quantity: 'length-feet',
+    name: "Custom Gutter",
+    visual: "#3b1afc",
+    price: "$15.00",
+    quantity: "length-feet",
     listed: true,
   },
   {
-    name: 'Custom Miter',
-    visual: '#000000',
-    price: '$20.00',
-    quantity: 'unit-per',
+    name: "Custom Miter",
+    visual: "#000000",
+    price: "$20.00",
+    quantity: "unit-per",
     listed: false,
   },
   {
@@ -183,7 +183,7 @@ export const starterItems = [
     listed: false,
   },
   {
-    name: "4x5 downspout",
+    name: "4x5 Downspout",
     visual: "#000000",
     price: "$4.00",
     quantity: "length-feet",
@@ -309,21 +309,21 @@ export const starterItems = [
     listed: false,
   },
   {
-    name: 'Box Downspout',
+    name: "Box Downspout",
     visual: "#000000",
     price: "$4.00",
     quantity: "length-feet",
     listed: false,
   },
   {
-    name: 'Box A Elbow',
+    name: "Box A Elbow",
     visual: "#234a38",
     price: "$5.00",
     quantity: "unit-per",
     listed: false,
   },
   {
-    name: 'Box B Elbow',
+    name: "Box B Elbow",
     visual: "#000000",
     price: "$5.00",
     quantity: "unit-per",
@@ -357,8 +357,6 @@ export const starterItems = [
     quantity: "unit-per",
     listed: false,
   },
-
-
 ];
 // when testing the app on the network and not on local host run the second baseUrl
 // export const BASE_URL = "http://127.0.0.1:4000/";
@@ -391,7 +389,7 @@ export function areLinesParallel(
   [x1_1, y1_1],
   [x1_2, y1_2],
   [x2_1, y2_1],
-  [x2_2, y2_2]
+  [x2_2, y2_2],
 ) {
   if (isLineVertical(x1_1, x1_2) && isLineVertical(x2_1, x2_2)) {
     return true;
@@ -411,7 +409,7 @@ export function isLineParallelToTop(x1, y1, x2, y2) {
     [topHorizontalLineCoords.x1, topHorizontalLineCoords.y1],
     [topHorizontalLineCoords.x2, topHorizontalLineCoords.y2],
     [x1, y1],
-    [x2, y2]
+    [x2, y2],
   );
   return answer;
 }
@@ -421,7 +419,7 @@ export function isLineParallelToSide(x1, y1, x2, y2) {
     [leftVerticalLineCoords.x1, leftVerticalLineCoords.y1],
     [leftVerticalLineCoords.x2, leftVerticalLineCoords.y2],
     [x1, y1],
-    [x2, y2]
+    [x2, y2],
   );
   return answer;
 }

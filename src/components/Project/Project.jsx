@@ -47,7 +47,6 @@ export default function Project({
   }, []);
 
   useEffect(() => {
-    console.log(activeModal === "");
     if (activeModal === "") {
       setSelectedDiagram({});
     }

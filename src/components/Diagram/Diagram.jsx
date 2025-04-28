@@ -12,6 +12,7 @@ import {
 } from "../../utils/constants";
 import { getProducts } from "../../utils/api";
 import { useParams } from "react-router-dom";
+import DownspoutModal from "../DownspoutModal/DownspoutModal";
 
 const Diagram = ({
   activeModal,
@@ -23,6 +24,7 @@ const Diagram = ({
   selectedDiagram,
   setSelectedDiagram,
   originalDiagram,
+  setActiveModal,
 }) => {
   const params = useParams();
 
@@ -40,6 +42,7 @@ const Diagram = ({
     color: "blue",
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
+  const [downspoutCoordinates, setDownspoutCoordinates] = useState([0, 0]);
   const [lineLength, setLineLength] = useState(0);
   const canvasBaseMeasurements = {
     top: 0,
@@ -52,38 +55,12 @@ const Diagram = ({
   const [unitPerTools, setUnitPerTools] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedLine, setSelectedLine] = useState({});
+  const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
+  const [unfilteredProducts, setUnfilteredProducts] = useState([]);
 
-  // useEffect(() => {
-  //   const canvas = canvasRef.current;
-  //   const ctx = canvas.getContext("2d");
-
-  //   const newLines = selectedDiagram?.lines;
-  //   if (newLines !== undefined) {
-  //     console.log("selected diagram: ", newLines);
-  //     newLines?.forEach((line) => {
-  //       console.log("drawing line: ", line);
-  //       drawLine(ctx, line);
-  //     });
-  //   }
-  // }, [selectedDiagram, activeModal]);
-
-  // useEffect(() => {
-  //   const canvas = canvasRef.current;
-  //   const ctx = canvas?.getContext("2d");
-
-  //   if (!ctx) return;
-
-  //   ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before drawing
-
-  //   const newLines = selectedDiagram?.lines;
-  //   if (newLines) {
-  //     console.log("selected diagram: ", newLines);
-  //     newLines.forEach((line) => {
-  //       console.log("drawing line: ", line);
-  //       drawLine(ctx, line);
-  //     });
-  //   }
-  // }, [selectedDiagram, activeModal]);
+  useEffect(()=>{
+    console.log(lines)
+  },[lines])
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -107,29 +84,34 @@ const Diagram = ({
     const token = localStorage.getItem("jwt");
     getProducts(token).then((data) => {
       if (data.products) {
-        console.log(data.products);
         const products = data.products;
-        const filteredProducts = products.filter((product) => {
-          return product.listed === true;
-        });
+        setUnfilteredProducts(data.products);
+        const filteredProducts = products.filter((product) => product.listed);
         setProducts(filteredProducts);
-        setTool(filteredProducts[0]?.name);
+
+        // Important: only set default tool once when products load
+        if (filteredProducts.length > 0) {
+          setTool(filteredProducts[0].name);
+        }
       } else {
-        setProducts({
-          name: "Test",
-          visual: "#badbad",
-          price: "0.00",
-          quantity: "length/feet",
-        });
+        setProducts([
+          {
+            name: "Test",
+            visual: "#badbad",
+            price: "0.00",
+            quantity: "length/feet",
+          },
+        ]);
       }
     });
+  }, [activeModal]); // <-- empty dependency array: only runs once on first mount
 
+  useEffect(() => {
     setLines((prevLines) =>
-      prevLines.map((line) => ({ ...line, isSelected: false }))
+      prevLines.map((line) => ({ ...line, isSelected: false })),
     );
     setSelectedLine({});
   }, [activeModal]);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
@@ -176,7 +158,7 @@ const Diagram = ({
   useEffect(() => {
     // Deselect all lines when the tool changes
     setLines((prevLines) =>
-      prevLines.map((line) => ({ ...line, isSelected: false }))
+      prevLines.map((line) => ({ ...line, isSelected: false })),
     );
     setSelectedLine({});
   }, [tool]);
@@ -219,11 +201,35 @@ const Diagram = ({
     return Math.round(number / gridSize) * gridSize;
   }
 
+  function handleAddDownspout(downspoutData) {
+    const currentDownspout = unfilteredProducts.filter((product)=> {
+      return (product.name === downspoutData.downspoutSize + ' Downspout') || product.name === downspoutData.downspoutSize + ' downspout'
+    })
+    console.log(downspoutData.downspoutSize + ' Downspout');
+    console.log(currentDownspout);
+
+    const formattedDownspout = {
+      startX: downspoutCoordinates[0],
+      startY: downspoutCoordinates[1],
+      endX: downspoutCoordinates[0],
+      endY: downspoutCoordinates[1],
+      midpoint: null,
+      measurement: parseInt(downspoutData.totalFootage),
+      color: currentDownspout[0].visual, 
+      isSelected: false,
+      isDownspout: true,
+      price: currentDownspout[0].price,
+    }
+    console.log(formattedDownspout);
+    setLines([...lines, formattedDownspout]);
+  }
+
   /* ------------------------------------------------------------------------------------ */
   /*                               event listeners                                        */
   /* ------------------------------------------------------------------------------------ */
 
   function handleMouseDown(e) {
+    if (isDownspoutModalOpen) return;
     let offsetX, offsetY;
     let foundLine = null;
 
@@ -233,16 +239,26 @@ const Diagram = ({
       const rect = canvas.getBoundingClientRect();
       offsetX = touch.clientX - rect.left;
       offsetY = touch.clientY - rect.top;
+    } else if (e.nativeEvent) {
+      offsetX = e.nativeEvent.offsetX;
+      offsetY = e.nativeEvent.offsetY;
     } else {
-      offsetX = e.offsetX;
-      offsetY = e.offsetY;
+      console.error("Mouse event missing nativeEvent offsets");
+      return;
     }
 
     if (tool === "downspout") {
-      console.log("open the downspout modal here", [
-        snapNumberToGrid(e.offsetX),
-        snapNumberToGrid(e.offsetY),
+      console.log("Opening Downspout modal at:", [
+        snapNumberToGrid(offsetX),
+        snapNumberToGrid(offsetY),
+        setDownspoutCoordinates([
+          snapNumberToGrid(offsetX),
+          snapNumberToGrid(offsetY),
+        ]),
       ]);
+      setIsDownspoutModalOpen(true);
+      setActiveModal("downspout");
+      return;
     } else if (tool === "select") {
       console.log("Selecting mode active");
 
@@ -259,9 +275,9 @@ const Diagram = ({
             line.startY,
             line.endX,
             line.endY,
-            snapNumberToGrid(e.pageX),
-            snapNumberToGrid(e.pageY),
-            5
+            snapNumberToGrid(offsetX),
+            snapNumberToGrid(offsetY),
+            5,
           )
         ) {
           foundLine = { ...line, isSelected: true };
@@ -273,8 +289,8 @@ const Diagram = ({
           updatedLines.map((line) =>
             line.startX === foundLine.startX && line.startY === foundLine.startY
               ? foundLine
-              : line
-          )
+              : line,
+          ),
         );
         setSelectedLine(foundLine);
         console.log("Selected line:", foundLine);
@@ -299,6 +315,7 @@ const Diagram = ({
   }
 
   function handleMouseMove(e) {
+    if (isDownspoutModalOpen) return;
     if (!isDrawing || tool === "downspout" || tool === "select") return;
 
     let offsetX, offsetY;
@@ -320,13 +337,13 @@ const Diagram = ({
         currentLine.startX,
         currentLine.startY,
         currentLine.endX,
-        currentLine.endY
+        currentLine.endY,
       ) ||
       isLineParallelToTop(
         currentLine.startX,
         currentLine.startY,
         currentLine.endX,
-        currentLine.endY
+        currentLine.endY,
       )
     ) {
       setCurrentLine((prevLine) => ({
@@ -351,10 +368,16 @@ const Diagram = ({
 
   // Stop drawing on mouseup
   function handleMouseUp(e) {
+    if (isDownspoutModalOpen) return;
     const currentProduct = products?.find((product) => product.name === tool);
     if (tool === "select") {
       console.log("mouseup select");
       setIsDrawing(false);
+      return;
+    }
+
+    if (tool === "downspout") {
+      console.log("ds select");
       return;
     }
 
@@ -380,7 +403,7 @@ const Diagram = ({
           currentLine.startX,
           currentLine.startY,
           currentLine.endX,
-          currentLine.endY
+          currentLine.endY,
         )
       ) {
         currentLine.isVertical = true;
@@ -395,7 +418,7 @@ const Diagram = ({
           currentLine.startX,
           currentLine.startY,
           currentLine.endX,
-          currentLine.endY
+          currentLine.endY,
         )
       ) {
         currentLine.isHorizontal = true;
@@ -484,6 +507,7 @@ const Diagram = ({
       measurement,
       color,
       isSelected,
+      isDownspout,
     } = line;
     // console.log(product)
     // Snap coordinates to the grid
@@ -492,34 +516,42 @@ const Diagram = ({
     const x2 = Math.round(endX / gridSize) * gridSize;
     const y2 = Math.round(endY / gridSize) * gridSize;
 
-    // Draw the line
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    if (isSelected) {
-      ctx.strokeStyle = "orange";
-      ctx.fillStyle = "orange";
-    } else {
-      ctx.strokeStyle = color; // Use the line's specific color
-    }
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.closePath();
-
-    if (isSelected) {
+    if (isDownspout) {
       ctx.beginPath();
       ctx.moveTo(x1, y1);
-      ctx.arc(x1, y1, gridSize / 2, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.moveTo(x2, y2);
-      ctx.arc(x2, y2, gridSize / 2, 0, 2 * Math.PI);
-      ctx.fill();
+      ctx.rect(line.startX, line.startY, 10, 10);
+      ctx.strokeStyle = line.color;
       ctx.stroke();
-    }
+    } else {
+      // Draw the line
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      if (isSelected) {
+        ctx.strokeStyle = "orange";
+        ctx.fillStyle = "orange";
+      } else {
+        ctx.strokeStyle = color; // Use the line's specific color
+      }
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.closePath();
 
-    // Place the measurement if available
-    if (midpoint && measurement) {
-      placeMeasurement(line, measurement, midpoint[0], midpoint[1]);
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.arc(x1, y1, gridSize / 2, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.moveTo(x2, y2);
+        ctx.arc(x2, y2, gridSize / 2, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // Place the measurement if available
+      if (midpoint && measurement) {
+        placeMeasurement(line, measurement, midpoint[0], midpoint[1]);
+      }
     }
   }
 
@@ -543,19 +575,36 @@ const Diagram = ({
       closeModal();
       return;
     }
-    const token = localStorage.getItem("jwt");
+    
 
+  // Check if diagram actually changed
+  const hasChanged = JSON.stringify(lines) !== JSON.stringify(originalDiagram.lines);
+
+  if (!hasChanged) {
+    console.log("No changes detected, not saving.");
+    closeModal();
+    return;
+  }
+
+    const token = localStorage.getItem("jwt");
     const canvas = canvasRef.current;
     const imageData = canvas.toDataURL("image/png");
 
     let totalFootage = 0;
     let price = 0;
+    let downspoutCentsPrice;
 
     lines.forEach((line) => {
+      if (line.isDownspout){
+        const downspoutPrice = (parseFloat(line.price.slice(1))).toFixed(2);
+        downspoutCentsPrice = parseInt(((line.measurement * downspoutPrice) * 100).toFixed(0));
+        price += downspoutCentsPrice;
+      } else {
       totalFootage += line.measurement;
       price +=
         convertToPriceInCents(line.currentProduct.price) * line.measurement;
-    });
+}
+          });
 
     const totalPrice = "$" + (price * 0.01).toFixed(2);
 
@@ -567,20 +616,19 @@ const Diagram = ({
     };
 
     console.log(totalPrice);
-    clearCanvas();
-    closeModal();
-    if (JSON.stringify(data.lines) === JSON.stringify(originalDiagram.lines)) {
-      setSelectedDiagram({});
-      closeModal();
-      return;
-    } else {
-      addDiagramToProject(currentProjectId, token, data).then((data) => {
-        handlePassDiagramData(data);
-        setSelectedDiagram({});
-      });
 
-      closeModal();
-    }
+    addDiagramToProject(currentProjectId, token, data)
+      .then((newDiagramData) => {
+        handlePassDiagramData(newDiagramData);
+        // ✅ Optional: Update selected diagram if needed
+        // setSelectedDiagram(newDiagramData);
+        clearCanvas();
+        closeModal();
+      })
+      .catch((err) => {
+        console.error("Failed to save diagram:", err);
+        closeModal();
+      });
   }
 
   function convertToPriceInCents(string) {
@@ -591,7 +639,9 @@ const Diagram = ({
     <>
       <div
         className={
-          activeModal === "diagram" ? "diagram diagram_visible" : "diagram"
+          activeModal === "diagram" || activeModal === "downspout"
+            ? "diagram diagram_visible"
+            : "diagram"
         }
       >
         <img
@@ -670,6 +720,13 @@ const Diagram = ({
           onTouchEnd={handleMouseUp}
         />
       </div>
+      <DownspoutModal
+        setActiveModal={setActiveModal}
+        activeModal={activeModal}
+        setTool={setTool}
+        setIsDownspoutModalOpen={setIsDownspoutModalOpen}
+        addDownspout={handleAddDownspout}
+      />
     </>
   );
 };

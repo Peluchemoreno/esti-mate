@@ -6,7 +6,7 @@ import Signup from "../Signup/Signup";
 import PageNotFound from "../PageNotFound/PageNotFound";
 import { Routes, Route } from "react-router-dom";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
-import { useState, useEffect, act } from "react";
+import { useState, useEffect } from "react";
 import {
   signin,
   getUser,
@@ -63,10 +63,6 @@ function App() {
       });
   }, []);
 
-  useEffect(() => {
-    console.log(starterItems);
-  }, []);
-
   function handleLogin(email, password) {
     signin(email, password)
       .then((data) => {
@@ -89,7 +85,7 @@ function App() {
         const token = data.token;
         uploadLogo(logo, token);
         starterItems.forEach((item) => {
-        createProduct(item, token);
+          createProduct(item, token);
         });
         getUser(token).then((user) => {
           setCurrentUser(user);
@@ -226,6 +222,7 @@ function App() {
                 selectedDiagram={currentDiagram}
                 originalDiagram={originalDiagram}
                 setSelectedDiagram={setCurrentDiagram}
+                setActiveModal={setActiveModal}
               />
             </>
           ) : (
@@ -240,6 +237,7 @@ function App() {
               selectedDiagram={currentDiagram}
               setSelectedDiagram={setCurrentDiagram}
               originalDiagram={originalDiagram}
+              setActiveModal={setActiveModal}
             />
           )}
         </>

@@ -1,0 +1,83 @@
+.downspout-modal {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.downspout-modal__form {
+  border: 1px solid var(--white);
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+.downspout-modal__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.downspout__radio-label {
+  width: 70%;
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.downspout-modal__div {
+  display: flex;
+  gap: 5px;
+  width: 40%;
+}
+
+.downspout-modal__second-radio {
+  margin-left: 10px;
+}
+
+.downspout__drop-label {
+  margin-bottom: 10px;
+  width: 62%;
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+}
+
+.downspout__drop-input {
+  background-color: transparent;
+  color: var(--white);
+}
+
+.input__drop {
+  background-color: black;
+}
+
+.footage-label-error_visible {
+  font-size: 14px;
+  font-weight: normal;
+  color: red;
+}
+
+.footage-label-error {
+  font-size: 14px;
+  font-weight: normal;
+  color: red;
+  display: none;
+}
+
+.elbow-sequence__input {
+  font-size: 12px;
+  display: none;
+}
+
+.elbow-sequence__input_visible {
+  display: inline-block;
+  font-size: 12px;
+}
+
+.elbow-sequence__input-error_visible {
+  color: red;
+  font-size: 12px;
+  display: inline-block;
+}
+
+.elbow-sequence__input-error {
+  font-size: 12px;
+  display: none;
+}
