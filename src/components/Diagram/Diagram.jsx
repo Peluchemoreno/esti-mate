@@ -90,9 +90,10 @@ const Diagram = ({
         setProducts(filteredProducts);
 
         // Important: only set default tool once when products load
-        if (filteredProducts.length > 0) {
-          setTool(filteredProducts[0].name);
-        }
+
+if (filteredProducts.length > 0 && tool === "") {
+  setTool(filteredProducts[0].name);
+}
       } else {
         setProducts([
           {
@@ -228,91 +229,95 @@ const Diagram = ({
   /*                               event listeners                                        */
   /* ------------------------------------------------------------------------------------ */
 
-  function handleMouseDown(e) {
-    if (isDownspoutModalOpen) return;
-    let offsetX, offsetY;
-    let foundLine = null;
+  
+function handleMouseDown(e) {
+  if (isDownspoutModalOpen) return;
+  
+  let offsetX, offsetY;
+  let foundLine = null;
 
-    if (e.nativeEvent?.touches) {
-      const touch = e.nativeEvent.touches[0];
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      offsetX = touch.clientX - rect.left;
-      offsetY = touch.clientY - rect.top;
-    } else if (e.nativeEvent) {
-      offsetX = e.nativeEvent.offsetX;
-      offsetY = e.nativeEvent.offsetY;
-    } else {
-      console.error("Mouse event missing nativeEvent offsets");
-      return;
-    }
+  if (e.nativeEvent?.touches) {
+    const touch = e.nativeEvent.touches[0];
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    offsetX = touch.clientX - rect.left;
+    offsetY = touch.clientY - rect.top;
+  } else if (e.nativeEvent) {
+    offsetX = e.nativeEvent.offsetX;
+    offsetY = e.nativeEvent.offsetY;
+  } else {
+    console.error("Mouse event missing nativeEvent offsets");
+    return;
+  }
 
-    if (tool === "downspout") {
-      console.log("Opening Downspout modal at:", [
-        snapNumberToGrid(offsetX),
-        snapNumberToGrid(offsetY),
-        setDownspoutCoordinates([
+  if (tool === "downspout") {
+    const snappedX = snapNumberToGrid(offsetX);
+    const snappedY = snapNumberToGrid(offsetY);
+
+    setDownspoutCoordinates([snappedX, snappedY]);
+    console.log("Opening Downspout modal at:", [snappedX, snappedY]);
+
+    setIsDownspoutModalOpen(true);
+    setActiveModal("downspout");
+    return;
+  } 
+  
+  else if (tool === "select") {
+    console.log("Selecting mode active");
+
+    const updatedLines = lines.map((line) => ({
+      ...line,
+      isSelected: false,
+    }));
+
+    updatedLines.forEach((line) => {
+      if (
+        isLineNearPoint(
+          line.startX,
+          line.startY,
+          line.endX,
+          line.endY,
           snapNumberToGrid(offsetX),
           snapNumberToGrid(offsetY),
-        ]),
-      ]);
-      setIsDownspoutModalOpen(true);
-      setActiveModal("downspout");
-      return;
-    } else if (tool === "select") {
-      console.log("Selecting mode active");
-
-      // Reset all lines to not be selected
-      const updatedLines = lines.map((line) => ({
-        ...line,
-        isSelected: false,
-      }));
-
-      updatedLines.forEach((line) => {
-        if (
-          isLineNearPoint(
-            line.startX,
-            line.startY,
-            line.endX,
-            line.endY,
-            snapNumberToGrid(offsetX),
-            snapNumberToGrid(offsetY),
-            5,
-          )
-        ) {
-          foundLine = { ...line, isSelected: true };
-        }
-      });
-
-      if (foundLine) {
-        setLines(
-          updatedLines.map((line) =>
-            line.startX === foundLine.startX && line.startY === foundLine.startY
-              ? foundLine
-              : line,
-          ),
-        );
-        setSelectedLine(foundLine);
-        console.log("Selected line:", foundLine);
-        console.log(lines);
-      } else {
-        console.log("No line found near click");
-        setSelectedLine({});
+          5,
+        )
+      ) {
+        foundLine = { ...line, isSelected: true };
       }
+    });
+
+    if (foundLine) {
+      setLines(
+        updatedLines.map((line) =>
+          line.startX === foundLine.startX && line.startY === foundLine.startY
+            ? foundLine
+            : line,
+        ),
+      );
+      setSelectedLine(foundLine);
+      console.log("Selected line:", foundLine);
+      console.log(lines);
     } else {
-      setCurrentLine({
-        startX: snapNumberToGrid(offsetX),
-        startY: snapNumberToGrid(offsetY),
-        endX: snapNumberToGrid(offsetX),
-        endY: snapNumberToGrid(offsetY),
-        isVertical: false,
-        isHorizontal: false,
-        isSelected: false,
-        color: "black",
-      });
-      setIsDrawing(true);
+      console.log("No line found near click");
+      setSelectedLine({});
     }
+  } 
+  
+  else {
+    setCurrentLine({
+      startX: snapNumberToGrid(offsetX),
+      startY: snapNumberToGrid(offsetY),
+      endX: snapNumberToGrid(offsetX),
+      endY: snapNumberToGrid(offsetY),
+      isVertical: false,
+      isHorizontal: false,
+      isSelected: false,
+      color: "black",
+    });
+    setIsDrawing(true);
   }
+}
+
 
   function handleMouseMove(e) {
     if (isDownspoutModalOpen) return;
@@ -519,7 +524,13 @@ const Diagram = ({
     if (isDownspout) {
       ctx.beginPath();
       ctx.moveTo(x1, y1);
-      ctx.rect(line.startX, line.startY, 10, 10);
+      ctx.lineTo(x1 + gridSize / 2.75, y1 + gridSize / 2.75);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 - gridSize / 2.75, y1 + gridSize / 2.75);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 - gridSize / 2.75, y1 - gridSize / 2.75);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 + gridSize / 2.75, y1 - gridSize / 2.75);
       ctx.strokeStyle = line.color;
       ctx.stroke();
     } else {

@@ -38,7 +38,6 @@ export default function DownspoutModal({
 
     setActiveModal('diagram');
     setIsDownspoutModalOpen(false);
-    setTool('downspout');
   }
   
   function handleChangeElbowSequence(e){
