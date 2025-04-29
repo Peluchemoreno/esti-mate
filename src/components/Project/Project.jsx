@@ -64,10 +64,7 @@ export default function Project({
     setCurrentProjectId(projectId);
   }, [activeModal]);
 
-  useEffect(() => {
-    console.log(diagramData)
-    }, [diagramData]);
-
+  
   // console.log(project)
   const navigator = useNavigate();
 

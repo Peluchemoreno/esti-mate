@@ -218,6 +218,9 @@ if (filteredProducts.length > 0 && tool === "") {
       downspoutSize: downspoutData.downspoutSize,
       currentProduct: {price: currentDownspout[0].price,
       name: downspoutData.downspoutSize + ' Downspout'},
+      rainBarrel: downspoutData.rainBarrel,
+      splashBlock: downspoutData.splashBlock,
+      undergroundDrainage: downspoutData.undergroundDrainage,
     }
     setLines([...lines, formattedDownspout]);
   }

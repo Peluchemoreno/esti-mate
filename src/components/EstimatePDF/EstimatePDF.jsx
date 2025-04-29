@@ -52,6 +52,8 @@ function EstimatePDF({
     const nonDownspoutItems = [];
     const lineItemTable = {};
     const tempArray = [];
+    let splashBlocks = 0;
+    let miters = 0;
 
     lines.forEach((line) => {
       if (line.isDownspout) {
@@ -62,7 +64,6 @@ function EstimatePDF({
     });
 
     for (let i = 0; i < downspoutItems.length; i++) {
-      console.log(downspoutItems[i].measurement);
       if (!lineItemTable[downspoutItems[i].downspoutSize]) {
         lineItemTable[downspoutItems[i].downspoutSize] =
           downspoutItems[i].measurement;
@@ -73,7 +74,6 @@ function EstimatePDF({
     }
 
     for (let i = 0; i < nonDownspoutItems.length; i++) {
-      console.log(nonDownspoutItems[i].currentProduct?.name);
       if (lineItemTable[nonDownspoutItems[i].currentProduct?.name]) {
         lineItemTable[nonDownspoutItems[i].currentProduct.name] +=
           nonDownspoutItems[i].measurement;
@@ -102,24 +102,85 @@ function EstimatePDF({
         })[0].currentProduct.price,
       };
 
-      console.log(formattedItem);
       tempArray.push(formattedItem);
     });
-    console.log(lineItemTable);
 
-    console.log(tempArray);
     setItemizedArray(tempArray);
     return downspoutItems;
   }
 
-  useEffect(() => {
-    console.log("selectedDiagram: ", selectedDiagram);
-    formatLineItems(selectedDiagram.lines);
-  }, [activeModal]);
+  function injectMiscItem({ name, quantity, price }) {
+    const formattedMiscItem = {
+      item: name,
+      quantity: quantity,
+      price: price,
+    };
+
+    setItemizedArray([...itemizedArray, formattedMiscItem]);
+  }
+
+  function countSharedPoints({ lines }) {
+    const pointMap = new Map();
+    let sharedPointCount = 0;
+
+    // Helper: format a point as a string
+    function pointKey(x, y) {
+      return `${x},${y}`;
+    }
+
+    // First pass: record how many times each point appears
+    lines.forEach((line) => {
+      if (!line.isDownspout) {
+        const start = pointKey(line.startX, line.startY);
+        const end = pointKey(line.endX, line.endY);
+
+        pointMap.set(start, (pointMap.get(start) || 0) + 1);
+        pointMap.set(end, (pointMap.get(end) || 0) + 1);
+      }
+    });
+
+    // Second pass: count points that are shared
+    pointMap.forEach((count) => {
+      if (count > 1) {
+        sharedPointCount += 1;
+      }
+    });
+
+    return sharedPointCount;
+  }
+
+  function getMiscItems(diagram) {
+    let splashBlocks = 0;
+    let rainBarrelConnections = 0;
+    let undergroundDrainageConnections = 0;
+
+    selectedDiagram.lines.forEach((line) => {
+      if (line.isDownspout) {
+        if (line.splashBlock) {
+          splashBlocks++;
+        }
+        if (line.rainBarrel) {
+          rainBarrelConnections++;
+        }
+        if (line.undergroundDrainage) {
+          undergroundDrainageConnections++;
+        }
+      }
+    });
+
+    return {
+      splashBlocks,
+      rainBarrelConnections,
+      undergroundDrainageConnections,
+    };
+  }
 
   useEffect(() => {
-    console.log(itemizedArray);
-  }, [itemizedArray]);
+    formatLineItems(selectedDiagram.lines);
+    console.log(selectedDiagram);
+    console.log(countSharedPoints(selectedDiagram));
+    console.log(getMiscItems(selectedDiagram));
+  }, [activeModal]);
 
   return (
     <Document>
