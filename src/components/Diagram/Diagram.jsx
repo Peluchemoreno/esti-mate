@@ -58,11 +58,7 @@ const Diagram = ({
   const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
   const [unfilteredProducts, setUnfilteredProducts] = useState([]);
 
-  useEffect(()=>{
-    console.log(lines)
-  },[lines])
-
-  useEffect(() => {
+    useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
 
@@ -206,8 +202,6 @@ if (filteredProducts.length > 0 && tool === "") {
     const currentDownspout = unfilteredProducts.filter((product)=> {
       return (product.name === downspoutData.downspoutSize + ' Downspout') || product.name === downspoutData.downspoutSize + ' downspout'
     })
-    console.log(downspoutData.downspoutSize + ' Downspout');
-    console.log(currentDownspout);
 
     const formattedDownspout = {
       startX: downspoutCoordinates[0],
@@ -220,8 +214,9 @@ if (filteredProducts.length > 0 && tool === "") {
       isSelected: false,
       isDownspout: true,
       price: currentDownspout[0].price,
+      elbowSequence: downspoutData.elbowSequence,
+      downspoutSize: downspoutData.downspoutSize,
     }
-    console.log(formattedDownspout);
     setLines([...lines, formattedDownspout]);
   }
 
@@ -597,10 +592,76 @@ function handleMouseDown(e) {
     return;
   }
 
+    function getBoundingBox(lines, padding = 20) {  // <-- 🔥 add a default padding value
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      lines.forEach((line) => {
+        minX = Math.min(minX, line.startX, line.endX);
+        minY = Math.min(minY, line.startY, line.endY);
+        maxX = Math.max(maxX, line.startX, line.endX);
+        maxY = Math.max(maxY, line.startY, line.endY);
+      });
+
+      // Expand the box by padding
+      return {
+        minX: minX - padding,
+        minY: minY - padding,
+        maxX: maxX + padding,
+        maxY: maxY + padding,
+      };
+    }
+
     const token = localStorage.getItem("jwt");
     const canvas = canvasRef.current;
-    const imageData = canvas.toDataURL("image/png");
+    const ctx = canvas.getContext('2d');
+    drawAllLines(ctx);
 
+    const boundingBox = getBoundingBox(lines, 30);
+    const cropWidth = boundingBox.maxX - boundingBox.minX;
+    const cropHeight = boundingBox.maxY - boundingBox.minY;
+
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+
+  
+    const thumbnailDisplaySize = 200; // what you want it to *look* like
+    const thumbnailInternalSize = 3 * thumbnailDisplaySize; // 2x pixel density for crispness
+
+    tempCanvas.width = thumbnailInternalSize;
+    tempCanvas.height = thumbnailInternalSize;
+    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+    const padding = 0.05 * thumbnailInternalSize; // padding based on bigger internal size
+
+    const availableWidth = thumbnailInternalSize - padding * 2;
+    const availableHeight = thumbnailInternalSize - padding * 2;
+
+    const scale = Math.min(availableWidth / cropWidth, availableHeight / cropHeight);
+
+    const destWidth = cropWidth * scale;
+    const destHeight = cropHeight * scale;
+
+    const dx = (thumbnailInternalSize - destWidth) / 2;
+    const dy = (thumbnailInternalSize - destHeight) / 2;
+
+    tempCtx.fillStyle = "#ffffff"; // optional background
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    tempCtx.drawImage(
+      canvas,
+      boundingBox.minX,
+      boundingBox.minY,
+      cropWidth,
+      cropHeight,
+      dx,
+      dy,
+      destWidth,
+      destHeight
+    );
+
+    const thumbnailDataUrl = tempCanvas.toDataURL('image/png');
     let totalFootage = 0;
     let price = 0;
     let downspoutCentsPrice;
@@ -621,20 +682,23 @@ function handleMouseDown(e) {
 
     const data = {
       lines: [...lines],
-      imageData,
+      imageData: thumbnailDataUrl,
       totalFootage,
       price: totalPrice,
     };
 
     console.log(totalPrice);
+    console.log(thumbnailDataUrl);
 
     addDiagramToProject(currentProjectId, token, data)
       .then((newDiagramData) => {
         handlePassDiagramData(newDiagramData);
         // ✅ Optional: Update selected diagram if needed
         // setSelectedDiagram(newDiagramData);
-        clearCanvas();
+        // clearCanvas();
         closeModal();
+      }).then(()=>{
+        clearCanvas()
       })
       .catch((err) => {
         console.error("Failed to save diagram:", err);

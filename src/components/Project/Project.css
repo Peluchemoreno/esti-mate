@@ -1,4 +1,4 @@
-.project__header{
+.project__header {
   background-color: transparent;
   height: 65px;
   display: flex;
@@ -20,18 +20,20 @@
   margin-right: 5px;
 }
 
-.project__delete-button, .edit-product-delete-button {
+.project__delete-button,
+.edit-product-delete-button {
   background-color: var(--delete-red);
   color: var(--white);
   border: 1px solid var(--white);
   border-radius: 5px;
   padding: 5px;
   cursor: pointer;
-  transition: opacity .2s ease;
+  transition: opacity 0.2s ease;
 }
 
-.project__delete-button:hover, .edit-product-delete-button:hover{
-  opacity: .7;
+.project__delete-button:hover,
+.edit-product-delete-button:hover {
+  opacity: 0.7;
 }
 
 .project__body-horizontal-spacer {
@@ -44,7 +46,6 @@
   max-width: 80vw;
 }
 
-
 .create-button {
   width: 100%;
   padding: 40px;
@@ -54,7 +55,9 @@
   border: 1px dashed var(--white);
   border-radius: 5px;
   cursor: pointer;
-  transition: background-color .2s ease, border .2s ease;
+  transition:
+    background-color 0.2s ease,
+    border 0.2s ease;
   background-color: transparent;
 }
 
@@ -73,19 +76,16 @@
 }
 
 .project__drawing {
-  background-color: white;
   margin-top: 20px;
   cursor: pointer;
 }
 
-.project__drawing_selected{
-  background-color: white;
+.project__drawing_selected {
   margin-top: 20px;
   /* border: 4px solid red;
   */
-   border: 4px solid rgb(255, 0, 0);
-   cursor: pointer;
-   box-shadow: 0 0 10px rgb(255, 0, 0);
+  border: 4px solid rgb(255, 0, 0);
+  cursor: pointer;
 }
 
 .project__diagram-container {
@@ -97,7 +97,7 @@
   flex-wrap: wrap;
 }
 
-.project__button-split{
+.project__button-split {
   display: flex;
 }
 

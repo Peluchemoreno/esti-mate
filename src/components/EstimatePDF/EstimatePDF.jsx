@@ -20,6 +20,7 @@ const styles = StyleSheet.create({
   text: { fontSize: 14, marginBottom: 5 },
   smallerText: { fontSize: 12, marginBottom: 5 },
   bold: { fontWeight: "bold" },
+  itemsHeader: { display: "flex", flexDirection: "row" },
 });
 
 function getCurrentDate() {
@@ -41,15 +42,54 @@ function EstimatePDF({
   const [token, setToken] = useState("");
 
   useEffect(() => {
-    console.log(selectedDiagram);
-    console.log(currentUser);
-  }, [activeModal, selectedDiagram]);
-
-  useEffect(() => {
-    console.log(currentUser);
     const token = localStorage.getItem("jwt");
     setToken(token);
   }, []);
+
+  function formatLineItems(lines) {
+    const downspoutItems = [];
+    const nonDownspoutItems = [];
+    const lineItemTable = {};
+
+    lines.forEach((line) => {
+      if (line.isDownspout) {
+        downspoutItems.push(line);
+      } else {
+        nonDownspoutItems.push(line);
+      }
+    });
+
+    for (let i = 0; i < downspoutItems.length; i++) {
+      console.log(downspoutItems[i].measurement);
+      if (!lineItemTable[downspoutItems[i].downspoutSize]) {
+        lineItemTable[downspoutItems[i].downspoutSize] =
+          downspoutItems[i].measurement;
+      } else {
+        lineItemTable[downspoutItems[i].downspoutSize] +=
+          downspoutItems[i].measurement;
+      }
+    }
+
+    for (let i = 0; i < nonDownspoutItems.length; i++) {
+      console.log(nonDownspoutItems[i].currentProduct?.name);
+      if (lineItemTable[nonDownspoutItems[i].currentProduct?.name]) {
+        lineItemTable[nonDownspoutItems[i].currentProduct.name] +=
+          nonDownspoutItems[i].measurement;
+      } else {
+        lineItemTable[nonDownspoutItems[i].currentProduct?.name] =
+          nonDownspoutItems[i].measurement;
+      }
+    }
+
+    console.log(lineItemTable);
+
+    return downspoutItems;
+  }
+
+  useEffect(() => {
+    console.log("selectedDiagram: ", selectedDiagram);
+    formatLineItems(selectedDiagram.lines);
+  }, [activeModal]);
 
   return (
     <Document>
@@ -210,12 +250,72 @@ function EstimatePDF({
                 />
               )}
             </View>
-            {/* <View>
-              <Text style={{ fontSize: 16, padding: 5, maxWidth: 150 }}>
-                {currentUser.companyName}
-              </Text>
-            </View> */}
           </View>
+        </View>
+        <View>
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: "#ccc",
+              padding: 8,
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{ width: "60%", fontWeight: "bold", fontSize: "12px" }}
+            >
+              Item
+            </Text>
+            <Text
+              style={{
+                width: "10%",
+                fontWeight: "bold",
+                textAlign: "center",
+                fontSize: "12px",
+              }}
+            >
+              Quantity
+            </Text>
+            <Text
+              style={{
+                width: "20%",
+                fontWeight: "bold",
+                textAlign: "right",
+                fontSize: "12px",
+              }}
+            >
+              Amount
+            </Text>
+          </View>
+
+          {selectedDiagram?.lines?.map((line, index) => (
+            <View
+              key={index}
+              style={{
+                flexDirection: "row",
+                padding: 8,
+                borderBottom: "1px solid #eee",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{ width: "60%", fontSize: "12px", fontWeight: "bold" }}
+              >
+                {line.currentProduct?.name || "N/A"}
+              </Text>
+              <Text
+                style={{ width: "20%", textAlign: "center", fontSize: "12px" }}
+              >
+                {line.measurement || "-"}
+              </Text>
+              <Text
+                style={{ width: "20%", textAlign: "right", fontSize: "12px" }}
+              >
+                {selectedDiagram.price}
+              </Text>
+            </View>
+          ))}
         </View>
       </Page>
     </Document>

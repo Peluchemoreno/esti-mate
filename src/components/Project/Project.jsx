@@ -64,6 +64,10 @@ export default function Project({
     setCurrentProjectId(projectId);
   }, [activeModal]);
 
+  useEffect(() => {
+    console.log(diagramData)
+    }, [diagramData]);
+
   // console.log(project)
   const navigator = useNavigate();
 
@@ -191,11 +195,13 @@ export default function Project({
                     width: "200px",
                     height: "200px",
                     backgroundImage: `url(${diagram.imageData})`,
-                    backgroundSize: "300px 300px",
-                    backgroundPosition: "50% 50%",
+                    backgroundSize: "200px",
+                    backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",
+                    borderRadius: '5px',
                   }}
-                ></div>
+                >
+                </div>
               ))
             ) : (
               <p>No Diagrams</p>
