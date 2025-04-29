@@ -40,6 +40,7 @@ function EstimatePDF({
   logoUrl,
 }) {
   const [token, setToken] = useState("");
+  const [itemizedArray, setItemizedArray] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -50,6 +51,7 @@ function EstimatePDF({
     const downspoutItems = [];
     const nonDownspoutItems = [];
     const lineItemTable = {};
+    const tempArray = [];
 
     lines.forEach((line) => {
       if (line.isDownspout) {
@@ -81,8 +83,32 @@ function EstimatePDF({
       }
     }
 
+    Object.keys(lineItemTable).forEach((item) => {
+      const formattedItem = {
+        item: selectedDiagram.lines.filter((line) => {
+          if (line.isDownspout) {
+            return line.downspoutSize === item;
+          } else {
+            return line.currentProduct?.name === item;
+          }
+        })[0].currentProduct?.name,
+        quantity: lineItemTable[item],
+        price: selectedDiagram.lines.filter((line) => {
+          if (line.isDownspout) {
+            return line.downspoutSize === item;
+          } else {
+            return line.currentProduct?.name === item;
+          }
+        })[0].currentProduct.price,
+      };
+
+      console.log(formattedItem);
+      tempArray.push(formattedItem);
+    });
     console.log(lineItemTable);
 
+    console.log(tempArray);
+    setItemizedArray(tempArray);
     return downspoutItems;
   }
 
@@ -90,6 +116,10 @@ function EstimatePDF({
     console.log("selectedDiagram: ", selectedDiagram);
     formatLineItems(selectedDiagram.lines);
   }, [activeModal]);
+
+  useEffect(() => {
+    console.log(itemizedArray);
+  }, [itemizedArray]);
 
   return (
     <Document>
@@ -289,7 +319,7 @@ function EstimatePDF({
             </Text>
           </View>
 
-          {selectedDiagram?.lines?.map((line, index) => (
+          {itemizedArray.map((line, index) => (
             <View
               key={index}
               style={{
@@ -302,17 +332,17 @@ function EstimatePDF({
               <Text
                 style={{ width: "60%", fontSize: "12px", fontWeight: "bold" }}
               >
-                {line.currentProduct?.name || "N/A"}
+                {line.item || "N/A"}
               </Text>
               <Text
                 style={{ width: "20%", textAlign: "center", fontSize: "12px" }}
               >
-                {line.measurement || "-"}
+                {line.quantity || "-"}
               </Text>
               <Text
                 style={{ width: "20%", textAlign: "right", fontSize: "12px" }}
               >
-                {selectedDiagram.price}
+                ${(parseFloat(line.price.slice(1)) * line.quantity).toFixed(2)}
               </Text>
             </View>
           ))}

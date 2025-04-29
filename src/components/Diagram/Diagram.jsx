@@ -216,6 +216,8 @@ if (filteredProducts.length > 0 && tool === "") {
       price: currentDownspout[0].price,
       elbowSequence: downspoutData.elbowSequence,
       downspoutSize: downspoutData.downspoutSize,
+      currentProduct: {price: currentDownspout[0].price,
+      name: downspoutData.downspoutSize + ' Downspout'},
     }
     setLines([...lines, formattedDownspout]);
   }
