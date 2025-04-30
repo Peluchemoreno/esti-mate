@@ -60,19 +60,23 @@ export function uploadLogo(logo, token) {
     });
 }
 
-export function getCompanyLogo(userId, token) {
-  return fetch(BASE_URL + `users/${userId}/logo`, {
-    method: "GET",
+
+
+export async function getCompanyLogo(userId, token) {
+  const res = await fetch(`${BASE_URL}users/${userId}/logo`, {
     headers: {
-      "Content-Type": "application/json",
-      authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${token}`, // ✅ no Content-Type header
     },
-  })
-    .then(processServerResponse)
-    .then((data) => {
-      return data;
-    });
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch company logo");
+  }
+
+  const blob = await res.blob();
+  return URL.createObjectURL(blob); // ✅ convert blob to browser-usable image URL
 }
+
 
 export function getUser(token) {
   return fetch(BASE_URL + "users/me", {
@@ -110,6 +114,21 @@ export function getProjects(token) {
       "Content-Type": "application/json",
       authorization: `Bearer ${token}`,
     },
+  })
+    .then(processServerResponse)
+    .then((data) => {
+      return data;
+    });
+}
+
+export function updateUserInfo(userInfo, token) {
+  return fetch(BASE_URL + "users/me", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(userInfo),
   })
     .then(processServerResponse)
     .then((data) => {

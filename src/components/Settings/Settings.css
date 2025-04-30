@@ -16,3 +16,11 @@
 .settings__input {
  border: 1px solid red; 
 }
+
+.input_invisible {
+  display: none;
+}
+
+.company-logo {
+  border: 1px solid red;
+}

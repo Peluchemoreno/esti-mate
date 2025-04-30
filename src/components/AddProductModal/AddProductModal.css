@@ -43,6 +43,12 @@
   padding: 10px;
 }
 
+.add-item-form__footer_no-border {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px;
+}
+
 .add-item-form__button_cancel,
 .add-item-form__button_create {
   border: none;

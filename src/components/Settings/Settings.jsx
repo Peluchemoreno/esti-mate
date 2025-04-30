@@ -1,14 +1,66 @@
 import { useContext, useEffect, useState } from "react";
 import "./Settings.css";
-import { getCompanyLogo } from "../../utils/auth";
+import { getCompanyLogo, updateUserInfo, uploadLogo } from "../../utils/auth";
 import CompanyLogo from "../CompanyLogo/CompanyLogo";
 
-export default function Settings({ currentUser }) {
+export default function Settings({ currentUser, setCurrentUser }) {
+  const [logoInputVisible, setLogoInputVisible] = useState(false);
   const [token, setToken] = useState("");
+  const [companyName, setCompanyName] = useState(currentUser.companyName);
+  const [companyAddress, setCompanyAddress] = useState(currentUser.companyAddress);
+  const [companyPhoneNumber, setCompanyPhoneNumber] = useState(currentUser.companyPhone);
+  const [logoFile, setLogoFile] = useState(null);
+  const [dummyState, setDummyState] = useState(false);
+
+  const [logoUrl, setLogoUrl] = useState(null);
+
+  function handleCompanyNameChange(e){
+    setCompanyName(e.target.value)
+    console.log(companyName)
+  }
+
+  function handleCompanyAddressChange(e){
+    setCompanyAddress(e.target.value)
+    console.log(companyAddress)
+  }
+
+  function handleCompanyPhoneNumberChange(e){
+    setCompanyPhoneNumber(e.target.value)
+    console.log(companyPhoneNumber)
+  }
+
+  function handleChangeLogoFile(e){
+    setLogoFile(e.target.files[0])
+  }
+
+  function handleUpdateBusinessInfo(e){
+    const token = localStorage.getItem('jwt');
+    e.preventDefault();
+    const businessData = {companyName, companyAddress, companyPhoneNumber}
+    console.log(businessData)
+    console.log(currentUser.logo)
+
+    updateUserInfo(businessData, token).then(data =>{setCurrentUser(data)}) 
+    
+    if (logoFile) {
+      uploadLogo(logoFile, token).then(() => {
+        getCompanyLogo(currentUser._id, token).then(setLogoUrl);
+      });
+    }
+  }
+
+
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     setToken(token);
-    getCompanyLogo(currentUser._id, token);
+
+    if (currentUser._id) {
+      
+getCompanyLogo(currentUser._id, token).then((url) => {
+  console.log("Fetched logo URL:", url);
+  setLogoUrl(url);
+});
+    }
   }, [currentUser]);
 
   useEffect(() => {
@@ -18,24 +70,28 @@ export default function Settings({ currentUser }) {
     <div className="settings">
       <h3 className="settings__header-title">Settings</h3>
       <div className="settings__body">
-        <form className="settings__form">
+        <form className="settings__form" onSubmit={handleUpdateBusinessInfo}>
           <label htmlFor="firstName" className="signup__form-label">
             Company Logo
-            <CompanyLogo token={token} currentUser={currentUser}></CompanyLogo>
-            <input
-              required
-              type="file"
-              className="signup__form-input signup__form-input_firstName input"
-            />
+            <div style={{border: 'none', marginTop: '10px'}}>
+              <CompanyLogo token={token} currentUser={currentUser} logoUrl={logoUrl}></CompanyLogo>
+              
+              <p style={{margin: '10px 0px 0px 0px'}}>Upload new logo:</p>
+              <input
+                type="file"
+                className="signup__form-input signup__form-input_firstName input"
+                onChange={handleChangeLogoFile}
+              />
+            </div>
           </label>
-        </form>
-        <label htmlFor="firstName" className="settings__label">
+        <label htmlFor="firstName" className="">
           Company Name
           <input
             required
             type="text"
-            className="signup__form-input settings__input"
-            value={currentUser.companyName}
+            className="signup__form-input input"
+            value={companyName}
+            onChange={handleCompanyNameChange}
           />
         </label>
         <label htmlFor="firstName" className="signup__form-label">
@@ -44,7 +100,8 @@ export default function Settings({ currentUser }) {
             required
             type="text"
             className="signup__form-input signup__form-input_firstName input"
-            value={currentUser.companyAddress}
+            value={companyAddress}
+            onChange={handleCompanyAddressChange}
           />
         </label>
         <label htmlFor="firstName" className="signup__form-label">
@@ -53,9 +110,17 @@ export default function Settings({ currentUser }) {
             required
             type="text"
             className="signup__form-input signup__form-input_firstName input"
-            value={currentUser.companyPhone}
+            value={companyPhoneNumber}
+            onChange={handleCompanyPhoneNumberChange}
           />
         </label>
+          <div className="add-item-form__footer_no-border">
+          <button
+            type="submit" className="add-item-form__button_create">
+            Update
+          </button>
+        </div>
+        </form>
       </div>
     </div>
   );
