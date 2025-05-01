@@ -9,6 +9,7 @@ import EditProductModal from "../EditProductModal/EditProductModal";
 export default function Products({ activeModal, setActiveModal, closeModal }) {
   const [tableRows, setTableRows] = useState([]);
   const [currentItem, setCurrentItem] = useState();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [tableColumns, setTableColumns] = useState([
     {
@@ -106,6 +107,9 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
     },
   ]);
 
+  const filteredRows = tableRows.filter((row) =>
+    row.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     getProducts(token).then((data) => {
@@ -159,8 +163,25 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             },
           }}
         >
+          <div style={{ marginBottom: "1rem" }}>
+            <input
+              type="text"
+              placeholder="Search products..."
+              className="products__search-input"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px",
+                fontSize: "14px",
+                borderRadius: "4px",
+                border: "1px solid #ccc",
+                color: "var(--white)",
+              }}
+            />
+          </div>
           <DataGrid
-            rows={tableRows}
+            rows={filteredRows}
             columns={tableColumns}
             getRowId={(row) => row._id}
             sx={{

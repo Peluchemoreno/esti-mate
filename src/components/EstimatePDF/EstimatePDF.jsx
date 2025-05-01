@@ -38,6 +38,7 @@ function EstimatePDF({
   activeModal,
   currentUser,
   logoUrl,
+  estimateData,
 }) {
   const [token, setToken] = useState("");
   const [itemizedArray, setItemizedArray] = useState([]);
@@ -189,10 +190,10 @@ function EstimatePDF({
         <View style={{}}>
           <View style={[styles.section, { paddingBottom: 40 }]}>
             <Text style={[styles.text, styles.bold, { textAlign: "right" }]}>
-              {currentUser.companyName}
+              {project.clientName}
             </Text>
             <Text style={[styles.text, { textAlign: "right" }]}>
-              {currentUser.companyAddress}
+              {project.address}
             </Text>
             <Text
               style={[
@@ -200,7 +201,7 @@ function EstimatePDF({
                 { textAlign: "right", color: "#444", marginTop: 10 },
               ]}
             >
-              {currentUser.companyPhone}
+              {project.primaryPhoneNumber}
             </Text>
           </View>
           <View
@@ -254,7 +255,7 @@ function EstimatePDF({
                 >
                   Estimate Number:
                 </Text>
-                <Text style={[styles.smallerText]}>001</Text>
+                <Text style={[styles.smallerText]}>{estimateData.estimateNumber}</Text>
               </View>
               <View style={{ display: "flex", flexDirection: "row" }}>
                 <Text
@@ -283,7 +284,7 @@ function EstimatePDF({
                 >
                   Payment Due:
                 </Text>
-                <Text style={[styles.smallerText]}>Upon completion</Text>
+                <Text style={[styles.smallerText]}>{estimateData.paymentDue}</Text>
               </View>
               <View
                 style={{
