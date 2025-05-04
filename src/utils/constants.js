@@ -5,6 +5,7 @@ export const starterItems = [
     price: "$8.00",
     quantity: "length-feet",
     listed: true,
+    description: '5" K-Style Seamless Rain Gutter',
   },
   {
     name: '5" K-Style Miter',
@@ -12,6 +13,8 @@ export const starterItems = [
     price: "$10.00",
     quantity: "unit-per",
     listed: false,
+    description:
+      'Stamped and color matched corner for 5" K-Style Gutter that joins two sections of gutter.',
   },
   {
     name: '6" K-Style Miter',
@@ -19,6 +22,8 @@ export const starterItems = [
     price: "$10.00",
     quantity: "unit-per",
     listed: false,
+    description:
+      'Stamped and color matched corner for 6" K-Style Gutter that joins two sections of gutter.',
   },
 
   {
@@ -27,6 +32,7 @@ export const starterItems = [
     price: "$10.00",
     quantity: "length-feet",
     listed: true,
+    description: '6" K-Style Seamless Rain Gutter',
   },
   {
     name: '5" Straight Face Miter',
@@ -34,6 +40,7 @@ export const starterItems = [
     price: "$10.00",
     quantity: "unit-per",
     listed: false,
+    description: 'Custom tabbed corner for 5" Straight Face Gutter',
   },
   {
     name: '5" Straight Face',
@@ -41,6 +48,7 @@ export const starterItems = [
     price: "$10.00",
     quantity: "length-feet",
     listed: true,
+    description: '5" Straight Face Rain Gutter',
   },
   {
     name: '6" Straight Face',
@@ -48,6 +56,7 @@ export const starterItems = [
     price: "$11.00",
     quantity: "length-feet",
     listed: true,
+    description: '6" Straight Face Rain Gutter',
   },
   {
     name: '6" Straight Face Miter',
@@ -55,6 +64,7 @@ export const starterItems = [
     price: "$10.00",
     quantity: "unit-per",
     listed: false,
+    description: 'Custom tabbed corner for 6" Straight Face Gutter',
   },
   {
     name: '5" Box Gutter',
@@ -62,6 +72,7 @@ export const starterItems = [
     price: "$14.00",
     quantity: "length-feet",
     listed: true,
+    description: '5" Box Style Rain Gutter',
   },
   {
     name: '5" Box Miter',
@@ -69,6 +80,7 @@ export const starterItems = [
     price: "$4.00",
     quantity: "unit-per",
     listed: false,
+    description: 'Custom tabbed corner for 5" Box Style Gutter',
   },
   {
     name: '6" Box Gutter',
@@ -76,6 +88,7 @@ export const starterItems = [
     price: "$11.00",
     quantity: "length-feet",
     listed: true,
+    description: '6" Box Style Rain Gutter',
   },
   {
     name: '6" Box Miter',
@@ -83,6 +96,7 @@ export const starterItems = [
     price: "$10.00",
     quantity: "unit-per",
     listed: false,
+    description: 'Custom tabbed corner for 6" Box Style Gutter',
   },
   {
     name: "Custom Gutter",
@@ -104,6 +118,7 @@ export const starterItems = [
     price: "$4.00",
     quantity: "length-feet",
     listed: false,
+    description: "2x3 Corrugated Downspout",
   },
   {
     name: "2x3 A Elbow",
@@ -146,6 +161,7 @@ export const starterItems = [
     price: "$4.00",
     quantity: "length-feet",
     listed: false,
+    description: "3x4 Corrugated Downspout",
   },
   {
     name: "3x4 A Elbow",
@@ -188,6 +204,7 @@ export const starterItems = [
     price: "$4.00",
     quantity: "length-feet",
     listed: false,
+    description: "4x5 Corrugated Downspout",
   },
   {
     name: "4x5 A Elbow",
@@ -230,6 +247,7 @@ export const starterItems = [
     price: "$4.00",
     quantity: "length-feet",
     listed: false,
+    description: '3" Round Downspout',
   },
   {
     name: '3" Round A Elbow',
@@ -272,6 +290,7 @@ export const starterItems = [
     price: "$4.00",
     quantity: "length-feet",
     listed: false,
+    description: '4" Round Downspout',
   },
   {
     name: '4" Round A Elbow',
@@ -356,6 +375,7 @@ export const starterItems = [
     price: "$5.00",
     quantity: "unit-per",
     listed: false,
+    description: "Ground-level block to deflect water from downspout.",
   },
 ];
 // when testing the app on the network and not on local host run the second baseUrl

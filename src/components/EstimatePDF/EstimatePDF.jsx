@@ -10,7 +10,7 @@ import {
 import { useEffect, useState } from "react";
 
 const styles = StyleSheet.create({
-  page: { padding: 20 },
+  page: { padding: 20, paddingBottom: 100 },
   section: { marginBottom: 15, borderBottom: "1px solid grey" },
   header: {
     fontSize: 28,
@@ -101,20 +101,30 @@ function EstimatePDF({
             return line.currentProduct?.name === item;
           }
         })[0].currentProduct.price,
+        description: selectedDiagram.lines.filter((line) => {
+          if (!line.isDownspout){
+            return line.currentProduct?.name === item;
+          } else {
+            return line.downspoutSize === item
+          }
+        })[0].currentProduct.description,
       };
 
       tempArray.push(formattedItem);
     });
 
+    console.log('line item table: ', lineItemTable)
+    console.log('tempArray: ', tempArray)
     setItemizedArray(tempArray);
     return downspoutItems;
   }
 
-  function injectMiscItem({ name, quantity, price }) {
+  function injectMiscItem({ name, quantity, price, description }) {
     const formattedMiscItem = {
       item: name,
       quantity: quantity,
       price: price,
+      description,
     };
 
     setItemizedArray([...itemizedArray, formattedMiscItem]);
@@ -381,7 +391,9 @@ function EstimatePDF({
             </Text>
           </View>
 
-          {itemizedArray.map((line, index) => (
+          {itemizedArray.map((line, index) => {
+return (
+            <>
             <View
               key={index}
               style={{
@@ -391,11 +403,18 @@ function EstimatePDF({
                 alignItems: "center",
               }}
             >
-              <Text
-                style={{ width: "60%", fontSize: "12px", fontWeight: "bold" }}
-              >
-                {line.item || "N/A"}
-              </Text>
+              
+              <View style={{ width: "60%" }}>
+                <Text style={{ fontSize: "12px", fontWeight: "bold" }}>
+                  {line.item || "N/A"}
+                </Text>
+                {line.description && (
+                  <Text style={{ fontSize: "10px", color: "#555", marginTop: 2 }}>
+                    {line.description}
+                  </Text>
+                )}
+              </View>
+
               <Text
                 style={{ width: "20%", textAlign: "center", fontSize: "12px" }}
               >
@@ -406,9 +425,40 @@ function EstimatePDF({
               >
                 ${(parseFloat(line.price.slice(1)) * line.quantity).toFixed(2)}
               </Text>
+              
             </View>
-          ))}
+              </>
+          )
+          })}
         </View>
+        <View>
+          
+        </View>
+        <View
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: 20,
+            right: 20,
+            padding: 10,
+            borderTop: "1px solid #ccc",
+            backgroundColor: "#f5f5f5",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: "bold" }}>
+            Total Amount Due (USD):
+          </Text>
+          <Text style={{ fontSize: 12, fontWeight: "bold" }}>
+            {selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
+          </Text>
+        </View>
+
+      </Page>
+      <Page>
+        <Text>This is some sample page text</Text>
       </Page>
     </Document>
   );

@@ -48,6 +48,7 @@ function App() {
     getUser(token)
       .then((user) => {
         setCurrentUser(user);
+        localStorage.setItem("currentUserId", user._id);
         getProjects(token).then((projectArray) => {
           if (!projectArray) {
             setProjects([]);
@@ -63,7 +64,7 @@ function App() {
       });
   }, []);
 
-  function handleLogin(email, password) {
+   function handleLogin(email, password) {
     signin(email, password)
       .then((data) => {
         const token = data.token;
@@ -85,10 +86,12 @@ function App() {
         const token = data.token;
         uploadLogo(logo, token);
         starterItems.forEach((item) => {
+          console.log('creating item: ', item, ' with description: ', item.description)
           createProduct(item, token);
         });
         getUser(token).then((user) => {
           setCurrentUser(user);
+          localStorage.setItem("userId", user._id);
           navigate("/dashboard/projects");
         });
       });
@@ -183,7 +186,12 @@ function App() {
               />
               <Route
                 path="settings"
-                element={<Settings currentUser={currentUser} setCurrentUser={setCurrentUser}/>}
+                element={
+                  <Settings
+                    currentUser={currentUser}
+                    setCurrentUser={setCurrentUser}
+                  />
+                }
               />
             </Route>
             <Route

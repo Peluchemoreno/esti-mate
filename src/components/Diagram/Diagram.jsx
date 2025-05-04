@@ -58,7 +58,7 @@ const Diagram = ({
   const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
   const [unfilteredProducts, setUnfilteredProducts] = useState([]);
 
-    useEffect(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
 
@@ -87,9 +87,9 @@ const Diagram = ({
 
         // Important: only set default tool once when products load
 
-if (filteredProducts.length > 0 && tool === "") {
-  setTool(filteredProducts[0].name);
-}
+        if (filteredProducts.length > 0 && tool === "") {
+          setTool(filteredProducts[0].name);
+        }
       } else {
         setProducts([
           {
@@ -199,9 +199,13 @@ if (filteredProducts.length > 0 && tool === "") {
   }
 
   function handleAddDownspout(downspoutData) {
-    const currentDownspout = unfilteredProducts.filter((product)=> {
-      return (product.name === downspoutData.downspoutSize + ' Downspout') || product.name === downspoutData.downspoutSize + ' downspout'
-    })
+    const currentDownspout = unfilteredProducts.filter((product) => {
+      return (
+        product.name === downspoutData.downspoutSize + " Downspout" ||
+        product.name === downspoutData.downspoutSize + " downspout"
+      );
+    });
+    console.log(currentDownspout)
 
     const formattedDownspout = {
       startX: downspoutCoordinates[0],
@@ -210,18 +214,21 @@ if (filteredProducts.length > 0 && tool === "") {
       endY: downspoutCoordinates[1],
       midpoint: null,
       measurement: parseInt(downspoutData.totalFootage),
-      color: currentDownspout[0].visual, 
+      color: currentDownspout[0].visual,
       isSelected: false,
       isDownspout: true,
       price: currentDownspout[0].price,
       elbowSequence: downspoutData.elbowSequence,
       downspoutSize: downspoutData.downspoutSize,
-      currentProduct: {price: currentDownspout[0].price,
-      name: downspoutData.downspoutSize + ' Downspout'},
+      currentProduct: {
+        price: currentDownspout[0].price,
+        name: downspoutData.downspoutSize + " Downspout",
+        description: currentDownspout[0].description,
+      },
       rainBarrel: downspoutData.rainBarrel,
       splashBlock: downspoutData.splashBlock,
       undergroundDrainage: downspoutData.undergroundDrainage,
-    }
+    };
     setLines([...lines, formattedDownspout]);
   }
 
@@ -229,95 +236,89 @@ if (filteredProducts.length > 0 && tool === "") {
   /*                               event listeners                                        */
   /* ------------------------------------------------------------------------------------ */
 
-  
-function handleMouseDown(e) {
-  if (isDownspoutModalOpen) return;
-  
-  let offsetX, offsetY;
-  let foundLine = null;
+  function handleMouseDown(e) {
+    if (isDownspoutModalOpen) return;
 
-  if (e.nativeEvent?.touches) {
-    const touch = e.nativeEvent.touches[0];
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    offsetX = touch.clientX - rect.left;
-    offsetY = touch.clientY - rect.top;
-  } else if (e.nativeEvent) {
-    offsetX = e.nativeEvent.offsetX;
-    offsetY = e.nativeEvent.offsetY;
-  } else {
-    console.error("Mouse event missing nativeEvent offsets");
-    return;
-  }
+    let offsetX, offsetY;
+    let foundLine = null;
 
-  if (tool === "downspout") {
-    const snappedX = snapNumberToGrid(offsetX);
-    const snappedY = snapNumberToGrid(offsetY);
-
-    setDownspoutCoordinates([snappedX, snappedY]);
-    console.log("Opening Downspout modal at:", [snappedX, snappedY]);
-
-    setIsDownspoutModalOpen(true);
-    setActiveModal("downspout");
-    return;
-  } 
-  
-  else if (tool === "select") {
-    console.log("Selecting mode active");
-
-    const updatedLines = lines.map((line) => ({
-      ...line,
-      isSelected: false,
-    }));
-
-    updatedLines.forEach((line) => {
-      if (
-        isLineNearPoint(
-          line.startX,
-          line.startY,
-          line.endX,
-          line.endY,
-          snapNumberToGrid(offsetX),
-          snapNumberToGrid(offsetY),
-          5,
-        )
-      ) {
-        foundLine = { ...line, isSelected: true };
-      }
-    });
-
-    if (foundLine) {
-      setLines(
-        updatedLines.map((line) =>
-          line.startX === foundLine.startX && line.startY === foundLine.startY
-            ? foundLine
-            : line,
-        ),
-      );
-      setSelectedLine(foundLine);
-      console.log("Selected line:", foundLine);
-      console.log(lines);
+    if (e.nativeEvent?.touches) {
+      const touch = e.nativeEvent.touches[0];
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      offsetX = touch.clientX - rect.left;
+      offsetY = touch.clientY - rect.top;
+    } else if (e.nativeEvent) {
+      offsetX = e.nativeEvent.offsetX;
+      offsetY = e.nativeEvent.offsetY;
     } else {
-      console.log("No line found near click");
-      setSelectedLine({});
+      console.error("Mouse event missing nativeEvent offsets");
+      return;
     }
-  } 
-  
-  else {
-    setCurrentLine({
-      startX: snapNumberToGrid(offsetX),
-      startY: snapNumberToGrid(offsetY),
-      endX: snapNumberToGrid(offsetX),
-      endY: snapNumberToGrid(offsetY),
-      isVertical: false,
-      isHorizontal: false,
-      isSelected: false,
-      color: "black",
-    });
-    setIsDrawing(true);
-  }
-}
 
+    if (tool === "downspout") {
+      const snappedX = snapNumberToGrid(offsetX);
+      const snappedY = snapNumberToGrid(offsetY);
+
+      setDownspoutCoordinates([snappedX, snappedY]);
+      console.log("Opening Downspout modal at:", [snappedX, snappedY]);
+
+      setIsDownspoutModalOpen(true);
+      setActiveModal("downspout");
+      return;
+    } else if (tool === "select") {
+      console.log("Selecting mode active");
+
+      const updatedLines = lines.map((line) => ({
+        ...line,
+        isSelected: false,
+      }));
+
+      updatedLines.forEach((line) => {
+        if (
+          isLineNearPoint(
+            line.startX,
+            line.startY,
+            line.endX,
+            line.endY,
+            snapNumberToGrid(offsetX),
+            snapNumberToGrid(offsetY),
+            5,
+          )
+        ) {
+          foundLine = { ...line, isSelected: true };
+        }
+      });
+
+      if (foundLine) {
+        setLines(
+          updatedLines.map((line) =>
+            line.startX === foundLine.startX && line.startY === foundLine.startY
+              ? foundLine
+              : line,
+          ),
+        );
+        setSelectedLine(foundLine);
+        console.log("Selected line:", foundLine);
+        console.log(lines);
+      } else {
+        console.log("No line found near click");
+        setSelectedLine({});
+      }
+    } else {
+      setCurrentLine({
+        startX: snapNumberToGrid(offsetX),
+        startY: snapNumberToGrid(offsetY),
+        endX: snapNumberToGrid(offsetX),
+        endY: snapNumberToGrid(offsetY),
+        isVertical: false,
+        isHorizontal: false,
+        isSelected: false,
+        color: "black",
+      });
+      setIsDrawing(true);
+    }
+  }
 
   function handleMouseMove(e) {
     if (isDownspoutModalOpen) return;
@@ -586,18 +587,19 @@ function handleMouseDown(e) {
       closeModal();
       return;
     }
-    
 
-  // Check if diagram actually changed
-  const hasChanged = JSON.stringify(lines) !== JSON.stringify(originalDiagram.lines);
+    // Check if diagram actually changed
+    const hasChanged =
+      JSON.stringify(lines) !== JSON.stringify(originalDiagram.lines);
 
-  if (!hasChanged) {
-    console.log("No changes detected, not saving.");
-    closeModal();
-    return;
-  }
+    if (!hasChanged) {
+      console.log("No changes detected, not saving.");
+      closeModal();
+      return;
+    }
 
-    function getBoundingBox(lines, padding = 20) {  // <-- 🔥 add a default padding value
+    function getBoundingBox(lines, padding = 20) {
+      // <-- 🔥 add a default padding value
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
@@ -621,17 +623,16 @@ function handleMouseDown(e) {
 
     const token = localStorage.getItem("jwt");
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     drawAllLines(ctx);
 
     const boundingBox = getBoundingBox(lines, 30);
     const cropWidth = boundingBox.maxX - boundingBox.minX;
     const cropHeight = boundingBox.maxY - boundingBox.minY;
 
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
 
-  
     const thumbnailDisplaySize = 200; // what you want it to *look* like
     const thumbnailInternalSize = 3 * thumbnailDisplaySize; // 2x pixel density for crispness
 
@@ -643,7 +644,10 @@ function handleMouseDown(e) {
     const availableWidth = thumbnailInternalSize - padding * 2;
     const availableHeight = thumbnailInternalSize - padding * 2;
 
-    const scale = Math.min(availableWidth / cropWidth, availableHeight / cropHeight);
+    const scale = Math.min(
+      availableWidth / cropWidth,
+      availableHeight / cropHeight,
+    );
 
     const destWidth = cropWidth * scale;
     const destHeight = cropHeight * scale;
@@ -663,25 +667,27 @@ function handleMouseDown(e) {
       dx,
       dy,
       destWidth,
-      destHeight
+      destHeight,
     );
 
-    const thumbnailDataUrl = tempCanvas.toDataURL('image/png');
+    const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
     let totalFootage = 0;
     let price = 0;
     let downspoutCentsPrice;
 
     lines.forEach((line) => {
-      if (line.isDownspout){
-        const downspoutPrice = (parseFloat(line.price.slice(1))).toFixed(2);
-        downspoutCentsPrice = parseInt(((line.measurement * downspoutPrice) * 100).toFixed(0));
+      if (line.isDownspout) {
+        const downspoutPrice = parseFloat(line.price.slice(1)).toFixed(2);
+        downspoutCentsPrice = parseInt(
+          (line.measurement * downspoutPrice * 100).toFixed(0),
+        );
         price += downspoutCentsPrice;
       } else {
-      totalFootage += line.measurement;
-      price +=
-        convertToPriceInCents(line.currentProduct.price) * line.measurement;
-}
-          });
+        totalFootage += line.measurement;
+        price +=
+          convertToPriceInCents(line.currentProduct.price) * line.measurement;
+      }
+    });
 
     const totalPrice = "$" + (price * 0.01).toFixed(2);
 
@@ -702,8 +708,9 @@ function handleMouseDown(e) {
         // setSelectedDiagram(newDiagramData);
         // clearCanvas();
         closeModal();
-      }).then(()=>{
-        clearCanvas()
+      })
+      .then(() => {
+        clearCanvas();
       })
       .catch((err) => {
         console.error("Failed to save diagram:", err);
