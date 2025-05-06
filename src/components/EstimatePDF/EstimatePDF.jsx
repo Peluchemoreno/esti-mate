@@ -48,6 +48,10 @@ function EstimatePDF({
     setToken(token);
   }, []);
 
+  useEffect(() => {
+    console.log(project);
+  }, []);
+
   function formatLineItems(lines) {
     const downspoutItems = [];
     const nonDownspoutItems = [];
@@ -102,10 +106,10 @@ function EstimatePDF({
           }
         })[0].currentProduct.price,
         description: selectedDiagram.lines.filter((line) => {
-          if (!line.isDownspout){
+          if (!line.isDownspout) {
             return line.currentProduct?.name === item;
           } else {
-            return line.downspoutSize === item
+            return line.downspoutSize === item;
           }
         })[0].currentProduct.description,
       };
@@ -113,8 +117,6 @@ function EstimatePDF({
       tempArray.push(formattedItem);
     });
 
-    console.log('line item table: ', lineItemTable)
-    console.log('tempArray: ', tempArray)
     setItemizedArray(tempArray);
     return downspoutItems;
   }
@@ -188,9 +190,6 @@ function EstimatePDF({
 
   useEffect(() => {
     formatLineItems(selectedDiagram.lines);
-    console.log(selectedDiagram);
-    console.log(countSharedPoints(selectedDiagram));
-    console.log(getMiscItems(selectedDiagram));
   }, [activeModal]);
 
   return (
@@ -200,10 +199,10 @@ function EstimatePDF({
         <View style={{}}>
           <View style={[styles.section, { paddingBottom: 40 }]}>
             <Text style={[styles.text, styles.bold, { textAlign: "right" }]}>
-              {project.clientName}
+              {project.siteName}
             </Text>
             <Text style={[styles.text, { textAlign: "right" }]}>
-              {project.address}
+              {project.siteAddress}
             </Text>
             <Text
               style={[
@@ -211,7 +210,7 @@ function EstimatePDF({
                 { textAlign: "right", color: "#444", marginTop: 10 },
               ]}
             >
-              {project.primaryPhoneNumber}
+              {project.sitePrimaryPhone}
             </Text>
           </View>
           <View
@@ -232,14 +231,14 @@ function EstimatePDF({
                 BILL TO
               </Text>
               <Text style={[styles.smallerText, styles.bold]}>
-                {project.clientName}
+                {project.billingName}
               </Text>
               <Text style={[styles.smallerText, { marginBottom: 10 }]}>
-                {project.address}
+                {project.billingAddress}
               </Text>
               <Text style={[styles.smallerText, { color: "#444" }]}></Text>
               <Text style={[styles.smallerText, { color: "#444" }]}>
-                {project.primaryPhoneNumber}
+                {project.billingPrimaryPhone}
               </Text>
             </View>
             <View
@@ -265,7 +264,9 @@ function EstimatePDF({
                 >
                   Estimate Number:
                 </Text>
-                <Text style={[styles.smallerText]}>{estimateData.estimateNumber}</Text>
+                <Text style={[styles.smallerText]}>
+                  {estimateData.estimateNumber}
+                </Text>
               </View>
               <View style={{ display: "flex", flexDirection: "row" }}>
                 <Text
@@ -294,7 +295,9 @@ function EstimatePDF({
                 >
                   Payment Due:
                 </Text>
-                <Text style={[styles.smallerText]}>{estimateData.paymentDue}</Text>
+                <Text style={[styles.smallerText]}>
+                  {estimateData.paymentDue}
+                </Text>
               </View>
               <View
                 style={{
@@ -392,48 +395,61 @@ function EstimatePDF({
           </View>
 
           {itemizedArray.map((line, index) => {
-return (
-            <>
-            <View
-              key={index}
-              style={{
-                flexDirection: "row",
-                padding: 8,
-                borderBottom: "1px solid #eee",
-                alignItems: "center",
-              }}
-            >
-              
-              <View style={{ width: "60%" }}>
-                <Text style={{ fontSize: "12px", fontWeight: "bold" }}>
-                  {line.item || "N/A"}
-                </Text>
-                {line.description && (
-                  <Text style={{ fontSize: "10px", color: "#555", marginTop: 2 }}>
-                    {line.description}
-                  </Text>
-                )}
-              </View>
+            return (
+              <>
+                <View
+                  key={index}
+                  style={{
+                    flexDirection: "row",
+                    padding: 8,
+                    borderBottom: "1px solid #eee",
+                    alignItems: "center",
+                  }}
+                >
+                  <View style={{ width: "60%" }}>
+                    <Text style={{ fontSize: "12px", fontWeight: "bold" }}>
+                      {line.item || "N/A"}
+                    </Text>
+                    {line.description && (
+                      <Text
+                        style={{
+                          fontSize: "10px",
+                          color: "#555",
+                          marginTop: 2,
+                        }}
+                      >
+                        {line.description}
+                      </Text>
+                    )}
+                  </View>
 
-              <Text
-                style={{ width: "20%", textAlign: "center", fontSize: "12px" }}
-              >
-                {line.quantity || "-"}
-              </Text>
-              <Text
-                style={{ width: "20%", textAlign: "right", fontSize: "12px" }}
-              >
-                ${(parseFloat(line.price.slice(1)) * line.quantity).toFixed(2)}
-              </Text>
-              
-            </View>
+                  <Text
+                    style={{
+                      width: "20%",
+                      textAlign: "center",
+                      fontSize: "12px",
+                    }}
+                  >
+                    {line.quantity || "-"}
+                  </Text>
+                  <Text
+                    style={{
+                      width: "20%",
+                      textAlign: "right",
+                      fontSize: "12px",
+                    }}
+                  >
+                    $
+                    {(parseFloat(line.price.slice(1)) * line.quantity).toFixed(
+                      2,
+                    )}
+                  </Text>
+                </View>
               </>
-          )
+            );
           })}
         </View>
-        <View>
-          
-        </View>
+        <View></View>
         <View
           style={{
             position: "absolute",
@@ -455,7 +471,6 @@ return (
             {selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
           </Text>
         </View>
-
       </Page>
       <Page>
         <Text>This is some sample page text</Text>

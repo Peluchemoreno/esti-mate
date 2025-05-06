@@ -205,7 +205,7 @@ const Diagram = ({
         product.name === downspoutData.downspoutSize + " downspout"
       );
     });
-    console.log(currentDownspout)
+    console.log(currentDownspout);
 
     const formattedDownspout = {
       startX: downspoutCoordinates[0],
@@ -697,9 +697,6 @@ const Diagram = ({
       totalFootage,
       price: totalPrice,
     };
-
-    console.log(totalPrice);
-    console.log(thumbnailDataUrl);
 
     addDiagramToProject(currentProjectId, token, data)
       .then((newDiagramData) => {

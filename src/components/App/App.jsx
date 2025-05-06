@@ -24,6 +24,7 @@ import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
+import Clients from "../Clients/Clients.jsx";
 import { addDiagramToProject, createProduct } from "../../utils/api";
 
 function App() {
@@ -64,7 +65,7 @@ function App() {
       });
   }, []);
 
-   function handleLogin(email, password) {
+  function handleLogin(email, password) {
     signin(email, password)
       .then((data) => {
         const token = data.token;
@@ -86,7 +87,12 @@ function App() {
         const token = data.token;
         uploadLogo(logo, token);
         starterItems.forEach((item) => {
-          console.log('creating item: ', item, ' with description: ', item.description)
+          console.log(
+            "creating item: ",
+            item,
+            " with description: ",
+            item.description,
+          );
           createProduct(item, token);
         });
         getUser(token).then((user) => {
@@ -193,6 +199,7 @@ function App() {
                   />
                 }
               />
+              <Route path="clients" element={<Clients />} />
             </Route>
             <Route
               path="/signin"

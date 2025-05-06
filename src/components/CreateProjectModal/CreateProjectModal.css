@@ -42,6 +42,9 @@
   max-width: 520px;
   box-shadow: 0 0 5px black;
   background-color: var(--black);
+  max-height: 700px;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 
 .create-project-form__header {
@@ -132,7 +135,6 @@
 }
 
 .create-project-form__body_extended {
-  max-height: 700px;
   padding: 0 20px;
 }
 
@@ -150,7 +152,11 @@
   margin: 0;
   margin-bottom: 20px;
   margin-top: 20px;
-  font-size: 15px;
+  font-size: 20px;
+}
+
+.create-project-form__bold-header {
+  font-weight: bold !important;
 }
 
 .create-project-form__client-details-input_name {
@@ -158,11 +164,23 @@
   margin-bottom: 30px;
 }
 
+.create-project-form__site-info-header {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  font-weight: normal;
+}
+
 .create-project-form__input {
   border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 5px;
   color: var(--white);
   margin-top: 5px;
+}
+
+.create-project-form__input_disabled {
+  color: grey;
+  user-select: none;
 }
 
 .create-project-form__client-details-input_address-street {
