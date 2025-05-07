@@ -15,6 +15,7 @@ export default function Projects({
   setProjects,
 }) {
   const currentUser = useContext(CurrentUserContext);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -32,6 +33,14 @@ export default function Projects({
     setActiveModal("create-project");
   }
 
+  function handleSearchChange(e) {
+    setSearchTerm(e.target.value);
+  }
+
+  const filteredProjects = projects.filter((project) =>
+    project.projectName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="projects">
       <h3 className="projects__header-title">Projects</h3>
@@ -43,15 +52,16 @@ export default function Projects({
           Create Project
         </button>
         <label htmlFor="search-projects" className="search-projects-label">
+          
           <input
             id="search-projects"
             type="text"
             className="header__search-projects"
             placeholder="Search Projects"
+            value={searchTerm}
+            onChange={handleSearchChange}
           />
-          <button className="header__search-projects-button">
-            <img className="search-icon" src={search} alt="search button" />
-          </button>
+
         </label>
       </header>
       <table className="project__table">
@@ -73,7 +83,7 @@ export default function Projects({
               <td>You don&apos;t have any projects.</td>
             </tr>
           ) : (
-            projects.map((project) => {
+            filteredProjects.map((project) => {
               return (
                 <ProjectRowData
                   key={project._id}

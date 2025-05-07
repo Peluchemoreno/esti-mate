@@ -24,7 +24,7 @@ import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
-import Clients from "../Clients/Clients.jsx";
+import Estimates from "../Estimates/Estimates.jsx";
 import { addDiagramToProject, createProduct } from "../../utils/api";
 
 function App() {
@@ -199,7 +199,7 @@ function App() {
                   />
                 }
               />
-              <Route path="clients" element={<Clients />} />
+              <Route path="estimates" element={<Estimates />} />
             </Route>
             <Route
               path="/signin"
