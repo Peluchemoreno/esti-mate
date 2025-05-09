@@ -3,17 +3,21 @@ import { useState, useEffect } from "react";
 import { updateProduct, deleteProduct } from "../../utils/api";
 
 export default function EditProductModal({ activeModal, closeModal, product }) {
-
   const [itemName, setItemName] = useState("");
   const [itemVisualColor, setItemVisualColor] = useState("#000000");
   const [quantityUnit, setQuantityUnit] = useState("length-feet");
   const [itemPrice, setItemPrice] = useState("");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
-    setItemName(product?.name || 'defualt name');
-    setItemVisualColor(product?.visual || "#000000");
-    setQuantityUnit(product?.quantity || "length-feet");
-    setItemPrice(product?.price.replace('$', '') || "$0.00");
+    console.log(product);
+    setItemName(product?.name || "defualt name");
+    setItemVisualColor(product?.colorCode || "#000000");
+    setQuantityUnit(product?.unit === "foot" ? "length-feet" : "unit/per");
+    setItemPrice(product?.price || "0.00");
+    setDescription(
+      product?.description || "No description, how about we add one?",
+    );
   }, [product, activeModal]);
 
   function handleItemNameChange(e) {
@@ -32,39 +36,48 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     setItemPrice(e.target.value);
   }
 
+  function handleDescriptionChange(e) {
+    setDescription(e.target.value);
+  }
+
   function handleCloseModal(e) {
     closeModal();
   }
 
   function handleItemUpdateSubmit(e) {
-    e.preventDefault()
-    const token = localStorage.getItem('jwt')
+    e.preventDefault();
+    const token = localStorage.getItem("jwt");
     const productData = {
       name: itemName,
       visual: itemVisualColor,
       quantity: quantityUnit,
       price: `$${parseFloat(itemPrice).toFixed(2).toString()}`,
-      productId: product._id
-    }
-    updateProduct(productData, token)
+      productId: product._id,
+    };
+    updateProduct(productData, token);
 
-    closeModal()
+    closeModal();
   }
 
-  function handleItemDeleteClick(){
-    const token = localStorage.getItem('jwt')
+  function handleItemDeleteClick() {
+    const token = localStorage.getItem("jwt");
     const productData = {
-      productId: product._id
-    }
-    deleteProduct(productData, token)
-    closeModal()
+      productId: product._id,
+    };
+    deleteProduct(productData, token);
+    closeModal();
   }
 
-  function isUpdateButtonDisabled(){
-    if (itemName === product?.name && itemPrice === product?.price.replace('$', '') && itemVisualColor === product?.visual && quantityUnit === product?.quantity ){
-      return true
-    }
-    return false
+  function isUpdateButtonDisabled() {
+    //if (
+    // itemName === product?.name &&
+    // itemPrice === product?.price.replace("$", "") &&
+    //itemVisualColor === product?.visual &&
+    //quantityUnit === product?.quantity
+    //) {
+    // return true;
+    //}
+    // return false;
   }
 
   return (
@@ -134,9 +147,31 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               required
             />
           </label>
+          <label
+            htmlFor="description"
+            className="add-item__label add-item__price-label"
+          >
+            <div>Description</div>
+
+            <textarea
+              type="text"
+              className="add-item-form__input add-item-form__description"
+              onChange={handleDescriptionChange}
+              value={description}
+              required
+            >
+              {description}
+            </textarea>
+          </label>
         </div>
         <div className="add-item-form__footer">
-          <button type="button" onClick={handleItemDeleteClick} className="edit-product-delete-button">Delete product</button>
+          <button
+            type="button"
+            onClick={handleItemDeleteClick}
+            className="edit-product-delete-button"
+          >
+            Delete product
+          </button>
           <div>
             <button
               onClick={handleCloseModal}
@@ -145,7 +180,11 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
             >
               Cancel
             </button>
-            <button disabled={isUpdateButtonDisabled()} type="submit" className="add-item-form__button_create">
+            <button
+              disabled={isUpdateButtonDisabled()}
+              type="submit"
+              className="add-item-form__button_create"
+            >
               Update
             </button>
           </div>

@@ -1,3 +1,10 @@
 .edit-product-delete-button {
   margin-right: auto;
 }
+
+.add-item-form__description {
+  background-color: var(--black);
+  scrollbar-width: none;
+  font-size: 0.75rem;
+  width: 60%;
+}

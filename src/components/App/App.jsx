@@ -93,7 +93,7 @@ function App() {
             " with description: ",
             item.description,
           );
-          createProduct(item, token);
+         // createProduct(item, token);
         });
         getUser(token).then((user) => {
           setCurrentUser(user);
