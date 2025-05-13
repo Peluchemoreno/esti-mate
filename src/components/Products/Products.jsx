@@ -47,7 +47,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
           sx={{
             width: "100%",
             height: "100%",
-            backgroundColor: params.row.colorCode,
+            backgroundColor: params.value,
             color: "white",
             display: "flex",
             alignItems: "center",
@@ -55,7 +55,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             paddingLeft: 1,
           }}
         >
-          <div>{params.row.colorCode}</div>
+          <div>{params.value}</div>
         </Box>
       ),
     },
@@ -77,7 +77,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             paddingLeft: 1,
           }}
         >
-          <div>{params.row.unit}</div>
+          <div>{params.value}</div>
         </Box>
       ),
     },
@@ -99,7 +99,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             paddingLeft: 1,
           }}
         >
-          <div>{"$" + params.row.price.toFixed(2)}</div>
+          <div>{params.value}</div>
         </Box>
       ),
     },
@@ -116,7 +116,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
     });
   }, [activeModal]);
 
-    function handleAddItemClick() {
+  function handleAddItemClick() {
     setActiveModal("add-item");
   }
 
