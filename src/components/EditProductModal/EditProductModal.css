@@ -6,5 +6,34 @@
   background-color: var(--black);
   scrollbar-width: none;
   font-size: 0.75rem;
-  width: 60%;
+  width: 100%;
+}
+
+table {
+  width: 100%;
+}
+
+.table-row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: normal;
+  margin-top: 5px;
+}
+
+.add-item-form__screen-add-button {
+  font-weight: normal;
+  margin-top: 10px;
+  border: none;
+  background: none;
+  color: var(--white);
+  font-size: 14px;
+}
+
+.add-item-form__screen-add-button:hover {
+  cursor: pointer;
+  color: var(--blue-secondary);
+}
+
+.add-item__temp_field {
+  border: 1px solid red;
 }

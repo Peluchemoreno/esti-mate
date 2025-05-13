@@ -8,6 +8,16 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
   const [quantityUnit, setQuantityUnit] = useState("length-feet");
   const [itemPrice, setItemPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [removalPrice, setRemovalPrice] = useState('');
+  const [repairPrice, setRepairPrice] = useState('');
+  const [category, setCategory] = useState('gutter');
+  const [isListed, setIsListed] = useState(true);
+  const [screenOptions, setScreenOptions] = useState([]);
+  const [addScreenInputsOpen, setAddScreenInputsOpen] = useState(false);
+  const [screenInputName, setScreenInputName] = useState('');
+  const [screenInputPrice, setScreenInputPrice] = useState('');
+  const [screenName, setScreenName] = useState('');
+  const [screenPrice, setScreenPrice] = useState('');
 
   useEffect(() => {
     console.log(product);
@@ -18,10 +28,35 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     setDescription(
       product?.description || "No description, how about we add one?",
     );
+    setScreenOptions(product.gutterGuardOptions);
   }, [product, activeModal]);
+
+  function handleCategoryChange(e){
+    setCategory(e.target.value)
+  }
+
+  function handleScreenNameChange(e){
+    setScreenName(e.target.value)
+  }
+
+  function handleScreenPriceChange(e){
+    setScreenPrice(e.target.value)
+  }
+
+  function handleIsListedChange(e){
+    setIsListed(e.target.checked)
+  }
 
   function handleItemNameChange(e) {
     setItemName(e.target.value);
+  }
+
+  function handleRemovalPriceChange(e){
+    setRemovalPrice(e.target.value)
+  }
+
+  function handleRepairPriceChange(e){
+    setRepairPrice(e.target.value)
   }
 
   function handleItemVisualColorChange(e) {
@@ -44,6 +79,14 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     closeModal();
   }
 
+  function handleScreenInputNameChange(e){
+    setScreenInputName(e.target.value)
+  }
+
+  function handleScreenInputPriceChange(e){
+    setScreenInputPrice(e.target.value)
+  }
+
   function handleItemUpdateSubmit(e) {
     e.preventDefault();
     const token = localStorage.getItem("jwt");
@@ -53,9 +96,17 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
       quantity: quantityUnit,
       price: `$${parseFloat(itemPrice).toFixed(2).toString()}`,
       productId: product._id,
-    };
-    updateProduct(productData, token);
+      description,
+      category,
+      listed: isListed,
+      removalPrice,
+      repairPrice,
+      screenOptions,
 
+    };
+    // updateProduct(productData, token);
+
+    console.log(productData)
     closeModal();
   }
 
@@ -101,6 +152,22 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
             />
           </label>
           <label
+            htmlFor="description"
+            className="add-item__label"
+          >
+            <div>Description</div>
+
+            <textarea
+              type="text"
+              className="add-item-form__input add-item-form__description"
+              onChange={handleDescriptionChange}
+              value={description}
+              required
+            >
+              {description}
+            </textarea>
+          </label>
+          <label
             htmlFor="visual"
             className="add-item__label add-item__visual-label"
           >
@@ -112,6 +179,33 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               value={itemVisualColor}
             />
           </label>
+          <label
+            htmlFor="category"
+            className="add-item__label add-item__quantity-select-label"
+          >
+            <div>Category</div>
+            <select
+              name="quantity-select"
+              id="quantity"
+              className="add-item__quantity-select"
+              onChange={handleCategoryChange}
+              value={category}
+            >
+              <option className="add-item__select-option" value="gutter">
+               Gutter
+              </option>
+              <option className="add-item__select-option" value="downspout">
+               Downspout
+              </option>
+              <option className="add-item__select-option" value="accessory">
+               Accessory
+              </option>
+              <option className="add-item__select-option" value="guard">
+               Guard
+              </option> 
+            </select>
+          </label>
+
           <label
             htmlFor="quantity"
             className="add-item__label add-item__quantity-select-label"
@@ -146,23 +240,89 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               value={itemPrice}
               required
             />
+
           </label>
           <label
-            htmlFor="description"
+            htmlFor="price_removal"
             className="add-item__label add-item__price-label"
           >
-            <div>Description</div>
+            <div>Removal Price</div>
 
-            <textarea
+            <span className="add-item__price-dollar-sign">$</span>
+            <input
               type="text"
-              className="add-item-form__input add-item-form__description"
-              onChange={handleDescriptionChange}
-              value={description}
+              className="add-item-price__input add-item-form__input"
+              onChange={handleRemovalPriceChange}
+              value={removalPrice}
               required
-            >
-              {description}
-            </textarea>
+              id='price_removal'
+            />
+
+          </label> 
+          <label
+            htmlFor="price_repair"
+            className="add-item__label add-item__price-label"
+          >
+            <div>Repair/Clean Price</div>
+
+            <span className="add-item__price-dollar-sign">$</span>
+            <input
+              type="text"
+              className="add-item-price__input add-item-form__input"
+              onChange={handleRepairPriceChange}
+              value={repairPrice}
+              required
+              id='price_repair'
+            />
           </label>
+          <label
+            htmlFor="show-in-canvas"
+            className='add-item__label'
+            style={{display: 'flex', justifyContent: 'space-between'}}
+          >
+            <div>Show in Diagram Toolbar?</div>
+
+            <input
+              type="checkbox"
+              onChange={handleIsListedChange}
+              checked={isListed}
+            />
+          </label>
+
+         { product.type === 'gutter' && <label
+            htmlFor="quantity"
+            className="add-item__label"
+          >
+            <div>Screen Options</div>
+            <div>
+            {screenOptions?.map(option => {
+              return <div className='table-row'>
+                    <input type='text' defaultValue={option?.name} onChange={handleScreenNameChange} className="add-item-form__input"/>
+                    <input type='text' defaultValue={option?.price.toFixed(2)} onChange={handleScreenPriceChange} className="add-item-price__input add-item-form__input"/>
+                   </div>
+              })}
+              { addScreenInputsOpen &&
+              <div className='table-row'>
+                <input type='text' value={screenInputName} onChange={handleScreenInputNameChange} className="add-item-form__input" />
+                <input type='text' value={screenInputPrice} onChange={handleScreenInputPriceChange} className="add-item-form__input add-item-price__input" />
+              </div> }
+            </div>
+            <button onClick={()=>{
+              if (addScreenInputsOpen){
+                if (!screenInputName || !screenInputPrice){
+                  setAddScreenInputsOpen(false)
+                  return
+                }
+                setScreenOptions([...screenOptions, {name: screenInputName, price: parseFloat(screenInputPrice)}])
+                setScreenInputPrice('')
+                setScreenInputName('')
+                setAddScreenInputsOpen(false)
+              } else {
+                console.log(addScreenInputsOpen)
+                setAddScreenInputsOpen(true)
+              }}} type='button' className='add-item-form__screen-add-button'>+ Add Screen</button>
+          </label> 
+          }
         </div>
         <div className="add-item-form__footer">
           <button
