@@ -8,6 +8,8 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import { useEffect, useState } from "react";
+import { getCurrentDate } from "../../utils/constants";
+import { capitalizeFirstLetter } from "../../utils/constants";
 
 const styles = StyleSheet.create({
   page: { padding: 20, paddingBottom: 100 },
@@ -23,15 +25,6 @@ const styles = StyleSheet.create({
   itemsHeader: { display: "flex", flexDirection: "row" },
 });
 
-function getCurrentDate() {
-  const today = new Date();
-  const day = String(today.getDate()).padStart(2, "0");
-  const month = String(today.getMonth() + 1).padStart(2, "0"); // Months are zero-based
-  const year = today.getFullYear();
-
-  return `${month}-${day}-${year}`;
-}
-
 function EstimatePDF({
   project,
   selectedDiagram,
@@ -46,11 +39,6 @@ function EstimatePDF({
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     setToken(token);
-  }, []);
-
-  useEffect(() => {
-    console.log(project);
-    console.log(selectedDiagram);
   }, []);
 
   function formatLineItems(lines) {
@@ -119,6 +107,7 @@ function EstimatePDF({
     });
 
     setItemizedArray(tempArray);
+    console.log(downspoutItems);
     return downspoutItems;
   }
 
@@ -322,7 +311,7 @@ function EstimatePDF({
                 <Text
                   style={[styles.smallerText, styles.bold, { paddingTop: 2 }]}
                 >
-                  {selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
+                  ${selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
                 </Text>
               </View>
             </View>
@@ -466,7 +455,7 @@ function EstimatePDF({
             Total Amount Due (USD):
           </Text>
           <Text style={{ fontSize: 12, fontWeight: "bold" }}>
-            {selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
+            ${selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
           </Text>
         </View>
       </Page>

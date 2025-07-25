@@ -89,11 +89,11 @@
 }
 
 .project__diagram-container {
-  /* border: 1px solid red; */
   margin: 0 auto;
   max-width: 80vw;
   display: flex;
-  justify-content: space-between;
+  /* justify-content: space-between; */
+  gap: 1.5rem;
   flex-wrap: wrap;
 }
 

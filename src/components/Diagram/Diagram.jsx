@@ -13,6 +13,7 @@ import {
 import { getProducts } from "../../utils/api";
 import { useParams } from "react-router-dom";
 import DownspoutModal from "../DownspoutModal/DownspoutModal";
+import { capitalizeFirstLetter } from "../../utils/constants";
 
 const Diagram = ({
   activeModal,
@@ -54,6 +55,7 @@ const Diagram = ({
   const [tool, setTool] = useState("");
   const [unitPerTools, setUnitPerTools] = useState([]);
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedLine, setSelectedLine] = useState({});
   const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
   const [unfilteredProducts, setUnfilteredProducts] = useState([]);
@@ -81,13 +83,14 @@ const Diagram = ({
     getProducts(token).then((data) => {
       if (data.products) {
         const products = data.products;
-        setUnfilteredProducts(data.products);
-        const filteredProducts = products.filter((product) => product.listed);
-        filteredProducts.forEach((product) => {
+        setUnfilteredProducts(products);
+
+        const filteredProducts = products.filter((product) => {
           if (product.type === "gutter") {
+            return product;
           }
         });
-        setProducts(filteredProducts);
+        setFilteredProducts(filteredProducts);
 
         // Important: only set default tool once when products load
 
@@ -203,12 +206,18 @@ const Diagram = ({
   }
 
   function handleAddDownspout(downspoutData) {
+    console.log(downspoutData);
     const currentDownspout = unfilteredProducts.filter((product) => {
+      console.log(product.name);
       return (
-        product.name === downspoutData.downspoutSize + " Downspout" ||
-        product.name === downspoutData.downspoutSize + " downspout"
+        product.name.includes("ownspout") &&
+        product.name
+          .toLowerCase()
+          .includes(downspoutData.profile.toLowerCase()) &&
+        product.name.includes(downspoutData.downspoutSize.split(" ")[0])
       );
     });
+
     console.log(currentDownspout);
 
     const formattedDownspout = {
@@ -226,7 +235,12 @@ const Diagram = ({
       downspoutSize: downspoutData.downspoutSize,
       currentProduct: {
         price: currentDownspout[0].price,
-        name: downspoutData.downspoutSize + " Downspout",
+        name:
+          downspoutData.downspoutSize.split(" ")[0] +
+          ` ${capitalizeFirstLetter(
+            downspoutData.downspoutSize.split(" ")[1]
+          )}` +
+          " Downspout",
         description: currentDownspout[0].description,
       },
       rainBarrel: downspoutData.rainBarrel,
@@ -379,7 +393,10 @@ const Diagram = ({
   // Stop drawing on mouseup
   function handleMouseUp(e) {
     if (isDownspoutModalOpen) return;
-    const currentProduct = products?.find((product) => product.name === tool);
+    console.log(products);
+    const currentProduct = filteredProducts?.find(
+      (product) => product.name === tool
+    );
     if (tool === "select") {
       console.log("mouseup select");
       setIsDrawing(false);
@@ -681,23 +698,22 @@ const Diagram = ({
     let downspoutCentsPrice;
 
     lines.forEach((line) => {
+      console.log(line);
       if (line.isDownspout) {
-        const downspoutPrice = parseFloat(line.price.slice(1)).toFixed(2);
-        downspoutCentsPrice = parseInt(
-          (line.measurement * downspoutPrice * 100).toFixed(0)
-        );
-        price += downspoutCentsPrice;
+        const downspoutPrice = parseFloat(line.price).toFixed(2);
+
+        price += downspoutPrice * line.measurement;
       } else {
-        totalFootage += line.measurement;
-        price += line.currentProduct.price * line.measurement;
+        price += parseFloat(line.currentProduct.price) * line.measurement;
       }
+      console.log(price);
     });
 
     const data = {
       lines: [...lines],
       imageData: thumbnailDataUrl,
       totalFootage,
-      price: price.toFixed(2),
+      price: parseFloat(price).toFixed(2),
     };
 
     addDiagramToProject(currentProjectId, token, data)
@@ -768,22 +784,18 @@ const Diagram = ({
           id="select-product-dropdown"
           defaultValue={products[0]?.name}
         >
-          {products?.map((product) => {
-            if (product.type === "gutter") {
-              return (
-                <option
-                  style={{
-                    backgroundColor: `${product.colorCode}`,
-                  }}
-                  value={product.name}
-                  key={product._id}
-                >
-                  {product.name}
-                </option>
-              );
-            } else {
-              return null;
-            }
+          {filteredProducts?.map((product) => {
+            return (
+              <option
+                style={{
+                  backgroundColor: `${product.colorCode}`,
+                }}
+                value={product.name}
+                key={product._id}
+              >
+                {product.name}
+              </option>
+            );
           })}
           <option value="downspout">Downspout</option>
           <option value="select">Select</option>

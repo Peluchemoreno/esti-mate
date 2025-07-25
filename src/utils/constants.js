@@ -410,7 +410,7 @@ export function areLinesParallel(
   [x1_1, y1_1],
   [x1_2, y1_2],
   [x2_1, y2_1],
-  [x2_2, y2_2],
+  [x2_2, y2_2]
 ) {
   if (isLineVertical(x1_1, x1_2) && isLineVertical(x2_1, x2_2)) {
     return true;
@@ -430,7 +430,7 @@ export function isLineParallelToTop(x1, y1, x2, y2) {
     [topHorizontalLineCoords.x1, topHorizontalLineCoords.y1],
     [topHorizontalLineCoords.x2, topHorizontalLineCoords.y2],
     [x1, y1],
-    [x2, y2],
+    [x2, y2]
   );
   return answer;
 }
@@ -440,7 +440,7 @@ export function isLineParallelToSide(x1, y1, x2, y2) {
     [leftVerticalLineCoords.x1, leftVerticalLineCoords.y1],
     [leftVerticalLineCoords.x2, leftVerticalLineCoords.y2],
     [x1, y1],
-    [x2, y2],
+    [x2, y2]
   );
   return answer;
 }
@@ -527,3 +527,16 @@ export function isLineNearPoint(x1, y1, x2, y2, px, py, radius) {
 //   // Check if the closest point on the line is within the given radius
 //   return distance(px, py, closestX, closestY) <= radius;
 // }
+//
+export function getCurrentDate() {
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, "0");
+  const month = String(today.getMonth() + 1).padStart(2, "0"); // Months are zero-based
+  const year = today.getFullYear();
+
+  return `${month}-${day}-${year}`;
+}
+
+export function capitalizeFirstLetter(string) {
+  return [string[0].toUpperCase(), string.slice(1)].join("");
+}

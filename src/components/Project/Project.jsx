@@ -64,7 +64,6 @@ export default function Project({
     setCurrentProjectId(projectId);
   }, [activeModal]);
 
-  
   // console.log(project)
   const navigator = useNavigate();
 
@@ -186,6 +185,7 @@ export default function Project({
                   }`}
                   alt="Diagram image"
                   onClick={() => {
+                    console.log(diagram);
                     handleSelectDiagram(diagram);
                   }}
                   style={{
@@ -195,10 +195,9 @@ export default function Project({
                     backgroundSize: "200px",
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",
-                    borderRadius: '5px',
+                    borderRadius: "5px",
                   }}
-                >
-                </div>
+                ></div>
               ))
             ) : (
               <p>No Diagrams</p>
