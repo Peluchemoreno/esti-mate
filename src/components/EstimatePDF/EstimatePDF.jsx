@@ -50,6 +50,7 @@ function EstimatePDF({
 
   useEffect(() => {
     console.log(project);
+    console.log(selectedDiagram);
   }, []);
 
   function formatLineItems(lines) {
@@ -439,10 +440,7 @@ function EstimatePDF({
                       fontSize: "12px",
                     }}
                   >
-                    $
-                    {(parseFloat(line.price.slice(1)) * line.quantity).toFixed(
-                      2,
-                    )}
+                    ${(line.price * line.quantity).toFixed(2)}
                   </Text>
                 </View>
               </>

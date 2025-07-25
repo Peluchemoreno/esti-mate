@@ -1,5 +1,14 @@
-.page {
+html {
+  overflow: hidden;
+  height: 100vh;
   box-sizing: border-box;
+}
+
+body {
+  height: 100vh;
+}
+
+.page {
   max-width: auto;
   margin: 0 auto;
   color: var(--white);

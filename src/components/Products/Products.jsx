@@ -44,10 +44,13 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
       headerClassName: "products__column-header",
       renderCell: (params) => (
         <Box
+          onClick={() => {
+            console.log(params.row);
+          }}
           sx={{
             width: "100%",
             height: "100%",
-            backgroundColor: params.value,
+            backgroundColor: params.row.colorCode,
             color: "white",
             display: "flex",
             alignItems: "center",
@@ -55,7 +58,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             paddingLeft: 1,
           }}
         >
-          <div>{params.value}</div>
+          <div>{params.row.colorCode}</div>
         </Box>
       ),
     },
@@ -77,7 +80,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             paddingLeft: 1,
           }}
         >
-          <div>{params.value}</div>
+          <div>{params.row.unit === "foot" ? "per/foot" : "per/unit"}</div>
         </Box>
       ),
     },
@@ -99,14 +102,14 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             paddingLeft: 1,
           }}
         >
-          <div>{params.value}</div>
+          <div>${params.row.price.toFixed(2)}</div>
         </Box>
       ),
     },
   ]);
 
   const filteredRows = tableRows.filter((row) =>
-    row.name.toLowerCase().includes(searchTerm.toLowerCase()),
+    row.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
   useEffect(() => {
     const token = localStorage.getItem("jwt");

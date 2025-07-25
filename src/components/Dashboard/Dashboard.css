@@ -1,7 +1,3 @@
-.dashboard {
-  height: 100vh;
-}
-
 .dashboard__header {
   border-bottom: 1px solid gray;
   display: flex;

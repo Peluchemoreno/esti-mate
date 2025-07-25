@@ -18,18 +18,18 @@ export default function CreateProjectModal({
   const [billingSecondrayPhone, setBillingSecondaryPhone] = useState("");
   const [billingEmail, setBillingEmail] = useState("");
 
-  const [siteName, setSiteName] = useState(''); 
-  const [siteStreetName, setSiteStreetName] = useState(''); 
-  const [siteCityName, setSiteCityName] = useState(''); 
-  const [siteStateName, setSiteStateName] = useState(''); 
-  const [siteZipCode, setSiteZipCode] = useState(''); 
-  const [sitePrimaryPhone, setSitePrimaryPhone] = useState('');
-  const [siteSecondaryPhone, setSiteSecondaryPhone] = useState('');
-  const [siteEmail, setSiteEmail] = useState('');
+  const [siteName, setSiteName] = useState("");
+  const [siteStreetName, setSiteStreetName] = useState("");
+  const [siteCityName, setSiteCityName] = useState("");
+  const [siteStateName, setSiteStateName] = useState("");
+  const [siteZipCode, setSiteZipCode] = useState("");
+  const [sitePrimaryPhone, setSitePrimaryPhone] = useState("");
+  const [siteSecondaryPhone, setSiteSecondaryPhone] = useState("");
+  const [siteEmail, setSiteEmail] = useState("");
 
   const [siteSameAsBilling, setSiteSameAsBilling] = useState(false);
 
-    function handleProjectNameChange(e) {
+  function handleProjectNameChange(e) {
     setProjectName(e.target.value);
   }
 
@@ -67,42 +67,41 @@ export default function CreateProjectModal({
 
   //==============================================================//
 
-  function handleSiteNameChange(e){
+  function handleSiteNameChange(e) {
     setSiteName(e.target.value);
   }
 
-  function handleSiteStreetChange(e){
-    setSiteStreetName(e.target.value)
+  function handleSiteStreetChange(e) {
+    setSiteStreetName(e.target.value);
   }
 
-  function handleSiteCityChange(e){
+  function handleSiteCityChange(e) {
     setSiteCityName(e.target.value);
   }
 
-  function handleSiteStateChange(e){
+  function handleSiteStateChange(e) {
     setSiteStateName(e.target.value);
   }
 
-  function handleSiteZipChange(e){
+  function handleSiteZipChange(e) {
     setSiteZipCode(e.target.value);
   }
 
-  function handleSitePrimaryNumberChange(e){
-    setSitePrimaryPhone(e.target.value)
+  function handleSitePrimaryNumberChange(e) {
+    setSitePrimaryPhone(e.target.value);
   }
 
-  function handleSiteSecondaryNumberChange(e){
+  function handleSiteSecondaryNumberChange(e) {
     setSiteSecondaryPhone(e.target.value);
   }
 
-  function handleSiteEmailChange(e){
+  function handleSiteEmailChange(e) {
     setSiteEmail(e.target.value);
   }
 
-  function handleToggleAddress(e){
+  function handleToggleAddress(e) {
     setSiteSameAsBilling(e.target.checked);
   }
-
 
   function handleCreateProjectSubmit(e) {
     e.preventDefault();
@@ -114,17 +113,23 @@ export default function CreateProjectModal({
       billingSecondrayPhone,
       billingEmail,
       siteName: siteSameAsBilling ? billingName : siteName,
-      siteAddress: siteSameAsBilling ? `${billingStreetName}, ${billingCityName}, ${billingStateName} ${billingZipCode}` : `${siteStreetName}, ${siteCityName}, ${siteStateName} ${siteZipCode}`,
-      sitePrimaryPhone: siteSameAsBilling ? billingPrimaryPhone : sitePrimaryPhone,
-      siteSecondaryPhone: siteSameAsBilling ? billingSecondrayPhone : siteSecondaryPhone,
+      siteAddress: siteSameAsBilling
+        ? `${billingStreetName}, ${billingCityName}, ${billingStateName} ${billingZipCode}`
+        : `${siteStreetName}, ${siteCityName}, ${siteStateName} ${siteZipCode}`,
+      sitePrimaryPhone: siteSameAsBilling
+        ? billingPrimaryPhone
+        : sitePrimaryPhone,
+      siteSecondaryPhone: siteSameAsBilling
+        ? billingSecondrayPhone
+        : siteSecondaryPhone,
       siteEmail: siteSameAsBilling ? undefined : siteEmail,
     };
-    handleCloseModal(e)
-    handleCreateProjectSubmitClick(projectData)
+    handleCloseModal(e);
+    handleCreateProjectSubmitClick(projectData);
   }
 
   function handleCloseModal(e) {
-    resetInputs()
+    resetInputs();
     closeModal();
   }
 
@@ -132,30 +137,37 @@ export default function CreateProjectModal({
     setIsShowingProjectDetails(!isShowingProjectDetails);
   }
 
-  function resetInputs(){
-    setProjectName('')
-    setBillingName('')
-    setBillingStreetName('')
-    setBillingCityName('')
-    setBillingStateName('')
-    setBillingZipCode('')
-    setBillingPrimaryPhone('')
-    setBillingSecondaryPhone('')
-    setBillingEmail('')
-    setSiteEmail('')
-    setSiteSecondaryPhone('')
-    setSitePrimaryPhone('')
-    setSiteName('')
-    setSiteStreetName('')
-    setSiteCityName('')
-    setSiteStateName('')
-    setSiteZipCode('')
+  function resetInputs() {
+    setProjectName("");
+    setBillingName("");
+    setBillingStreetName("");
+    setBillingCityName("");
+    setBillingStateName("");
+    setBillingZipCode("");
+    setBillingPrimaryPhone("");
+    setBillingSecondaryPhone("");
+    setBillingEmail("");
+    setSiteEmail("");
+    setSiteSecondaryPhone("");
+    setSitePrimaryPhone("");
+    setSiteName("");
+    setSiteStreetName("");
+    setSiteCityName("");
+    setSiteStateName("");
+    setSiteZipCode("");
     setSiteSameAsBilling(false);
   }
 
+  useEffect(() => {
+    toggleProjectDetails();
+  }, []);
+
   return (
     <div className={isOpen ? "modal modal_visible" : "modal"}>
-      <form className="create-project-form" onSubmit={handleCreateProjectSubmit}>
+      <form
+        className="create-project-form"
+        onSubmit={handleCreateProjectSubmit}
+      >
         <header className="create-project-form__header">
           <h3 className="create-project-form__header-text">
             Create New Project
@@ -201,12 +213,12 @@ export default function CreateProjectModal({
             htmlFor="client-name"
             className="create-project-form__client-name create-project__label"
           >
-           Customer / Company Name *
+            Customer / Company Name *
             <input
               className="create-project-form__client-details-input_name create-project-form__input"
               type="text"
               id="client-name"
-              placeholder="Ex: ABC Roofing"
+              placeholder="Ex: ABC Roofing or John Doe"
               onChange={handleCustomerNameChange}
               value={billingName}
             />
@@ -296,7 +308,16 @@ export default function CreateProjectModal({
             </label>
           </div>
           <h3 className="create-project-form__client-details create-project-form__site-info-header create-project-form__bold-header">
-            Jobsite Information    <span style={{fontSize: '14px', fontWeight: '400'}}><input onChange={handleToggleAddress} type='checkbox' checked={siteSameAsBilling} style={{marginRight: '5px', fontWeight: '400',}} />Same as billing?</span>
+            Jobsite Information{" "}
+            <span style={{ fontSize: "14px", fontWeight: "400" }}>
+              <input
+                onChange={handleToggleAddress}
+                type="checkbox"
+                checked={siteSameAsBilling}
+                style={{ marginRight: "5px", fontWeight: "400" }}
+              />
+              Same as billing?
+            </span>
           </h3>
           <label
             htmlFor="client-name"
@@ -304,7 +325,11 @@ export default function CreateProjectModal({
           >
             Customer Name *
             <input
-              className={siteSameAsBilling ? 'create-project-form__client-details-input_name create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_name create-project-form__input'}
+              className={
+                siteSameAsBilling
+                  ? "create-project-form__client-details-input_name create-project-form__input create-project-form__input_disabled"
+                  : "create-project-form__client-details-input_name create-project-form__input"
+              }
               type="text"
               id="client-name"
               placeholder="Ex: John Doe"
@@ -323,8 +348,11 @@ export default function CreateProjectModal({
               <input
                 type="text"
                 id="client-address-street"
-                className="create-project-form__client-details-input_address-street create-project-form__input"
-                className={siteSameAsBilling ? 'create-project-form__client-details-input_address-street create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_address-street create-project-form__input'}
+                className={
+                  siteSameAsBilling
+                    ? "create-project-form__client-details-input_address-street create-project-form__input create-project-form__input_disabled"
+                    : "create-project-form__client-details-input_address-street create-project-form__input"
+                }
                 placeholder="Street"
                 onChange={handleSiteStreetChange}
                 value={siteSameAsBilling ? billingStreetName : siteStreetName}
@@ -335,7 +363,11 @@ export default function CreateProjectModal({
                 <input
                   type="text"
                   id="client-address-city"
-                  className={siteSameAsBilling ? 'create-project-form__client-details-input_address-city create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_address-city create-project-form__input'}
+                  className={
+                    siteSameAsBilling
+                      ? "create-project-form__client-details-input_address-city create-project-form__input create-project-form__input_disabled"
+                      : "create-project-form__client-details-input_address-city create-project-form__input"
+                  }
                   placeholder="City"
                   onChange={handleSiteCityChange}
                   value={siteSameAsBilling ? billingCityName : siteCityName}
@@ -347,7 +379,11 @@ export default function CreateProjectModal({
                 <input
                   type="text"
                   id="client-address-state"
-                  className={siteSameAsBilling ? 'create-project-form__client-details-input_address-state create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_address-state create-project-form__input'}
+                  className={
+                    siteSameAsBilling
+                      ? "create-project-form__client-details-input_address-state create-project-form__input create-project-form__input_disabled"
+                      : "create-project-form__client-details-input_address-state create-project-form__input"
+                  }
                   placeholder="State"
                   onChange={handleSiteStateChange}
                   value={siteSameAsBilling ? billingStateName : siteStateName}
@@ -357,7 +393,11 @@ export default function CreateProjectModal({
                 <input
                   type="text"
                   id="client-address-zip"
-                  className={siteSameAsBilling ? 'create-project-form__client-details-input_address-zip create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_address-zip create-project-form__input'}
+                  className={
+                    siteSameAsBilling
+                      ? "create-project-form__client-details-input_address-zip create-project-form__input create-project-form__input_disabled"
+                      : "create-project-form__client-details-input_address-zip create-project-form__input"
+                  }
                   placeholder="Zip Code"
                   onChange={handleSiteZipChange}
                   value={siteSameAsBilling ? billingZipCode : siteZipCode}
@@ -373,20 +413,32 @@ export default function CreateProjectModal({
               Phone *
               <input
                 type="phone"
-                className={siteSameAsBilling ? 'create-project-form__client-details-input_phone-primary create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_phone-primary create-project-form__input'}
+                className={
+                  siteSameAsBilling
+                    ? "create-project-form__client-details-input_phone-primary create-project-form__input create-project-form__input_disabled"
+                    : "create-project-form__client-details-input_phone-primary create-project-form__input"
+                }
                 placeholder="Phone Number"
                 onChange={handleSitePrimaryNumberChange}
-                value={siteSameAsBilling ? billingPrimaryPhone : sitePrimaryPhone}
+                value={
+                  siteSameAsBilling ? billingPrimaryPhone : sitePrimaryPhone
+                }
                 disabled={siteSameAsBilling}
                 required={true}
               />
               Alternate Phone
               <input
                 type="phone"
-                className={siteSameAsBilling ? 'create-project-form__client-details-input_phone-alternate create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_phone-alternate create-project-form__input'}
+                className={
+                  siteSameAsBilling
+                    ? "create-project-form__client-details-input_phone-alternate create-project-form__input create-project-form__input_disabled"
+                    : "create-project-form__client-details-input_phone-alternate create-project-form__input"
+                }
                 placeholder="Alternate Number"
                 onChange={handleSiteSecondaryNumberChange}
-                value={siteSameAsBilling ? billingSecondrayPhone : siteSecondaryPhone}
+                value={
+                  siteSameAsBilling ? billingSecondrayPhone : siteSecondaryPhone
+                }
                 disabled={siteSameAsBilling}
               />
             </label>
@@ -397,7 +449,11 @@ export default function CreateProjectModal({
               Email *
               <input
                 type="email"
-                className={siteSameAsBilling ? 'create-project-form__client-details-input_email create-project-form__input create-project-form__input_disabled' : 'create-project-form__client-details-input_email create-project-form__input'}
+                className={
+                  siteSameAsBilling
+                    ? "create-project-form__client-details-input_email create-project-form__input create-project-form__input_disabled"
+                    : "create-project-form__client-details-input_email create-project-form__input"
+                }
                 placeholder="Email Address"
                 onChange={handleSiteEmailChange}
                 value={siteSameAsBilling ? billingEmail : siteEmail}
@@ -406,7 +462,6 @@ export default function CreateProjectModal({
               />
             </label>
           </div>
-
         </div>
         <div className="create-project-form__footer">
           <button
@@ -416,10 +471,7 @@ export default function CreateProjectModal({
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="create-project-form__button_create"
-          >
+          <button type="submit" className="create-project-form__button_create">
             Create
           </button>
         </div>

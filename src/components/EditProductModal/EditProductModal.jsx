@@ -8,16 +8,16 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
   const [quantityUnit, setQuantityUnit] = useState("length-feet");
   const [itemPrice, setItemPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [removalPrice, setRemovalPrice] = useState('');
-  const [repairPrice, setRepairPrice] = useState('');
-  const [category, setCategory] = useState('gutter');
+  const [removalPrice, setRemovalPrice] = useState("");
+  const [repairPrice, setRepairPrice] = useState("");
+  const [category, setCategory] = useState("gutter");
   const [isListed, setIsListed] = useState(true);
   const [screenOptions, setScreenOptions] = useState([]);
   const [addScreenInputsOpen, setAddScreenInputsOpen] = useState(false);
-  const [screenInputName, setScreenInputName] = useState('');
-  const [screenInputPrice, setScreenInputPrice] = useState('');
-  const [screenName, setScreenName] = useState('');
-  const [screenPrice, setScreenPrice] = useState('');
+  const [screenInputName, setScreenInputName] = useState("");
+  const [screenInputPrice, setScreenInputPrice] = useState("");
+  const [screenName, setScreenName] = useState("");
+  const [screenPrice, setScreenPrice] = useState("");
 
   useEffect(() => {
     console.log(product);
@@ -26,37 +26,37 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     setQuantityUnit(product?.unit === "foot" ? "length-feet" : "unit/per");
     setItemPrice(product?.price || "0.00");
     setDescription(
-      product?.description || "No description, how about we add one?",
+      product?.description || "No description, how about we add one?"
     );
     setScreenOptions(product.gutterGuardOptions);
   }, [product, activeModal]);
 
-  function handleCategoryChange(e){
-    setCategory(e.target.value)
+  function handleCategoryChange(e) {
+    setCategory(e.target.value);
   }
 
-  function handleScreenNameChange(e){
-    setScreenName(e.target.value)
+  function handleScreenNameChange(e) {
+    setScreenName(e.target.value);
   }
 
-  function handleScreenPriceChange(e){
-    setScreenPrice(e.target.value)
+  function handleScreenPriceChange(e) {
+    setScreenPrice(e.target.value);
   }
 
-  function handleIsListedChange(e){
-    setIsListed(e.target.checked)
+  function handleIsListedChange(e) {
+    setIsListed(e.target.checked);
   }
 
   function handleItemNameChange(e) {
     setItemName(e.target.value);
   }
 
-  function handleRemovalPriceChange(e){
-    setRemovalPrice(e.target.value)
+  function handleRemovalPriceChange(e) {
+    setRemovalPrice(e.target.value);
   }
 
-  function handleRepairPriceChange(e){
-    setRepairPrice(e.target.value)
+  function handleRepairPriceChange(e) {
+    setRepairPrice(e.target.value);
   }
 
   function handleItemVisualColorChange(e) {
@@ -79,12 +79,12 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     closeModal();
   }
 
-  function handleScreenInputNameChange(e){
-    setScreenInputName(e.target.value)
+  function handleScreenInputNameChange(e) {
+    setScreenInputName(e.target.value);
   }
 
-  function handleScreenInputPriceChange(e){
-    setScreenInputPrice(e.target.value)
+  function handleScreenInputPriceChange(e) {
+    setScreenInputPrice(e.target.value);
   }
 
   function handleItemUpdateSubmit(e) {
@@ -92,21 +92,20 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     const token = localStorage.getItem("jwt");
     const productData = {
       name: itemName,
-      visual: itemVisualColor,
-      quantity: quantityUnit,
-      price: `$${parseFloat(itemPrice).toFixed(2).toString()}`,
+      colorCode: itemVisualColor,
+      unit: quantityUnit,
+      price: parseFloat(itemPrice).toFixed(2).toString(),
       productId: product._id,
       description,
       category,
       listed: isListed,
-      removalPrice,
-      repairPrice,
-      screenOptions,
-
+      removalPricePerFoot: removalPrice,
+      repairPricePerFoot: repairPrice,
+      gutterGuardOptions: screenOptions,
     };
-    // updateProduct(productData, token);
+    updateProduct(productData, token);
 
-    console.log(productData)
+    console.log(productData);
     closeModal();
   }
 
@@ -151,10 +150,7 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               required
             />
           </label>
-          <label
-            htmlFor="description"
-            className="add-item__label"
-          >
+          <label htmlFor="description" className="add-item__label">
             <div>Description</div>
 
             <textarea
@@ -192,17 +188,17 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               value={category}
             >
               <option className="add-item__select-option" value="gutter">
-               Gutter
+                Gutter
               </option>
               <option className="add-item__select-option" value="downspout">
-               Downspout
+                Downspout
               </option>
               <option className="add-item__select-option" value="accessory">
-               Accessory
+                Accessory
               </option>
               <option className="add-item__select-option" value="guard">
-               Guard
-              </option> 
+                Guard
+              </option>
             </select>
           </label>
 
@@ -240,7 +236,6 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               value={itemPrice}
               required
             />
-
           </label>
           <label
             htmlFor="price_removal"
@@ -255,10 +250,9 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               onChange={handleRemovalPriceChange}
               value={removalPrice}
               required
-              id='price_removal'
+              id="price_removal"
             />
-
-          </label> 
+          </label>
           <label
             htmlFor="price_repair"
             className="add-item__label add-item__price-label"
@@ -272,13 +266,13 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               onChange={handleRepairPriceChange}
               value={repairPrice}
               required
-              id='price_repair'
+              id="price_repair"
             />
           </label>
           <label
             htmlFor="show-in-canvas"
-            className='add-item__label'
-            style={{display: 'flex', justifyContent: 'space-between'}}
+            className="add-item__label"
+            style={{ display: "flex", justifyContent: "space-between" }}
           >
             <div>Show in Diagram Toolbar?</div>
 
@@ -289,40 +283,74 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
             />
           </label>
 
-         { product.type === 'gutter' && <label
-            htmlFor="quantity"
-            className="add-item__label"
-          >
-            <div>Screen Options</div>
-            <div>
-            {screenOptions?.map(option => {
-              return <div className='table-row'>
-                    <input type='text' defaultValue={option?.name} onChange={handleScreenNameChange} className="add-item-form__input"/>
-                    <input type='text' defaultValue={option?.price.toFixed(2)} onChange={handleScreenPriceChange} className="add-item-price__input add-item-form__input"/>
-                   </div>
-              })}
-              { addScreenInputsOpen &&
-              <div className='table-row'>
-                <input type='text' value={screenInputName} onChange={handleScreenInputNameChange} className="add-item-form__input" />
-                <input type='text' value={screenInputPrice} onChange={handleScreenInputPriceChange} className="add-item-form__input add-item-price__input" />
-              </div> }
-            </div>
-            <button onClick={()=>{
-              if (addScreenInputsOpen){
-                if (!screenInputName || !screenInputPrice){
-                  setAddScreenInputsOpen(false)
-                  return
-                }
-                setScreenOptions([...screenOptions, {name: screenInputName, price: parseFloat(screenInputPrice)}])
-                setScreenInputPrice('')
-                setScreenInputName('')
-                setAddScreenInputsOpen(false)
-              } else {
-                console.log(addScreenInputsOpen)
-                setAddScreenInputsOpen(true)
-              }}} type='button' className='add-item-form__screen-add-button'>+ Add Screen</button>
-          </label> 
-          }
+          {product.type === "gutter" && (
+            <label htmlFor="quantity" className="add-item__label">
+              <div>Screen Options</div>
+              <div>
+                {screenOptions?.map((option) => {
+                  return (
+                    <div className="table-row">
+                      <input
+                        type="text"
+                        defaultValue={option?.name}
+                        onChange={handleScreenNameChange}
+                        className="add-item-form__input"
+                      />
+                      <input
+                        type="text"
+                        defaultValue={option?.price.toFixed(2)}
+                        onChange={handleScreenPriceChange}
+                        className="add-item-price__input add-item-form__input"
+                      />
+                    </div>
+                  );
+                })}
+                {addScreenInputsOpen && (
+                  <div className="table-row">
+                    <input
+                      type="text"
+                      value={screenInputName}
+                      onChange={handleScreenInputNameChange}
+                      className="add-item-form__input"
+                    />
+                    <input
+                      type="text"
+                      value={screenInputPrice}
+                      onChange={handleScreenInputPriceChange}
+                      className="add-item-form__input add-item-price__input"
+                    />
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  if (addScreenInputsOpen) {
+                    if (!screenInputName || !screenInputPrice) {
+                      setAddScreenInputsOpen(false);
+                      return;
+                    }
+                    setScreenOptions([
+                      ...screenOptions,
+                      {
+                        name: screenInputName,
+                        price: parseFloat(screenInputPrice),
+                      },
+                    ]);
+                    setScreenInputPrice("");
+                    setScreenInputName("");
+                    setAddScreenInputsOpen(false);
+                  } else {
+                    console.log(addScreenInputsOpen);
+                    setAddScreenInputsOpen(true);
+                  }
+                }}
+                type="button"
+                className="add-item-form__screen-add-button"
+              >
+                + Add Screen
+              </button>
+            </label>
+          )}
         </div>
         <div className="add-item-form__footer">
           <button

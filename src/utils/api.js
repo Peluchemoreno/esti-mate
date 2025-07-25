@@ -117,7 +117,7 @@ export function createProduct(productData, token) {
 }
 
 export function updateProduct(productData, token) {
-  return fetch(BASE_URL + "dashboard/products", {
+  return fetch(BASE_URL + `dashboard/products/${productData.productId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

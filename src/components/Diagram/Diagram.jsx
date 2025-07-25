@@ -39,7 +39,7 @@ const Diagram = ({
     isHorizontal: false,
     isVertical: false,
     isSelected: false,
-    color: "blue",
+    color: "black",
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
   const [downspoutCoordinates, setDownspoutCoordinates] = useState([0, 0]);
@@ -83,6 +83,10 @@ const Diagram = ({
         const products = data.products;
         setUnfilteredProducts(data.products);
         const filteredProducts = products.filter((product) => product.listed);
+        filteredProducts.forEach((product) => {
+          if (product.type === "gutter") {
+          }
+        });
         setProducts(filteredProducts);
 
         // Important: only set default tool once when products load
@@ -105,7 +109,7 @@ const Diagram = ({
 
   useEffect(() => {
     setLines((prevLines) =>
-      prevLines.map((line) => ({ ...line, isSelected: false })),
+      prevLines.map((line) => ({ ...line, isSelected: false }))
     );
     setSelectedLine({});
   }, [activeModal]);
@@ -155,7 +159,7 @@ const Diagram = ({
   useEffect(() => {
     // Deselect all lines when the tool changes
     setLines((prevLines) =>
-      prevLines.map((line) => ({ ...line, isSelected: false })),
+      prevLines.map((line) => ({ ...line, isSelected: false }))
     );
     setSelectedLine({});
   }, [tool]);
@@ -283,7 +287,7 @@ const Diagram = ({
             line.endY,
             snapNumberToGrid(offsetX),
             snapNumberToGrid(offsetY),
-            5,
+            5
           )
         ) {
           foundLine = { ...line, isSelected: true };
@@ -295,8 +299,8 @@ const Diagram = ({
           updatedLines.map((line) =>
             line.startX === foundLine.startX && line.startY === foundLine.startY
               ? foundLine
-              : line,
-          ),
+              : line
+          )
         );
         setSelectedLine(foundLine);
         console.log("Selected line:", foundLine);
@@ -343,13 +347,13 @@ const Diagram = ({
         currentLine.startX,
         currentLine.startY,
         currentLine.endX,
-        currentLine.endY,
+        currentLine.endY
       ) ||
       isLineParallelToTop(
         currentLine.startX,
         currentLine.startY,
         currentLine.endX,
-        currentLine.endY,
+        currentLine.endY
       )
     ) {
       setCurrentLine((prevLine) => ({
@@ -402,6 +406,7 @@ const Diagram = ({
       (currentLine.startY + currentLine.endY) / 2,
     ];
     currentLine.measurement = lineLength;
+    console.log(currentLine, currentProduct);
 
     if (isDrawing) {
       if (
@@ -409,7 +414,7 @@ const Diagram = ({
           currentLine.startX,
           currentLine.startY,
           currentLine.endX,
-          currentLine.endY,
+          currentLine.endY
         )
       ) {
         currentLine.isVertical = true;
@@ -424,7 +429,7 @@ const Diagram = ({
           currentLine.startX,
           currentLine.startY,
           currentLine.endX,
-          currentLine.endY,
+          currentLine.endY
         )
       ) {
         currentLine.isHorizontal = true;
@@ -439,7 +444,7 @@ const Diagram = ({
         currentLine.isHorizontal = false;
       }
 
-      currentLine.color = currentProduct?.visual;
+      currentLine.color = currentProduct?.colorCode;
       const updatedLine = { ...currentLine };
       updatedLine.currentProduct = currentProduct;
 
@@ -646,7 +651,7 @@ const Diagram = ({
 
     const scale = Math.min(
       availableWidth / cropWidth,
-      availableHeight / cropHeight,
+      availableHeight / cropHeight
     );
 
     const destWidth = cropWidth * scale;
@@ -667,7 +672,7 @@ const Diagram = ({
       dx,
       dy,
       destWidth,
-      destHeight,
+      destHeight
     );
 
     const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
@@ -679,23 +684,20 @@ const Diagram = ({
       if (line.isDownspout) {
         const downspoutPrice = parseFloat(line.price.slice(1)).toFixed(2);
         downspoutCentsPrice = parseInt(
-          (line.measurement * downspoutPrice * 100).toFixed(0),
+          (line.measurement * downspoutPrice * 100).toFixed(0)
         );
         price += downspoutCentsPrice;
       } else {
         totalFootage += line.measurement;
-        price +=
-          convertToPriceInCents(line.currentProduct.price) * line.measurement;
+        price += line.currentProduct.price * line.measurement;
       }
     });
-
-    const totalPrice = "$" + (price * 0.01).toFixed(2);
 
     const data = {
       lines: [...lines],
       imageData: thumbnailDataUrl,
       totalFootage,
-      price: totalPrice,
+      price: price.toFixed(2),
     };
 
     addDiagramToProject(currentProjectId, token, data)
@@ -713,10 +715,6 @@ const Diagram = ({
         console.error("Failed to save diagram:", err);
         closeModal();
       });
-  }
-
-  function convertToPriceInCents(string) {
-    return parseInt(string.replace("$", "").replace(".", ""));
   }
 
   return (
@@ -771,17 +769,21 @@ const Diagram = ({
           defaultValue={products[0]?.name}
         >
           {products?.map((product) => {
-            return (
-              <option
-                style={{
-                  backgroundColor: `${product.visual}`,
-                }}
-                value={product.name}
-                key={product._id}
-              >
-                {product.name}
-              </option>
-            );
+            if (product.type === "gutter") {
+              return (
+                <option
+                  style={{
+                    backgroundColor: `${product.colorCode}`,
+                  }}
+                  value={product.name}
+                  key={product._id}
+                >
+                  {product.name}
+                </option>
+              );
+            } else {
+              return null;
+            }
           })}
           <option value="downspout">Downspout</option>
           <option value="select">Select</option>
