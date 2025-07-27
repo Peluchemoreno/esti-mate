@@ -14,6 +14,7 @@ import { getProducts } from "../../utils/api";
 import { useParams } from "react-router-dom";
 import DownspoutModal from "../DownspoutModal/DownspoutModal";
 import { capitalizeFirstLetter } from "../../utils/constants";
+import SelectedDownspoutModal from "../SelectedDownspoutModal/SelectedDownspoutModal";
 
 const Diagram = ({
   activeModal,
@@ -111,11 +112,14 @@ const Diagram = ({
   }, [activeModal]); // <-- empty dependency array: only runs once on first mount
 
   useEffect(() => {
-    setLines((prevLines) =>
-      prevLines.map((line) => ({ ...line, isSelected: false }))
-    );
-    setSelectedLine({});
+    if (activeModal !== "selectedLine") {
+      setLines((prevLines) =>
+        prevLines.map((line) => ({ ...line, isSelected: false }))
+      );
+      setSelectedLine({});
+    }
   }, [activeModal]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
@@ -316,9 +320,10 @@ const Diagram = ({
               : line
           )
         );
+        console.log(foundLine);
         setSelectedLine(foundLine);
+        setActiveModal("selectedLine");
         console.log("Selected line:", foundLine);
-        console.log(lines);
       } else {
         console.log("No line found near click");
         setSelectedLine({});
@@ -393,12 +398,10 @@ const Diagram = ({
   // Stop drawing on mouseup
   function handleMouseUp(e) {
     if (isDownspoutModalOpen) return;
-    console.log(products);
     const currentProduct = filteredProducts?.find(
       (product) => product.name === tool
     );
     if (tool === "select") {
-      console.log("mouseup select");
       setIsDrawing(false);
       return;
     }
@@ -737,7 +740,7 @@ const Diagram = ({
     <>
       <div
         className={
-          activeModal === "diagram" || activeModal === "downspout"
+          ["diagram", "downspout", "selectedLine"].includes(activeModal)
             ? "diagram diagram_visible"
             : "diagram"
         }
@@ -824,6 +827,11 @@ const Diagram = ({
         setTool={setTool}
         setIsDownspoutModalOpen={setIsDownspoutModalOpen}
         addDownspout={handleAddDownspout}
+      />
+      <SelectedDownspoutModal
+        selectedLine={selectedLine}
+        activeModal={activeModal}
+        setActiveModal={setActiveModal}
       />
     </>
   );
