@@ -614,7 +614,7 @@ const Diagram = ({
     // setSelectedProduct(currentProduct)
   }
 
-  function saveDiagram() {
+  function saveDiagram(saveType) {
     if (lines.length === 0) {
       closeModal();
       return;
@@ -630,11 +630,7 @@ const Diagram = ({
       return;
     }
 
-    const overwriting = window.confirm(
-      "Do you want to overwrite this diagram?"
-    );
-
-    console.log(overwriting);
+    setActiveModal("confirmDiagramOverwrite");
 
     function getBoundingBox(lines, padding = 20) {
       // <-- 🔥 add a default padding value
@@ -732,25 +728,7 @@ const Diagram = ({
       price: parseFloat(price).toFixed(2),
     };
 
-    if (diagrams.length !== 0 || overwriting) {
-      console.log("overwriting");
-      updateDiagram(currentProjectId, selectedDiagram._id, token, data)
-        .then((newDiagramData) => {
-          handlePassDiagramData(newDiagramData);
-          // ✅ Optional: Update selected diagram if needed
-          // setSelectedDiagram(newDiagramData);
-          // clearCanvas();
-          closeModal();
-        })
-        .then(() => {
-          clearCanvas();
-        })
-        .catch((err) => {
-          console.error("Failed to save diagram:", err);
-          closeModal();
-        });
-    } else {
-      console.log("adding");
+    function handleAddDiagramToProject() {
       addDiagramToProject(currentProjectId, token, data)
         .then((newDiagramData) => {
           handlePassDiagramData(newDiagramData);
@@ -767,13 +745,44 @@ const Diagram = ({
           closeModal();
         });
     }
+
+    function handleUpdateDiagram() {
+      updateDiagram(currentProjectId, selectedDiagram._id, token, data)
+        .then((newDiagramData) => {
+          handlePassDiagramData(newDiagramData);
+          // ✅ Optional: Update selected diagram if needed
+          // setSelectedDiagram(newDiagramData);
+          // clearCanvas();
+          closeModal();
+        })
+        .then(() => {
+          clearCanvas();
+        })
+        .catch((err) => {
+          console.error("Failed to save diagram:", err);
+          closeModal();
+        });
+    }
+
+    if (saveType === "overwrite") {
+      console.log("overwriting");
+      handleUpdateDiagram();
+    } else {
+      console.log("adding");
+      handleAddDiagramToProject();
+    }
   }
 
   return (
     <>
       <div
         className={
-          ["diagram", "downspout", "selectedLine"].includes(activeModal)
+          [
+            "diagram",
+            "downspout",
+            "selectedLine",
+            "confirmDiagramOverwrite",
+          ].includes(activeModal)
             ? "diagram diagram_visible"
             : "diagram"
         }
@@ -792,11 +801,7 @@ const Diagram = ({
           alt="save digram"
           className="diagram__icon diagram__save"
           onClick={() => {
-            // saveDiagram().then((data) => {
-            //   setDiagrams((previousData) => [...previousData, data]);
-            // });
             setActiveModal("confirmDiagramOverwrite");
-            // saveDiagram();
           }}
         />
         <img
@@ -870,6 +875,7 @@ const Diagram = ({
       <OverwriteDiagramModal
         activeModal={activeModal}
         setActiveModal={setActiveModal}
+        saveDiagram={saveDiagram}
       />
     </>
   );
