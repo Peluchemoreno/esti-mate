@@ -15,17 +15,20 @@ import { useParams } from "react-router-dom";
 import DownspoutModal from "../DownspoutModal/DownspoutModal";
 import { capitalizeFirstLetter } from "../../utils/constants";
 import SelectedDownspoutModal from "../SelectedDownspoutModal/SelectedDownspoutModal";
+import { OverwriteDiagramModal } from "../OverwriteDiagramModal/OverwriteDiagramModal";
 
 const Diagram = ({
   activeModal,
   closeModal,
   isMobile,
   currentProjectId,
+  updateDiagram,
   addDiagramToProject,
   handlePassDiagramData,
   selectedDiagram,
   setSelectedDiagram,
   originalDiagram,
+  diagrams,
   setActiveModal,
 }) => {
   const params = useParams();
@@ -78,6 +81,10 @@ const Diagram = ({
 
     setLines(selectedDiagram.lines || []);
   }, [selectedDiagram]);
+
+  useEffect(() => {
+    console.log(diagrams.length);
+  }, [activeModal]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -623,6 +630,12 @@ const Diagram = ({
       return;
     }
 
+    const overwriting = window.confirm(
+      "Do you want to overwrite this diagram?"
+    );
+
+    console.log(overwriting);
+
     function getBoundingBox(lines, padding = 20) {
       // <-- 🔥 add a default padding value
       let minX = Infinity;
@@ -695,13 +708,13 @@ const Diagram = ({
       destHeight
     );
 
+    console.log("generating image url");
     const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
     let totalFootage = 0;
     let price = 0;
     let downspoutCentsPrice;
 
     lines.forEach((line) => {
-      console.log(line);
       if (line.isDownspout) {
         const downspoutPrice = parseFloat(line.price).toFixed(2);
 
@@ -719,21 +732,41 @@ const Diagram = ({
       price: parseFloat(price).toFixed(2),
     };
 
-    addDiagramToProject(currentProjectId, token, data)
-      .then((newDiagramData) => {
-        handlePassDiagramData(newDiagramData);
-        // ✅ Optional: Update selected diagram if needed
-        // setSelectedDiagram(newDiagramData);
-        // clearCanvas();
-        closeModal();
-      })
-      .then(() => {
-        clearCanvas();
-      })
-      .catch((err) => {
-        console.error("Failed to save diagram:", err);
-        closeModal();
-      });
+    if (diagrams.length !== 0 || overwriting) {
+      console.log("overwriting");
+      updateDiagram(currentProjectId, selectedDiagram._id, token, data)
+        .then((newDiagramData) => {
+          handlePassDiagramData(newDiagramData);
+          // ✅ Optional: Update selected diagram if needed
+          // setSelectedDiagram(newDiagramData);
+          // clearCanvas();
+          closeModal();
+        })
+        .then(() => {
+          clearCanvas();
+        })
+        .catch((err) => {
+          console.error("Failed to save diagram:", err);
+          closeModal();
+        });
+    } else {
+      console.log("adding");
+      addDiagramToProject(currentProjectId, token, data)
+        .then((newDiagramData) => {
+          handlePassDiagramData(newDiagramData);
+          // ✅ Optional: Update selected diagram if needed
+          // setSelectedDiagram(newDiagramData);
+          // clearCanvas();
+          closeModal();
+        })
+        .then(() => {
+          clearCanvas();
+        })
+        .catch((err) => {
+          console.error("Failed to save diagram:", err);
+          closeModal();
+        });
+    }
   }
 
   return (
@@ -762,7 +795,8 @@ const Diagram = ({
             // saveDiagram().then((data) => {
             //   setDiagrams((previousData) => [...previousData, data]);
             // });
-            saveDiagram();
+            setActiveModal("confirmDiagramOverwrite");
+            // saveDiagram();
           }}
         />
         <img
@@ -830,6 +864,10 @@ const Diagram = ({
       />
       <SelectedDownspoutModal
         selectedLine={selectedLine}
+        activeModal={activeModal}
+        setActiveModal={setActiveModal}
+      />
+      <OverwriteDiagramModal
         activeModal={activeModal}
         setActiveModal={setActiveModal}
       />

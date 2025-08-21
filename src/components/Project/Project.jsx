@@ -4,7 +4,6 @@ import backIcon from "../../assets/icons/back.svg";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
-  addDiagramToProject,
   deleteDiagram,
   deleteProject,
   retrieveProjectDiagrams,
@@ -57,6 +56,7 @@ export default function Project({
 
     retrieveProjectDiagrams(projectId, token).then((diagrams) => {
       setDiagramData(diagrams);
+      console.log("diagrams changed: ", diagrams);
     });
   }, [diagrams]);
 
@@ -176,28 +176,33 @@ export default function Project({
           <div className="project__diagram-container">
             {diagramData.length > 0 ? (
               diagramData.map((diagram, index) => (
-                <div
-                  key={index}
-                  className={`${
-                    diagram._id === selectedDiagram._id
-                      ? "project__drawing_selected"
-                      : "project__drawing"
-                  }`}
-                  alt="Diagram image"
-                  onClick={() => {
-                    console.log(diagram);
-                    handleSelectDiagram(diagram);
-                  }}
-                  style={{
-                    width: "200px",
-                    height: "200px",
-                    backgroundImage: `url(${diagram.imageData})`,
-                    backgroundSize: "200px",
-                    backgroundPosition: "center",
-                    backgroundRepeat: "no-repeat",
-                    borderRadius: "5px",
-                  }}
-                ></div>
+                <div className="project__drawing-container">
+                  <div
+                    key={index}
+                    className={`${
+                      diagram._id === selectedDiagram._id
+                        ? "project__drawing_selected"
+                        : "project__drawing"
+                    }`}
+                    alt="Diagram image"
+                    onClick={() => {
+                      console.log(diagram);
+                      handleSelectDiagram(diagram);
+                    }}
+                    style={{
+                      width: "200px",
+                      height: "200px",
+                      backgroundImage: `url(${diagram.imageData})`,
+                      backgroundSize: "200px",
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                      borderRadius: "5px",
+                    }}
+                  ></div>
+                  <p className="diagram__details">
+                    {diagram.createdAt.replace(",", " |")}
+                  </p>
+                </div>
               ))
             ) : (
               <p>No Diagrams</p>

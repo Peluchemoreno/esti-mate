@@ -80,6 +80,10 @@
   cursor: pointer;
 }
 
+.diagram__details {
+  text-align: center;
+}
+
 .project__drawing_selected {
   margin-top: 20px;
   /* border: 4px solid red;

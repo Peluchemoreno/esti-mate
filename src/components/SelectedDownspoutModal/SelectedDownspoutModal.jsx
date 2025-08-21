@@ -6,14 +6,8 @@ export default function SelectedDownspoutModal({
   activeModal,
   setActiveModal,
 }) {
-  useEffect(() => {
-    console.log(selectedLine);
-  }, [selectedLine]);
-  useEffect(() => {
-    console.log("selectedLine:", selectedLine);
-    console.log("keys:", Object.keys(selectedLine || {}));
-    console.log("color:", selectedLine?.color);
-  }, [selectedLine]);
+  useEffect(() => {}, [selectedLine]);
+  useEffect(() => {}, [selectedLine]);
 
   return (
     <div
