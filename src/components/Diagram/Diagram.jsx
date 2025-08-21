@@ -413,6 +413,11 @@ const Diagram = ({
       return;
     }
 
+    if (tool === "note") {
+      console.log("make a note");
+      return;
+    }
+
     if (tool === "downspout") {
       console.log("ds select");
       return;
@@ -475,7 +480,16 @@ const Diagram = ({
       const updatedLine = { ...currentLine };
       updatedLine.currentProduct = currentProduct;
 
-      setLines([...lines, updatedLine]); // Save the current line
+      if (
+        currentLine.startX === currentLine.endX &&
+        currentLine.startY === currentLine.endY
+      ) {
+        console.log("touched accidentaly");
+        console.log(lines);
+        return;
+      } else {
+        setLines([...lines, updatedLine]); // Save the current line
+      }
     }
 
     setIsDrawing(false);
@@ -629,7 +643,6 @@ const Diagram = ({
       closeModal();
       return;
     }
-
     setActiveModal("confirmDiagramOverwrite");
 
     function getBoundingBox(lines, padding = 20) {
@@ -801,7 +814,13 @@ const Diagram = ({
           alt="save digram"
           className="diagram__icon diagram__save"
           onClick={() => {
-            setActiveModal("confirmDiagramOverwrite");
+            const hasChanged =
+              JSON.stringify(lines) !== JSON.stringify(originalDiagram.lines);
+            if (!hasChanged) {
+              return;
+            } else {
+              setActiveModal("confirmDiagramOverwrite");
+            }
           }}
         />
         <img
@@ -841,6 +860,7 @@ const Diagram = ({
           })}
           <option value="downspout">Downspout</option>
           <option value="select">Select</option>
+          <option value="note">Notation</option>
         </select>
 
         <div className="diagram__line-length-display">
