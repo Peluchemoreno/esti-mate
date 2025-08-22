@@ -52,6 +52,8 @@ function EstimatePDF({
     lines.forEach((line) => {
       if (line.isDownspout) {
         downspoutItems.push(line);
+      } else if (line.isNote) {
+        return;
       } else {
         nonDownspoutItems.push(line);
       }
@@ -78,32 +80,37 @@ function EstimatePDF({
     }
 
     Object.keys(lineItemTable).forEach((item) => {
-      const formattedItem = {
-        item: selectedDiagram.lines.filter((line) => {
-          if (line.isDownspout) {
-            return line.downspoutSize === item;
-          } else {
-            return line.currentProduct?.name === item;
-          }
-        })[0].currentProduct?.name,
-        quantity: lineItemTable[item],
-        price: selectedDiagram.lines.filter((line) => {
-          if (line.isDownspout) {
-            return line.downspoutSize === item;
-          } else {
-            return line.currentProduct?.name === item;
-          }
-        })[0].currentProduct.price,
-        description: selectedDiagram.lines.filter((line) => {
-          if (!line.isDownspout) {
-            return line.currentProduct?.name === item;
-          } else {
-            return line.downspoutSize === item;
-          }
-        })[0].currentProduct.description,
-      };
-
-      tempArray.push(formattedItem);
+      console.log(item);
+      if (item === undefined) {
+        console.log(item, "is undefined");
+        return;
+      } else {
+        const formattedItem = {
+          item: selectedDiagram.lines.filter((line) => {
+            if (line.isDownspout) {
+              return line.downspoutSize === item;
+            } else {
+              return line.currentProduct?.name === item;
+            }
+          })[0].currentProduct?.name,
+          quantity: lineItemTable[item],
+          price: selectedDiagram.lines.filter((line) => {
+            if (line.isDownspout) {
+              return line.downspoutSize === item;
+            } else {
+              return line.currentProduct?.name === item;
+            }
+          })[0].currentProduct.price,
+          description: selectedDiagram.lines.filter((line) => {
+            if (!line.isDownspout) {
+              return line.currentProduct?.name === item;
+            } else {
+              return line.downspoutSize === item;
+            }
+          })[0].currentProduct.description,
+        };
+        tempArray.push(formattedItem);
+      }
     });
 
     setItemizedArray(tempArray);

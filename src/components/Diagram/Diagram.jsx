@@ -16,6 +16,7 @@ import DownspoutModal from "../DownspoutModal/DownspoutModal";
 import { capitalizeFirstLetter } from "../../utils/constants";
 import SelectedDownspoutModal from "../SelectedDownspoutModal/SelectedDownspoutModal";
 import { OverwriteDiagramModal } from "../OverwriteDiagramModal/OverwriteDiagramModal";
+import { AnnotationModal } from "../AnnotationModal/AnnotationModal";
 
 const Diagram = ({
   activeModal,
@@ -48,6 +49,7 @@ const Diagram = ({
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
   const [downspoutCoordinates, setDownspoutCoordinates] = useState([0, 0]);
+  const [noteCoordinates, setNoteCoordinates] = useState([0, 0]);
   const [lineLength, setLineLength] = useState(0);
   const canvasBaseMeasurements = {
     top: 0,
@@ -216,6 +218,22 @@ const Diagram = ({
     return Math.round(number / gridSize) * gridSize;
   }
 
+  function addNote(note) {
+    console.log(note);
+    const formattedNote = {
+      startX: noteCoordinates[0],
+      startY: noteCoordinates[1],
+      endX: noteCoordinates[0],
+      endY: noteCoordinates[1],
+      midpoint: null,
+      isSelected: false,
+      color: "black",
+      isNote: true,
+      note,
+    };
+    setLines([...lines, formattedNote]);
+  }
+
   function handleAddDownspout(downspoutData) {
     console.log(downspoutData);
     const currentDownspout = unfilteredProducts.filter((product) => {
@@ -295,6 +313,14 @@ const Diagram = ({
       setIsDownspoutModalOpen(true);
       setActiveModal("downspout");
       return;
+    } else if (tool === "note") {
+      const snappedX = snapNumberToGrid(offsetX);
+      const snappedY = snapNumberToGrid(offsetY);
+
+      setNoteCoordinates([snappedX, snappedY]);
+      console.log("adding note here", [snappedX, snappedY]);
+      setActiveModal("note");
+      console.log("make a note");
     } else if (tool === "select") {
       console.log("Selecting mode active");
 
@@ -414,7 +440,6 @@ const Diagram = ({
     }
 
     if (tool === "note") {
-      console.log("make a note");
       return;
     }
 
@@ -484,8 +509,6 @@ const Diagram = ({
         currentLine.startX === currentLine.endX &&
         currentLine.startY === currentLine.endY
       ) {
-        console.log("touched accidentaly");
-        console.log(lines);
         return;
       } else {
         setLines([...lines, updatedLine]); // Save the current line
@@ -568,6 +591,13 @@ const Diagram = ({
     const x2 = Math.round(endX / gridSize) * gridSize;
     const y2 = Math.round(endY / gridSize) * gridSize;
 
+    if (line.isNote) {
+      ctx.font = "1000 12px Arial";
+      ctx.fillStyle = "black";
+      ctx.textAlign = "center";
+      ctx.fillText(line.note, startX, startY);
+    }
+
     if (isDownspout) {
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -580,6 +610,25 @@ const Diagram = ({
       ctx.lineTo(x1 + gridSize / 2.75, y1 - gridSize / 2.75);
       ctx.strokeStyle = line.color;
       ctx.stroke();
+
+      const boxX = line.startX + 5;
+      const boxY = line.startY + 5;
+      const boxWidth = 60;
+      const boxHeight = 20;
+
+      ctx.fillStyle = "grey";
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+
+      ctx.strokeStyle = line.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+      ctx.fillStyle = "white";
+      ctx.font = "10px Arial";
+      ctx.textAlign = "center";
+
+      ctx.fillText(line.elbowSequence, boxX + 30, boxY + 15);
+      ctx.strokeStyle = line.color;
     } else {
       // Draw the line
       ctx.beginPath();
@@ -728,6 +777,8 @@ const Diagram = ({
         const downspoutPrice = parseFloat(line.price).toFixed(2);
 
         price += downspoutPrice * line.measurement;
+      } else if (line.isNote) {
+        price += 0;
       } else {
         price += parseFloat(line.currentProduct.price) * line.measurement;
       }
@@ -795,6 +846,7 @@ const Diagram = ({
             "downspout",
             "selectedLine",
             "confirmDiagramOverwrite",
+            "note",
           ].includes(activeModal)
             ? "diagram diagram_visible"
             : "diagram"
@@ -896,6 +948,11 @@ const Diagram = ({
         activeModal={activeModal}
         setActiveModal={setActiveModal}
         saveDiagram={saveDiagram}
+      />
+      <AnnotationModal
+        activeModal={activeModal}
+        setActiveModal={setActiveModal}
+        addNote={addNote}
       />
     </>
   );
