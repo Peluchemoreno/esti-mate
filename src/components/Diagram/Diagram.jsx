@@ -194,29 +194,6 @@ const Diagram = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-
-    // Fallback for touch or mouse events
-    canvas.addEventListener("mousedown", handleMouseDown);
-    canvas.addEventListener("mousemove", handleMouseMove);
-    canvas.addEventListener("mouseup", handleMouseUp);
-
-    canvas.addEventListener("touchstart", handleMouseDown);
-    canvas.addEventListener("touchmove", handleMouseMove);
-    canvas.addEventListener("touchend", handleMouseUp);
-
-    return () => {
-      // Cleanup
-      canvas.removeEventListener("mousedown", handleMouseDown);
-      canvas.removeEventListener("mousemove", handleMouseMove);
-      canvas.removeEventListener("mouseup", handleMouseUp);
-      canvas.removeEventListener("touchstart", handleMouseDown);
-      canvas.removeEventListener("touchmove", handleMouseMove);
-      canvas.removeEventListener("touchend", handleMouseUp);
-    };
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
     drawAllLines(ctx); // Redraw all lines whenever currentLine or lines change
@@ -230,6 +207,306 @@ const Diagram = ({
     setSelectedLineId(null);
   }, [tool]);
   // helper functions
+  // ----- Product key helpers -----
+  // Pull a stable "product key" for gutter lines.
+  // Default: use the product's name. Customize if you want to extract just the size/profile.
+  function getGutterKey(line) {
+    // Only lines that are actual gutters (not notes/downspouts)
+    if (line.isNote || line.isDownspout) return null;
+    // If your product object has a "type==='gutter'", you can guard it here:
+    // if (line.currentProduct?.type !== 'gutter') return null;
+
+    // Basic: use name as key
+    const name =
+      line.currentProduct?.name ||
+      line.currentProduct?.productName ||
+      line.productName;
+    if (!name) return null;
+    return normalizeGutterKey(name);
+  }
+
+  const PROFILE_ALIASES = [
+    [/k[-\s]?style/i, "K-Style"],
+    [/half[-\s]?round/i, "Half-Round"],
+    [/straight[-\s]?face|straightface/i, "Straight Face"],
+    [/fascia/i, "Fascia"],
+    [/box/i, "Box"],
+    [/og\b|o\.?g\.?/i, "OG"],
+    [/euro/i, "Euro"],
+    [/square/i, "Square"],
+    [/round(?!.*half)/i, "Round"], // "Round" but not "Half-Round"
+  ];
+
+  function normalizeGutterKey(name) {
+    const trimmed = (name || "").trim();
+    const sizeMatch = trimmed.match(/(\d+)\s*"/);
+    if (!sizeMatch) return trimmed;
+
+    const size = sizeMatch[1];
+    // try to detect a known profile anywhere in the string
+    for (const [rx, label] of PROFILE_ALIASES) {
+      if (rx.test(trimmed)) return `${size}" ${label}`;
+    }
+
+    // Fallback: grab 1–2 words after the size before a dash/comma/paren/material/color tokens
+    const after = trimmed.slice(sizeMatch.index + sizeMatch[0].length);
+    const stopPunct = /[-–—]|,|\(|\)|\/|\\|\|/;
+    const stopIdx = after.search(stopPunct);
+    let chunk = stopIdx >= 0 ? after.slice(0, stopIdx) : after;
+
+    // strip common non-profile words
+    const junk =
+      /\b(alum(?:inum)?|copper|steel|gutter|seamless|paint(?:ed)?|color|finish|white|black|bronze|brown|matte|textured|coil|stock|sku|ft|pcs?)\b/gi;
+    chunk = chunk.replace(junk, " ").replace(/\s+/g, " ").trim();
+
+    const words = chunk.split(/\s+/).filter(Boolean).slice(0, 2).join(" ");
+    return words ? `${size}" ${titleCase(words)}` : `${size}"`;
+  }
+
+  function titleCase(s) {
+    return s.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function centroidOfLines(allLines) {
+    if (!allLines.length) return { x: 0, y: 0 };
+    let sx = 0,
+      sy = 0,
+      n = 0;
+    allLines.forEach((L) => {
+      const mx = (L.startX + L.endX) / 2;
+      const my = (L.startY + L.endY) / 2;
+      sx += mx;
+      sy += my;
+      n += 1;
+    });
+    return { x: sx / n, y: sy / n };
+  }
+
+  // Return the "inward" corner bisector for rays A and B at a joint (both are vectors from the joint).
+  // We choose the smaller-angle bisector by adding the normalized vectors.
+  function cornerBisector(vA, vB) {
+    const A = norm(vA);
+    const B = norm(vB);
+    const bx = A.x + B.x;
+    const by = A.y + B.y;
+    const L = Math.hypot(bx, by);
+    if (L < 1e-6) {
+      // Rays are opposite (180°) — no corner; return a zero vector
+      return { x: 0, y: 0 };
+    }
+    return { x: bx / L, y: by / L };
+  }
+
+  // --- Geometry helpers ---
+  function vec(x1, y1, x2, y2) {
+    return { x: x2 - x1, y: y2 - y1 };
+  }
+  function len(v) {
+    return Math.hypot(v.x, v.y);
+  }
+  function norm(v) {
+    const L = len(v) || 1;
+    return { x: v.x / L, y: v.y / L };
+  }
+  function dot(a, b) {
+    return a.x * b.x + a.y * b.y;
+  }
+  function crossZ(a, b) {
+    // 2D cross product (z-component)
+    return a.x * b.y - a.y * b.x;
+  }
+  function angleBetweenDeg(a, b) {
+    const A = norm(a);
+    const B = norm(b);
+    const clamped = Math.min(1, Math.max(-1, dot(A, B)));
+    return (Math.acos(clamped) * 180) / Math.PI; // 0..180
+  }
+
+  // Round to an integer grid/tolerance so nearly-equal endpoints cluster
+  const JOINT_SNAP = 1; // you can set this to gridSize (e.g. 10) if you prefer strict snapping
+  function keyForPoint(x, y, tol = JOINT_SNAP) {
+    // quantize to tolerance so points that are "the same" end up with same key
+    return `${Math.round(x / tol) * tol}|${Math.round(y / tol) * tol}`;
+  }
+
+  // Buckets for angles
+  const isStraight = (ang) => ang > 175; // treat ~180° as no miter
+  const isRight = (ang) => ang >= 80 && ang <= 100;
+  const isBay = (ang) => ang >= 130 && ang <= 150; // typical bay ~135°
+
+  function analyzeJoints(allLines) {
+    // Only consider gutter lines for joints/endcaps/miters
+    const gutterLines = allLines
+      .map((L, idx) => ({ L, idx, key: getGutterKey(L) }))
+      .filter(({ key, L }) => key && !L.isNote && !L.isDownspout);
+
+    const center = centroidOfLines(gutterLines.map((g) => g.L));
+
+    // Build joints map: quantized point -> { x,y, members:[{lineIndex, end, key}] }
+    const joints = new Map();
+    gutterLines.forEach(({ L, idx, key }) => {
+      const sKey = keyForPoint(L.startX, L.startY);
+      const eKey = keyForPoint(L.endX, L.endY);
+
+      if (!joints.has(sKey))
+        joints.set(sKey, { x: L.startX, y: L.startY, members: [] });
+      if (!joints.has(eKey))
+        joints.set(eKey, { x: L.endX, y: L.endY, members: [] });
+
+      joints.get(sKey).members.push({ lineIndex: idx, end: "start", key });
+      joints.get(eKey).members.push({ lineIndex: idx, end: "end", key });
+    });
+
+    // Result buckets
+    const endCapsByProduct = Object.create(null);
+    const mitersByProduct = Object.create(null); // per product (same on both rays)
+    const mixedMiters = Object.create(null); // productA + productB
+
+    // helpers to bump counters
+    const bumpEnd = (k) => {
+      endCapsByProduct[k] = (endCapsByProduct[k] || 0) + 1;
+    };
+
+    const ensureMiterBucket = (k) => {
+      if (!mitersByProduct[k]) {
+        mitersByProduct[k] = {
+          inside90: 0,
+          outside90: 0,
+          bay135: 0,
+          custom: new Map(),
+        };
+      }
+      return mitersByProduct[k];
+    };
+
+    const ensureMixedBucket = (keyPair) => {
+      if (!mixedMiters[keyPair]) {
+        mixedMiters[keyPair] = {
+          inside90: 0,
+          outside90: 0,
+          bay135: 0,
+          custom: new Map(),
+        };
+      }
+      return mixedMiters[keyPair];
+    };
+
+    const pushCustom = (bucket, ang) => {
+      const r = Math.round(ang);
+      bucket.custom.set(r, (bucket.custom.get(r) || 0) + 1);
+    };
+
+    // Bucketing predicates
+    const isStraight = (ang) => ang > 175;
+    const isRight = (ang) => ang >= 80 && ang <= 100;
+    const isBay = (ang) => ang >= 130 && ang <= 150;
+
+    // For each joint, analyze corners
+    joints.forEach((joint) => {
+      const { x: JX, y: JY, members } = joint;
+
+      // degree = number of rays (gutter endpoints) at this point
+      const degree = members.length;
+
+      // End cap: exactly one gutter line terminates here
+      if (degree === 1) {
+        bumpEnd(members[0].key);
+        return;
+      }
+
+      if (degree >= 2) {
+        // Build outgoing rays with product keys
+        const rays = members
+          .map(({ lineIndex, end, key }) => {
+            const L = allLines[lineIndex];
+            const otherX = end === "start" ? L.endX : L.startX;
+            const otherY = end === "start" ? L.endY : L.startY;
+            const v = vec(JX, JY, otherX, otherY);
+            return { key, v, angle: Math.atan2(v.y, v.x) };
+          })
+          .filter((r) => len(r.v) > 0.0001);
+
+        if (rays.length < 2) return;
+
+        // Sort by polar angle for stable adjacency pairs
+        const sorted = rays.slice().sort((a, b) => a.angle - b.angle);
+
+        // Form pairs: for degree==2 -> one pair; else adjacent + wrap
+        const pairs = [];
+        if (sorted.length === 2) {
+          pairs.push([sorted[0], sorted[1]]);
+        } else {
+          for (let i = 0; i < sorted.length; i++) {
+            const a = sorted[i];
+            const b = sorted[(i + 1) % sorted.length];
+            pairs.push([a, b]);
+          }
+        }
+
+        // Bias for “inside vs outside” using centroid (optional but helps)
+        const toC = { x: center.x - JX, y: center.y - JY };
+
+        pairs.forEach(([A, B]) => {
+          const ang = angleBetweenDeg(A.v, B.v);
+          if (isStraight(ang)) return;
+
+          // Inward bisector
+          const bis = cornerBisector(A.v, B.v);
+          const facesCenter = bis.x * toC.x + bis.y * toC.y > 0;
+
+          // Classify angle label
+          let label;
+          if (isRight(ang)) {
+            label = facesCenter ? "inside90" : "outside90";
+          } else if (isBay(ang)) {
+            label = "bay135";
+          } else {
+            label = "custom";
+          }
+
+          // Decide which bucket (same product vs mixed)
+          if (A.key === B.key) {
+            const bucket = ensureMiterBucket(A.key);
+            if (label === "inside90") bucket.inside90 += 1;
+            else if (label === "outside90") bucket.outside90 += 1;
+            else if (label === "bay135") bucket.bay135 += 1;
+            else pushCustom(bucket, ang);
+          } else {
+            // mixed edge: keep a stable combined key (alphabetical)
+            const combo = [A.key, B.key].sort().join(" + ");
+            const bucket = ensureMixedBucket(combo);
+            if (label === "inside90") bucket.inside90 += 1;
+            else if (label === "outside90") bucket.outside90 += 1;
+            else if (label === "bay135") bucket.bay135 += 1;
+            else pushCustom(bucket, ang);
+          }
+        });
+      }
+    });
+
+    // Convert custom maps to arrays for JSON
+    function finalize(bucketObj) {
+      const out = {};
+      for (const [k, v] of Object.entries(bucketObj)) {
+        out[k] = {
+          inside90: v.inside90,
+          outside90: v.outside90,
+          bay135: v.bay135,
+          custom: [...v.custom.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([angle, count]) => ({ angle, count })),
+        };
+      }
+      return out;
+    }
+
+    return {
+      endCapsByProduct, // { "5\" K-Style": n, "6\" Half-Round": m, ... }
+      mitersByProduct: finalize(mitersByProduct),
+      mixedMiters: finalize(mixedMiters), // e.g. { '5" K-Style + 6" K-Style': {...} }
+    };
+  }
+
   function deleteSelected() {
     if (selectedIndex === null) return;
     setLines((prev) => prev.filter((_, i) => i !== selectedIndex));
@@ -270,17 +547,11 @@ const Diagram = ({
     }
   }
   function getCanvasCoords(e) {
-    let clientX, clientY;
-    if (e?.nativeEvent?.touches?.[0]) {
-      const t = e.nativeEvent.touches[0];
-      clientX = t.clientX;
-      clientY = t.clientY;
-    } else {
-      // Pointer/mouse events land here
-      clientX = e.clientX ?? e?.nativeEvent?.clientX;
-      clientY = e.clientY ?? e?.nativeEvent?.clientY;
-    }
+    // Works for mouse/touch/pen via Pointer Events
+    const ne = e.nativeEvent;
     const rect = canvasRef.current.getBoundingClientRect();
+    const clientX = ne.clientX;
+    const clientY = ne.clientY;
     return { x: clientX - rect.left, y: clientY - rect.top };
   }
 
@@ -1572,12 +1843,19 @@ const Diagram = ({
       console.log(price);
     });
 
+    const analysis = analyzeJoints(lines);
+
     const data = {
       lines: [...lines],
       imageData: thumbnailDataUrl,
       totalFootage,
       price: parseFloat(price).toFixed(2),
+      // New per-product/mixed output:
+      endCapsByProduct: analysis.endCapsByProduct,
+      mitersByProduct: analysis.mitersByProduct,
+      mixedMiters: analysis.mixedMiters,
     };
+    console.log(data);
 
     function handleAddDiagramToProject() {
       addDiagramToProject(currentProjectId, token, data)

@@ -18,6 +18,8 @@
   width: 100%;
   background-color: #dfdfdf;
   height: 100dvh;
+  touch-action: none;
+  -ms-touch-action: none;
 }
 
 .diagram_visible {
