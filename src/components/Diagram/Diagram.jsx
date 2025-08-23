@@ -14,9 +14,14 @@ import { getProducts } from "../../utils/api";
 import { useParams } from "react-router-dom";
 import DownspoutModal from "../DownspoutModal/DownspoutModal";
 import { capitalizeFirstLetter } from "../../utils/constants";
-import SelectedDownspoutModal from "../SelectedDownspoutModal/SelectedDownspoutModal";
 import { OverwriteDiagramModal } from "../OverwriteDiagramModal/OverwriteDiagramModal";
 import { AnnotationModal } from "../AnnotationModal/AnnotationModal";
+
+// Stable id generator for lines (works in all browsers)
+const newId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const Diagram = ({
   activeModal,
@@ -35,6 +40,15 @@ const Diagram = ({
   const params = useParams();
 
   const canvasRef = useRef(null);
+  // NEW: unified selection + dragging state
+  const [selectedIndex, setSelectedIndex] = useState(null); // which element in `lines` is selected
+  const [dragging, setDragging] = useState({
+    mode: "none", // "none" | "move" | "drag-end"
+    end: null, // "start" | "end" when dragging an endpoint
+    lastX: 0,
+    lastY: 0,
+  });
+
   const [isDrawing, setIsDrawing] = useState(false);
   const [gridSize, setGridSize] = useState(10);
   const [currentLine, setCurrentLine] = useState({
@@ -48,6 +62,7 @@ const Diagram = ({
     color: "black",
   });
   const [lines, setLines] = useState([]); // Array to store all drawn lines
+  const [draggingEndpoint, setDraggingEndpoint] = useState(null); // "start" | "end" | null
   const [downspoutCoordinates, setDownspoutCoordinates] = useState([0, 0]);
   const [noteCoordinates, setNoteCoordinates] = useState([0, 0]);
   const [lineLength, setLineLength] = useState(0);
@@ -62,9 +77,29 @@ const Diagram = ({
   const [unitPerTools, setUnitPerTools] = useState([]);
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [selectedLine, setSelectedLine] = useState({});
+  // const [selectedLine, setSelectedLine] = useState({});
+  const [selectedLineId, setSelectedLineId] = useState(null);
+
   const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
   const [unfilteredProducts, setUnfilteredProducts] = useState([]);
+  // const selectedLine = lines.find((l) => l.id === selectedLineId); If you still want a selectedLine handy for quick checks:
+  useEffect(() => {
+    function onKeyDown(e) {
+      // Delete or Backspace (avoid deleting while typing inside inputs)
+      const tag = (e.target && e.target.tagName) || "";
+      const isTyping =
+        tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable;
+
+      if (!isTyping && (e.key === "Delete" || e.key === "Backspace")) {
+        if (tool === "select" && selectedIndex !== null) {
+          e.preventDefault();
+          deleteSelected();
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [tool, selectedIndex]); // depends on current tool + selection
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,16 +112,23 @@ const Diagram = ({
     //     drawLine(ctx, line);
     //   });
     // }, 0);
-    selectedDiagram?.lines?.forEach((line) => {
+    /* selectedDiagram?.lines?.forEach((line) => {
       drawLine(ctx, line);
     });
 
     setLines(selectedDiagram.lines || []);
+ */
+    const withIds = (selectedDiagram?.lines || []).map((l) => ({
+      id: l.id || newId(),
+      ...l,
+    }));
+    withIds.forEach((line) => drawLine(ctx, line));
+    setLines(withIds);
   }, [selectedDiagram]);
 
   useEffect(() => {
-    console.log(diagrams.length);
-  }, [activeModal]);
+    console.log(draggingEndpoint);
+  }, [draggingEndpoint]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -125,21 +167,29 @@ const Diagram = ({
       setLines((prevLines) =>
         prevLines.map((line) => ({ ...line, isSelected: false }))
       );
-      setSelectedLine({});
+      setSelectedLineId(null);
     }
   }, [activeModal]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d");
 
-    // Adjust for device pixel ratio
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    context.scale(dpr, dpr);
 
-    drawGrid(context); // Redraw the grid after scaling
+    // Set backing store size
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+
+    // Set CSS size so the element appears at CSS pixels
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+
+    // Reset transform before (re)scaling to avoid compounding
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+
+    drawGrid(ctx); // Redraw the grid after scaling
   }, [window.innerWidth, window.innerHeight]);
 
   useEffect(() => {
@@ -170,15 +220,176 @@ const Diagram = ({
     const ctx = canvas.getContext("2d");
 
     drawAllLines(ctx); // Redraw all lines whenever currentLine or lines change
-  }, [currentLine, lines, isDrawing, selectedLine]);
+  }, [currentLine, lines, isDrawing]);
 
   useEffect(() => {
     // Deselect all lines when the tool changes
     setLines((prevLines) =>
       prevLines.map((line) => ({ ...line, isSelected: false }))
     );
-    setSelectedLine({});
+    setSelectedLineId(null);
   }, [tool]);
+  // helper functions
+  function deleteSelected() {
+    if (selectedIndex === null) return;
+    setLines((prev) => prev.filter((_, i) => i !== selectedIndex));
+    setSelectedIndex(null);
+    setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
+  }
+
+  function recalcGeometry(line) {
+    // Update midpoint
+    line.midpoint = [
+      (line.startX + line.endX) / 2,
+      (line.startY + line.endY) / 2,
+    ];
+    // Update measurement
+    line.measurement = convertToFeet(
+      calculateDistance([line.startX, line.startY], [line.endX, line.endY])
+    );
+
+    // Update orientation flags + label position
+    if (isLineParallelToSide(line.startX, line.startY, line.endX, line.endY)) {
+      line.isVertical = true;
+      line.isHorizontal = false;
+      line.position =
+        line.midpoint[0] >= canvasBaseMeasurements.width / 2 ? "right" : "left";
+    } else if (
+      isLineParallelToTop(line.startX, line.startY, line.endX, line.endY)
+    ) {
+      line.isHorizontal = true;
+      line.isVertical = false;
+      line.position =
+        line.midpoint[1] <= canvasBaseMeasurements.height / 2
+          ? "top"
+          : "bottom";
+    } else {
+      line.isHorizontal = false;
+      line.isVertical = false;
+      // position for diagonal is just above by default in placeMeasurement
+    }
+  }
+  function getCanvasCoords(e) {
+    let clientX, clientY;
+    if (e?.nativeEvent?.touches?.[0]) {
+      const t = e.nativeEvent.touches[0];
+      clientX = t.clientX;
+      clientY = t.clientY;
+    } else {
+      // Pointer/mouse events land here
+      clientX = e.clientX ?? e?.nativeEvent?.clientX;
+      clientY = e.clientY ?? e?.nativeEvent?.clientY;
+    }
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function updateLineComputedProps(line) {
+    line.midpoint = [
+      (line.startX + line.endX) / 2,
+      (line.startY + line.endY) / 2,
+    ];
+    line.measurement = convertToFeet(
+      calculateDistance([line.startX, line.startY], [line.endX, line.endY])
+    );
+
+    if (isLineParallelToSide(line.startX, line.startY, line.endX, line.endY)) {
+      line.isVertical = true;
+      line.isHorizontal = false;
+      line.position =
+        line.midpoint[0] >= canvasBaseMeasurements.width / 2 ? "right" : "left";
+    } else if (
+      isLineParallelToTop(line.startX, line.startY, line.endX, line.endY)
+    ) {
+      line.isHorizontal = true;
+      line.isVertical = false;
+      line.position =
+        line.midpoint[1] <= canvasBaseMeasurements.height / 2
+          ? "top"
+          : "bottom";
+    } else {
+      line.isVertical = false;
+      line.isHorizontal = false;
+    }
+    return line;
+  }
+
+  // --- Hit tests ---
+
+  // (1) Lines: prefer endpoints, then body
+  function hitTestLine(line, x, y) {
+    const EP = 10; // endpoint radius
+    if (calculateDistance([x, y], [line.startX, line.startY]) <= EP)
+      return { hit: "start" };
+    if (calculateDistance([x, y], [line.endX, line.endY]) <= EP)
+      return { hit: "end" };
+
+    // Near the segment? Reuse your helper:
+    if (
+      isLineNearPoint(line.startX, line.startY, line.endX, line.endY, x, y, 6)
+    )
+      return { hit: "body" };
+
+    return null;
+  }
+
+  // (2) Downspout: near the center mark or inside the elbow box
+  function hitTestDownspout(ds, x, y) {
+    // Near the "X" center
+    const r = gridSize; // lenient
+    if (calculateDistance([x, y], [ds.startX, ds.startY]) <= r) return true;
+
+    // Inside the elbow sequence box (same numbers you draw with)
+    const boxX = ds.startX + 5;
+    const boxY = ds.startY + 5;
+    const boxW = 60;
+    const boxH = 20;
+    if (x >= boxX && x <= boxX + boxW && y >= boxY && y <= boxY + boxH) {
+      return true;
+    }
+    return false;
+  }
+
+  // (3) Annotation: inside its text box
+  function hitTestAnnotation(note, x, y) {
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.font = "1000 12px Arial";
+    // You draw annotation text centered at startX,startY
+    const text = note.note || "";
+    const textWidth = ctx.measureText(text).width;
+    const paddingX = 6;
+    const paddingY = 4;
+    // Approx height of 12px font:
+    const textHeight = 12;
+
+    const x1 = note.startX - textWidth / 2 - paddingX;
+    const y1 = note.startY - textHeight - paddingY; // above baseline
+    const w = textWidth + paddingX * 2;
+    const h = textHeight + paddingY * 2;
+
+    return x >= x1 && x <= x1 + w && y >= y1 && y <= y1 + h;
+  }
+
+  // Utility: mark one selected, others not
+  function selectIndex(i) {
+    setLines((prev) => prev.map((l, idx) => ({ ...l, isSelected: idx === i })));
+    setSelectedIndex(i);
+  }
+
+  // OPTIONAL: bring selected element to front for consistent layering
+  function bringToFront(i) {
+    setLines((prev) => {
+      const next = [...prev];
+      const [picked] = next.splice(i, 1);
+      next.push(picked);
+      // Update selectedIndex to the new position (end)
+      setSelectedIndex(next.length - 1);
+      return next.map((l, idx) => ({
+        ...l,
+        isSelected: idx === next.length - 1,
+      }));
+    });
+  }
 
   /* ------------------------------------------------------------------------------------ */
   /*                            tightly coupled grid functions                            */
@@ -221,6 +432,7 @@ const Diagram = ({
   function addNote(note) {
     console.log(note);
     const formattedNote = {
+      id: newId(),
       startX: noteCoordinates[0],
       startY: noteCoordinates[1],
       endX: noteCoordinates[0],
@@ -250,6 +462,7 @@ const Diagram = ({
     console.log(currentDownspout);
 
     const formattedDownspout = {
+      id: newId(),
       startX: downspoutCoordinates[0],
       startY: downspoutCoordinates[1],
       endX: downspoutCoordinates[0],
@@ -283,7 +496,7 @@ const Diagram = ({
   /*                               event listeners                                        */
   /* ------------------------------------------------------------------------------------ */
 
-  function handleMouseDown(e) {
+  /* function handleMouseDown(e) {
     if (isDownspoutModalOpen) return;
 
     let offsetX, offsetY;
@@ -322,7 +535,25 @@ const Diagram = ({
       setActiveModal("note");
       console.log("make a note");
     } else if (tool === "select") {
-      console.log("Selecting mode active");
+      if (tool === "select" && selectedLine?._id) {
+        if (
+          calculateDistance(
+            [offsetX, offsetY],
+            [selectedLine.startX, selectedLine.startY]
+          ) < 10
+        ) {
+          setDraggingEndpoint("start");
+        } else if (
+          calculateDistance(
+            [offsetX, offsetY],
+            [selectedLine.endX, selectedLine.endY]
+          ) < 10
+        ) {
+          setDraggingEndpoint("end");
+        } else {
+          setDraggingEndpoint(null);
+        }
+      }
 
       const updatedLines = lines.map((line) => ({
         ...line,
@@ -355,11 +586,8 @@ const Diagram = ({
         );
         console.log(foundLine);
         setSelectedLine(foundLine);
-        setActiveModal("selectedLine");
-        console.log("Selected line:", foundLine);
       } else {
         console.log("No line found near click");
-        setSelectedLine({});
       }
     } else {
       setCurrentLine({
@@ -375,10 +603,215 @@ const Diagram = ({
       setIsDrawing(true);
     }
   }
-
-  function handleMouseMove(e) {
+ */
+  /* function handleMouseDown(e) {
     if (isDownspoutModalOpen) return;
-    if (!isDrawing || tool === "downspout" || tool === "select") return;
+
+    let offsetX, offsetY;
+    let foundLine = null;
+
+    if (e.nativeEvent?.touches) {
+      const touch = e.nativeEvent.touches[0];
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      offsetX = touch.clientX - rect.left;
+      offsetY = touch.clientY - rect.top;
+    } else if (e.nativeEvent) {
+      offsetX = e.nativeEvent.offsetX;
+      offsetY = e.nativeEvent.offsetY;
+    } else {
+      console.error("Mouse event missing nativeEvent offsets");
+      return;
+    }
+
+    const snappedX = snapNumberToGrid(offsetX);
+    const snappedY = snapNumberToGrid(offsetY);
+
+    // Tool: Downspout
+    if (tool === "downspout") {
+      setDownspoutCoordinates([snappedX, snappedY]);
+      setIsDownspoutModalOpen(true);
+      setActiveModal("downspout");
+      return;
+    }
+
+    // Tool: Note
+    if (tool === "note") {
+      setNoteCoordinates([snappedX, snappedY]);
+      setActiveModal("note");
+      return;
+    }
+
+    // Tool: Select
+    if (tool === "select") {
+      // 1) If a line is already selected, check if user clicked an endpoint to start resizing
+      if (selectedLineId) {
+        const line = lines.find((l) => l.id === selectedLineId);
+        if (line) {
+          if (
+            calculateDistance([offsetX, offsetY], [line.startX, line.startY]) <
+            10
+          ) {
+            setDraggingEndpoint("start");
+            return; // begin resize
+          }
+          if (
+            calculateDistance([offsetX, offsetY], [line.endX, line.endY]) < 10
+          ) {
+            setDraggingEndpoint("end");
+            return; // begin resize
+          }
+        }
+      }
+
+      // 2) Otherwise, try to select a line by clicking near it
+      const updatedLines = lines.map((line) => ({
+        ...line,
+        isSelected: false,
+      }));
+      updatedLines.forEach((line) => {
+        if (
+          isLineNearPoint(
+            line.startX,
+            line.startY,
+            line.endX,
+            line.endY,
+            snappedX,
+            snappedY,
+            5
+          )
+        ) {
+          foundLine = { ...line, isSelected: true };
+        }
+      });
+
+      if (foundLine) {
+        setLines(
+          updatedLines.map((line) =>
+            line.id === foundLine.id ? foundLine : line
+          )
+        );
+        setSelectedLineId(foundLine.id);
+      } else {
+        // Clicked empty space: clear selection
+        setSelectedLineId(null);
+        setLines(updatedLines);
+      }
+      return;
+    }
+
+    // Tool: (default) draw
+    setCurrentLine({
+      startX: snappedX,
+      startY: snappedY,
+      endX: snappedX,
+      endY: snappedY,
+      isVertical: false,
+      isHorizontal: false,
+      isSelected: false,
+      color: "black",
+    });
+    setIsDrawing(true);
+  }
+ */
+  function handleMouseDown(e) {
+    if (isDownspoutModalOpen) return;
+
+    const { x, y } = getCanvasCoords(e);
+    const snappedX = snapNumberToGrid(x);
+    const snappedY = snapNumberToGrid(y);
+
+    // 3A) TOOL: downspout → start the modal
+    if (tool === "downspout") {
+      setDownspoutCoordinates([snappedX, snappedY]);
+      setIsDownspoutModalOpen(true);
+      setActiveModal("downspout");
+      return;
+    }
+
+    // 3B) TOOL: note → open modal to add a note
+    if (tool === "note") {
+      setNoteCoordinates([snappedX, snappedY]);
+      setActiveModal("note");
+      return;
+    }
+
+    // 3C) TOOL: select → hit test from top-most
+    if (tool === "select") {
+      // Try hit-testing in reverse draw order (topmost first)
+      let hitIndex = null;
+      let dragMode = "none";
+      let end = null;
+
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const el = lines[i];
+
+        if (el.isNote) {
+          if (hitTestAnnotation(el, x, y)) {
+            hitIndex = i;
+            dragMode = "move";
+            break;
+          }
+        } else if (el.isDownspout) {
+          if (hitTestDownspout(el, x, y)) {
+            hitIndex = i;
+            dragMode = "move";
+            break;
+          }
+        } else {
+          // It's a line
+          const hit = hitTestLine(el, x, y);
+          if (hit) {
+            hitIndex = i;
+            if (hit.hit === "start" || hit.hit === "end") {
+              dragMode = "drag-end";
+              end = hit.hit; // "start" | "end"
+            } else {
+              dragMode = "move"; // drag the whole line
+            }
+            break;
+          }
+        }
+      }
+
+      if (hitIndex !== null) {
+        // Select & (optionally) bring to front
+        // selectIndex(hitIndex);
+        bringToFront(hitIndex); // use this if you want "selected is on top"
+
+        setDragging({
+          mode: dragMode,
+          end: end ?? null,
+          lastX: x,
+          lastY: y,
+        });
+        return;
+      }
+
+      // If nothing hit, clear selection
+      setLines((prev) => prev.map((l) => ({ ...l, isSelected: false })));
+      setSelectedIndex(null);
+      setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
+      return;
+    }
+
+    // 3D) Default tool (draw a new line)
+    setCurrentLine({
+      startX: snappedX,
+      startY: snappedY,
+      endX: snappedX,
+      endY: snappedY,
+      isVertical: false,
+      isHorizontal: false,
+      isSelected: false,
+      color: "black",
+    });
+    setIsDrawing(true);
+  }
+
+  /* function handleMouseMove(e) {
+    if (isDownspoutModalOpen) return;
+    if ((!isDrawing || tool === "downspout") && tool !== "select") return;
 
     let offsetX, offsetY;
     if (e.nativeEvent?.touches) {
@@ -393,7 +826,42 @@ const Diagram = ({
       offsetX = e.nativeEvent?.offsetX;
       offsetY = e.nativeEvent?.offsetY;
     }
+    if (tool === "select" && draggingEndpoint && selectedLine) {
+      const updatedLine = { ...selectedLine };
 
+      if (draggingEndpoint === "start") {
+        updatedLine.startX = snapNumberToGrid(offsetX);
+        updatedLine.startY = snapNumberToGrid(offsetY);
+      } else if (draggingEndpoint === "end") {
+        updatedLine.endX = snapNumberToGrid(offsetX);
+        updatedLine.endY = snapNumberToGrid(offsetY);
+      }
+
+      // Recalculate midpoint + measurement
+      updatedLine.midpoint = [
+        (updatedLine.startX + updatedLine.endX) / 2,
+        (updatedLine.startY + updatedLine.endY) / 2,
+      ];
+      updatedLine.measurement = convertToFeet(
+        calculateDistance(
+          [updatedLine.startX, updatedLine.startY],
+          [updatedLine.endX, updatedLine.endY]
+        )
+      );
+
+      setLines((prev) =>
+        prev.map((line) =>
+          line.startX === selectedLine.startX &&
+          line.startY === selectedLine.startY &&
+          line.endX === selectedLine.endX &&
+          line.endY === selectedLine.endY
+            ? updatedLine
+            : line
+        )
+      );
+      setSelectedLine(updatedLine);
+      return; // exit so it doesn’t fall back to normal draw logic
+    }
     if (
       isLineParallelToSide(
         currentLine.startX,
@@ -427,9 +895,200 @@ const Diagram = ({
     let pt2 = [currentLine.endX, currentLine.endY];
     setLineLength(convertToFeet(calculateDistance(pt1, pt2)));
   }
+ */
+  /*   function handleMouseMove(e) {
+    if (isDownspoutModalOpen) return;
+
+    let offsetX, offsetY;
+    if (e.nativeEvent?.touches) {
+      const touch = e.nativeEvent?.touches[0];
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      offsetX = touch.clientX - rect.left;
+      offsetY = touch.clientY - rect.top;
+    } else {
+      offsetX = e.nativeEvent?.offsetX;
+      offsetY = e.nativeEvent?.offsetY;
+    }
+
+    const snappedX = snapNumberToGrid(offsetX);
+    const snappedY = snapNumberToGrid(offsetY);
+
+    // === RESIZE MODE (select tool + dragging an endpoint) ===
+    if (tool === "select" && draggingEndpoint && selectedLineId) {
+      setLines((prev) =>
+        prev.map((line) => {
+          if (line.id !== selectedLineId) return line;
+          const updated = { ...line };
+          if (draggingEndpoint === "start") {
+            updated.startX = snappedX;
+            updated.startY = snappedY;
+          } else {
+            updated.endX = snappedX;
+            updated.endY = snappedY;
+          }
+          recalcGeometry(updated);
+          return updated;
+        })
+      );
+      return; // don’t fall into draw logic
+    }
+
+    // === HOVER FEEDBACK IN SELECT MODE (optional cursor) ===
+    if (tool === "select" && selectedLineId) {
+      const canvas = canvasRef.current;
+      const line = lines.find((l) => l.id === selectedLineId);
+      if (line) {
+        const nearStart =
+          calculateDistance([offsetX, offsetY], [line.startX, line.startY]) <
+          10;
+        const nearEnd =
+          calculateDistance([offsetX, offsetY], [line.endX, line.endY]) < 10;
+        canvas.style.cursor = nearStart || nearEnd ? "pointer" : "default";
+      }
+    }
+
+    // === DRAW MODE ===
+    if (
+      !isDrawing ||
+      tool === "downspout" ||
+      tool === "select" ||
+      tool === "note"
+    )
+      return;
+
+    // snap and colorize the preview line
+    const nextLine = {
+      ...currentLine,
+      endX: snappedX,
+      endY: snappedY,
+      color:
+        isLineParallelToSide(
+          currentLine.startX,
+          currentLine.startY,
+          snappedX,
+          snappedY
+        ) ||
+        isLineParallelToTop(
+          currentLine.startX,
+          currentLine.startY,
+          snappedX,
+          snappedY
+        )
+          ? "#14c414"
+          : "black",
+    };
+    setCurrentLine(nextLine);
+
+    // live length preview
+    const pt1 = [nextLine.startX, nextLine.startY];
+    const pt2 = [nextLine.endX, nextLine.endY];
+    setLineLength(convertToFeet(calculateDistance(pt1, pt2)));
+  } */
+  function handleMouseMove(e) {
+    if (isDownspoutModalOpen) return;
+
+    const { x, y } = getCanvasCoords(e);
+    const snappedX = snapNumberToGrid(x);
+    const snappedY = snapNumberToGrid(y);
+
+    // 4A) SELECT mode: dragging something?
+    if (
+      tool === "select" &&
+      dragging.mode !== "none" &&
+      selectedIndex !== null
+    ) {
+      const dx = x - dragging.lastX;
+      const dy = y - dragging.lastY;
+
+      setLines((prev) => {
+        const next = [...prev];
+        const el = next[selectedIndex];
+
+        if (!el) return prev;
+
+        if (el.isNote) {
+          // Move note anchor
+          el.startX += dx;
+          el.startY += dy;
+          el.endX = el.startX;
+          el.endY = el.startY;
+        } else if (el.isDownspout) {
+          // Move downspout center
+          el.startX += dx;
+          el.startY += dy;
+          el.endX = el.startX;
+          el.endY = el.startY;
+        } else {
+          // It's a line
+          if (dragging.mode === "move") {
+            el.startX += dx;
+            el.startY += dy;
+            el.endX += dx;
+            el.endY += dy;
+          } else if (dragging.mode === "drag-end") {
+            if (dragging.end === "start") {
+              el.startX = snappedX;
+              el.startY = snappedY;
+            } else if (dragging.end === "end") {
+              el.endX = snappedX;
+              el.endY = snappedY;
+            }
+          }
+          updateLineComputedProps(el);
+        }
+
+        return next;
+      });
+
+      setDragging((prev) => ({ ...prev, lastX: x, lastY: y }));
+      return; // don't fall through to draw logic
+    }
+
+    // 4B) DRAW mode: continue your existing line draw logic
+    if (
+      isDrawing &&
+      tool !== "downspout" &&
+      tool !== "select" &&
+      tool !== "note"
+    ) {
+      if (
+        isLineParallelToSide(
+          currentLine.startX,
+          currentLine.startY,
+          currentLine.endX,
+          currentLine.endY
+        ) ||
+        isLineParallelToTop(
+          currentLine.startX,
+          currentLine.startY,
+          currentLine.endX,
+          currentLine.endY
+        )
+      ) {
+        setCurrentLine((prevLine) => ({
+          ...prevLine,
+          endX: snappedX,
+          endY: snappedY,
+          color: "#14c414",
+        }));
+      } else {
+        setCurrentLine((prevLine) => ({
+          ...prevLine,
+          endX: snappedX,
+          endY: snappedY,
+          color: "black",
+        }));
+      }
+
+      const pt1 = [currentLine.startX, currentLine.startY];
+      const pt2 = [snappedX, snappedY];
+      setLineLength(convertToFeet(calculateDistance(pt1, pt2)));
+    }
+  }
 
   // Stop drawing on mouseup
-  function handleMouseUp(e) {
+  /*   function handleMouseUp(e) {
     if (isDownspoutModalOpen) return;
     const currentProduct = filteredProducts?.find(
       (product) => product.name === tool
@@ -448,6 +1107,11 @@ const Diagram = ({
       return;
     }
 
+    if (tool === "select") {
+      setDraggingEndpoint(null);
+      return;
+    }
+
     if (e.nativeEvent?.touches) {
       let offsetX, offsetY;
       const touch = e.nativeEvent?.touches[0];
@@ -463,7 +1127,6 @@ const Diagram = ({
       (currentLine.startY + currentLine.endY) / 2,
     ];
     currentLine.measurement = lineLength;
-    console.log(currentLine, currentProduct);
 
     if (isDrawing) {
       if (
@@ -504,6 +1167,7 @@ const Diagram = ({
       currentLine.color = currentProduct?.colorCode;
       const updatedLine = { ...currentLine };
       updatedLine.currentProduct = currentProduct;
+      updatedLine.id = newId();
 
       if (
         currentLine.startX === currentLine.endX &&
@@ -515,6 +1179,87 @@ const Diagram = ({
       }
     }
 
+    setIsDrawing(false);
+    setLineLength(0);
+  }
+ */
+  /* function handleMouseUp(e) {
+    if (isDownspoutModalOpen) return;
+
+    // Finish resizing in select mode
+    if (tool === "select") {
+      setDraggingEndpoint(null);
+      return;
+    }
+
+    if (tool === "note" || tool === "downspout") return;
+
+    // Commit the newly drawn line
+    if (isDrawing) {
+      const currentProduct = filteredProducts?.find((p) => p.name === tool);
+      const committed = { ...currentLine };
+      recalcGeometry(committed);
+      committed.color = currentProduct?.colorCode;
+      committed.currentProduct = currentProduct;
+      committed.id = newId();
+
+      if (
+        committed.startX !== committed.endX ||
+        committed.startY !== committed.endY
+      ) {
+        setLines((prev) => [...prev, committed]);
+      }
+    }
+
+    setIsDrawing(false);
+    setLineLength(0);
+  }
+ */
+  function handleMouseUp(e) {
+    if (isDownspoutModalOpen) return;
+
+    // Finish any drag in select mode
+    if (tool === "select") {
+      setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
+      setIsDrawing(false);
+      return;
+    }
+
+    // Notes / downspouts don't draw here (handled by modal)
+    if (tool === "note" || tool === "downspout") {
+      setIsDrawing(false);
+      return;
+    }
+
+    // Finish drawing a new line
+    const currentProduct = filteredProducts?.find(
+      (product) => product.name === tool
+    );
+
+    const updated = { ...currentLine };
+    updated.midpoint = [
+      (updated.startX + updated.endX) / 2,
+      (updated.startY + updated.endY) / 2,
+    ];
+    updated.measurement = convertToFeet(
+      calculateDistance(
+        [updated.startX, updated.startY],
+        [updated.endX, updated.endY]
+      )
+    );
+
+    updateLineComputedProps(updated);
+    updated.color = currentProduct?.colorCode;
+    updated.currentProduct = currentProduct;
+
+    // ignore zero-length
+    if (updated.startX === updated.endX && updated.startY === updated.endY) {
+      setIsDrawing(false);
+      setLineLength(0);
+      return;
+    }
+
+    setLines((prev) => [...prev, updated]);
     setIsDrawing(false);
     setLineLength(0);
   }
@@ -562,7 +1307,6 @@ const Diagram = ({
     drawGrid(ctx);
     // Draw each saved line or product using its own properties
     lines.forEach((line) => {
-      line.product = currentLine[0];
       drawLine(ctx, line);
     });
 
@@ -571,7 +1315,6 @@ const Diagram = ({
       drawLine(ctx, currentLine); // Draw current line in-progress
     }
   }
-
   function drawLine(ctx, line) {
     const {
       startX,
@@ -584,21 +1327,46 @@ const Diagram = ({
       isSelected,
       isDownspout,
     } = line;
-    // console.log(product)
-    // Snap coordinates to the grid
+
     const x1 = Math.round(startX / gridSize) * gridSize;
     const y1 = Math.round(startY / gridSize) * gridSize;
     const x2 = Math.round(endX / gridSize) * gridSize;
     const y2 = Math.round(endY / gridSize) * gridSize;
 
+    // --- Annotation ---
     if (line.isNote) {
+      // draw the text (as you already do)
       ctx.font = "1000 12px Arial";
       ctx.fillStyle = "black";
       ctx.textAlign = "center";
       ctx.fillText(line.note, startX, startY);
+
+      // If selected, draw a highlight box around text
+      if (isSelected) {
+        const text = line.note || "";
+        const textWidth = ctx.measureText(text).width;
+        const paddingX = 6;
+        const paddingY = 4;
+        const textHeight = 12;
+
+        const bx = startX - textWidth / 2 - paddingX;
+        const by = startY - textHeight - paddingY;
+        const bw = textWidth + paddingX * 2;
+        const bh = textHeight + paddingY * 2;
+
+        ctx.save();
+        ctx.strokeStyle = "orange";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.restore();
+      }
+      return;
     }
 
+    // --- Downspout ---
     if (isDownspout) {
+      // your "X" shape
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x1 + gridSize / 2.75, y1 + gridSize / 2.75);
@@ -611,8 +1379,9 @@ const Diagram = ({
       ctx.strokeStyle = line.color;
       ctx.stroke();
 
-      const boxX = line.startX + 5;
-      const boxY = line.startY + 5;
+      // elbow box
+      const boxX = startX + 5;
+      const boxY = startY + 5;
       const boxWidth = 60;
       const boxHeight = 20;
 
@@ -626,39 +1395,55 @@ const Diagram = ({
       ctx.fillStyle = "white";
       ctx.font = "10px Arial";
       ctx.textAlign = "center";
+      ctx.fillText(line.elbowSequence, boxX + boxWidth / 2, boxY + 15);
 
-      ctx.fillText(line.elbowSequence, boxX + 30, boxY + 15);
-      ctx.strokeStyle = line.color;
-    } else {
-      // Draw the line
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
+      // selection highlight
       if (isSelected) {
+        ctx.save();
         ctx.strokeStyle = "orange";
-        ctx.fillStyle = "orange";
-      } else {
-        ctx.strokeStyle = color; // Use the line's specific color
-      }
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.closePath();
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(boxX - 4, boxY - 4, boxWidth + 8, boxHeight + 8);
 
-      if (isSelected) {
+        // small handle at the center "X"
+        ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.arc(x1, y1, gridSize / 2, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.moveTo(x2, y2);
-        ctx.arc(x2, y2, gridSize / 2, 0, 2 * Math.PI);
-        ctx.fill();
+        ctx.arc(startX, startY, gridSize * 0.45, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.restore();
       }
+      return;
+    }
 
-      // Place the measurement if available
-      if (midpoint && measurement) {
-        placeMeasurement(line, measurement, midpoint[0], midpoint[1]);
-      }
+    // --- Line (gutter) ---
+    // Draw the segment
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    if (isSelected) {
+      ctx.strokeStyle = "orange";
+      ctx.lineWidth = 2;
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+    }
+    ctx.stroke();
+    ctx.closePath();
+
+    // When selected, always show endpoint handles
+    if (isSelected) {
+      ctx.fillStyle = "orange";
+      ctx.beginPath();
+      ctx.arc(x1, y1, gridSize / 2, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x2, y2, gridSize / 2, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    // measurement
+    if (midpoint && measurement) {
+      placeMeasurement(line, measurement, midpoint[0], midpoint[1]);
     }
   }
 
@@ -678,6 +1463,8 @@ const Diagram = ({
   }
 
   function saveDiagram(saveType) {
+    setSelectedLineId(null);
+
     if (lines.length === 0) {
       closeModal();
       return;
@@ -877,10 +1664,17 @@ const Diagram = ({
         />
         <img
           src={trashIcon}
-          alt="clear diagram"
+          alt="clear or delete"
           className="diagram__icon diagram__trash"
-          onClick={clearCanvas}
+          onClick={() => {
+            if (tool === "select" && selectedIndex !== null) {
+              deleteSelected();
+            } else {
+              clearCanvas();
+            }
+          }}
         />
+
         <img
           src={itemsIcon}
           alt="select product"
@@ -938,11 +1732,6 @@ const Diagram = ({
         setTool={setTool}
         setIsDownspoutModalOpen={setIsDownspoutModalOpen}
         addDownspout={handleAddDownspout}
-      />
-      <SelectedDownspoutModal
-        selectedLine={selectedLine}
-        activeModal={activeModal}
-        setActiveModal={setActiveModal}
       />
       <OverwriteDiagramModal
         activeModal={activeModal}
