@@ -37,8 +37,6 @@ const Diagram = ({
   diagrams,
   setActiveModal,
 }) => {
-  const params = useParams();
-
   const canvasRef = useRef(null);
   // NEW: unified selection + dragging state
   const [selectedIndex, setSelectedIndex] = useState(null); // which element in `lines` is selected
@@ -82,6 +80,10 @@ const Diagram = ({
 
   const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
   const [unfilteredProducts, setUnfilteredProducts] = useState([]);
+
+  useEffect(() => {
+    console.log(diagrams);
+  }, [diagrams]);
   // const selectedLine = lines.find((l) => l.id === selectedLineId); If you still want a selectedLine handy for quick checks:
   useEffect(() => {
     function onKeyDown(e) {
@@ -100,6 +102,10 @@ const Diagram = ({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [tool, selectedIndex]); // depends on current tool + selection
+
+  useEffect(() => {
+    console.log(lines);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -206,6 +212,12 @@ const Diagram = ({
     );
     setSelectedLineId(null);
   }, [tool]);
+
+  // Treat "unknown" as true to avoid accidentally skipping confirmation.
+  // If diagrams is not an array yet (loading), we'll assume there ARE existing diagrams.
+  const diagramsKnown = Array.isArray(diagrams);
+  const hasExistingDiagrams = diagramsKnown ? diagrams.length > 0 : true;
+
   // helper functions
   // ----- Product key helpers -----
   // Pull a stable "product key" for gutter lines.
@@ -227,9 +239,10 @@ const Diagram = ({
 
   const PROFILE_ALIASES = [
     [/k[-\s]?style/i, "K-Style"],
-    [/half[-\s]?round/i, "Half-Round"],
+    [/half[-\s]?round/i, "Half Round"],
     [/straight[-\s]?face|straightface/i, "Straight Face"],
     [/fascia/i, "Fascia"],
+    [/custom/i, "Custom"],
     [/box/i, "Box"],
     [/og\b|o\.?g\.?/i, "OG"],
     [/euro/i, "Euro"],
@@ -1733,6 +1746,45 @@ const Diagram = ({
     // setSelectedProduct(currentProduct)
   }
 
+  function calculateEndCapsAndMiters(data) {
+    const endCaps = {};
+    const miters = {};
+    const customMiters = {};
+    const allAccessories = [endCaps, miters, customMiters];
+
+    console.log(unfilteredProducts);
+    console.log(data.endCapsByProduct);
+    Object.keys(data.endCapsByProduct).forEach((profile) => {
+      console.log(profile + " End Cap");
+      unfilteredProducts.forEach((product) => {
+        if (
+          product.name === `${profile} End Cap` ||
+          (profile === "Custom Profile Gutter" &&
+            product.name.includes("ustom End Cap"))
+        ) {
+          // calculate the end caps
+          endCaps[profile] = {
+            price: product.price,
+            quantity: data.endCapsByProduct[profile],
+            product,
+          };
+          let tempLineData = {
+            isEndCap: true,
+            name: product.name,
+            product: product,
+            price: product.price,
+          };
+
+          setLines([...lines, tempLineData]);
+        }
+      });
+    });
+    // iterate over the .endCapsByProduct property and take each key of that property and search for the corresponding product
+    // do the same thing for the .mitersByProduct property
+    // do something about the mixed miters
+    return allAccessories;
+  }
+
   function saveDiagram(saveType) {
     setSelectedLineId(null);
 
@@ -1742,15 +1794,19 @@ const Diagram = ({
     }
 
     // Check if diagram actually changed
-    const hasChanged =
-      JSON.stringify(lines) !== JSON.stringify(originalDiagram.lines);
 
+    const original = originalDiagram?.lines || [];
+    const hasChanged = JSON.stringify(lines) !== JSON.stringify(original);
     if (!hasChanged) {
-      console.log("No changes detected, not saving.");
       closeModal();
       return;
     }
-    setActiveModal("confirmDiagramOverwrite");
+
+    // Only trigger the confirm modal *here* for overwrite,
+    // or for adds when caller explicitly wanted a confirm.
+    if (saveType !== "add") {
+      setActiveModal("confirmDiagramOverwrite");
+    }
 
     function getBoundingBox(lines, padding = 20) {
       // <-- 🔥 add a default padding value
@@ -1831,6 +1887,7 @@ const Diagram = ({
     let downspoutCentsPrice;
 
     lines.forEach((line) => {
+      // console.log(line);
       if (line.isDownspout) {
         const downspoutPrice = parseFloat(line.price).toFixed(2);
 
@@ -1840,23 +1897,39 @@ const Diagram = ({
       } else {
         price += parseFloat(line.currentProduct.price) * line.measurement;
       }
-      console.log(price);
     });
 
     const analysis = analyzeJoints(lines);
+    const endcapMiterData = {
+      // New per-product/mixed output:
+      endCapsByProduct: analysis.endCapsByProduct,
+      mitersByProduct: analysis.mitersByProduct,
+      mixedMiters: analysis.mixedMiters,
+    };
+
+    console.log(endcapMiterData, "DATA");
+
+    const accessoryData = calculateEndCapsAndMiters(endcapMiterData);
+    console.log(accessoryData);
+    Object.keys(accessoryData[0]).forEach((accessory) => {
+      console.log(accessoryData[0][accessory]);
+      console.log(typeof price);
+      price +=
+        accessoryData[0][accessory].price *
+        accessoryData[0][accessory].quantity;
+      console.log(price);
+    });
 
     const data = {
       lines: [...lines],
       imageData: thumbnailDataUrl,
       totalFootage,
       price: parseFloat(price).toFixed(2),
-      // New per-product/mixed output:
-      endCapsByProduct: analysis.endCapsByProduct,
-      mitersByProduct: analysis.mitersByProduct,
-      mixedMiters: analysis.mixedMiters,
+      accessoryData,
     };
-    console.log(data);
+    console.log(price);
 
+    console.log("data", data);
     function handleAddDiagramToProject() {
       addDiagramToProject(currentProjectId, token, data)
         .then((newDiagramData) => {
@@ -1928,18 +2001,30 @@ const Diagram = ({
         />
         <img
           src={saveIcon}
-          alt="save digram"
+          alt="save diagram"
           className="diagram__icon diagram__save"
           onClick={() => {
+            const original = originalDiagram?.lines || [];
             const hasChanged =
-              JSON.stringify(lines) !== JSON.stringify(originalDiagram.lines);
-            if (!hasChanged) {
-              return;
-            } else {
+              JSON.stringify(lines) !== JSON.stringify(original);
+
+            if (!hasChanged) return;
+
+            // If we are overwriting an existing diagram, always confirm.
+            const isOverwrite = Boolean(selectedDiagram?._id);
+
+            // If adding a brand-new diagram: confirm only when there are existing ones.
+            const mustConfirm = isOverwrite || hasExistingDiagrams;
+
+            if (mustConfirm) {
               setActiveModal("confirmDiagramOverwrite");
+            } else {
+              // First ever diagram for this project: save immediately (no modal)
+              saveDiagram("add");
             }
           }}
         />
+
         <img
           src={trashIcon}
           alt="clear or delete"
@@ -1985,6 +2070,8 @@ const Diagram = ({
           <option value="downspout">Downspout</option>
           <option value="select">Select</option>
           <option value="note">Notation</option>
+          <option value="splashGuard">Splash Guard/Valley Shield</option>
+          <option value="freeLine">Free Line</option>
         </select>
 
         <div className="diagram__line-length-display">

@@ -4,7 +4,7 @@ import { EstimatePDF } from "../EstimatePDF/EstimatePDF";
 import { useEffect, useState } from "react";
 import { BASE_URL } from "../../utils/constants";
 import { getCompanyLogo } from "../../utils/auth";
-import { useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom";
 
 Modal.setAppElement("#root"); // Required for accessibility
 
@@ -36,42 +36,45 @@ const EstimateModal = ({
           overrideName: line.currentProduct?.name || "",
           overridePrice: line.currentProduct?.price || "$0.00",
           overrideQuantity: line.measurement || 0,
-        })),
+        }))
       );
     }
   }, [selectedDiagram]);
 
   const [editableLines, setEditableLines] = useState(
-    selectedDiagram?.lines || [],
+    selectedDiagram?.lines || []
   );
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
 
-    if (token && currentUser._id){
+    if (token && currentUser._id) {
       fetch(`${BASE_URL}users/${currentUser._id}/logo`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          })
-            .then((res) => res.blob())
-            .then((blob) => {
-              return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result); // ✅ use full result, untouched
-                reader.onerror = reject;
-                reader.readAsDataURL(blob); // ✅ will auto-include proper MIME
-              });
-            })
-            .then((base64Image) => {
-              setLogoUrl(base64Image); // no string splitting!
-            })
-            .catch((err) => console.error("Failed to fetch and convert logo:", err));
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+        .then((res) => res.blob())
+        .then((blob) => {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result); // ✅ use full result, untouched
+            reader.onerror = reject;
+            reader.readAsDataURL(blob); // ✅ will auto-include proper MIME
+          });
+        })
+        .then((base64Image) => {
+          setLogoUrl(base64Image); // no string splitting!
+        })
+        .catch((err) =>
+          console.error("Failed to fetch and convert logo:", err)
+        );
+    }
+  }, [activeModal]);
 
-    } 
-    
-    
-      }, [activeModal]);
+  useEffect(() => {
+    console.log(selectedDiagram);
+  }, []);
 
   return (
     <Modal

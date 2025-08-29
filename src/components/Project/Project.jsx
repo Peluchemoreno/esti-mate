@@ -54,10 +54,13 @@ export default function Project({
   useEffect(() => {
     const token = localStorage.getItem("jwt");
 
-    retrieveProjectDiagrams(projectId, token).then((diagrams) => {
-      setDiagramData(diagrams);
-      console.log("diagrams changed: ", diagrams);
-    });
+    retrieveProjectDiagrams(projectId, token)
+      .then((diagrams) => {
+        setDiagramData(diagrams);
+      })
+      .then((data) => {
+        // console.log("heres the data ", data);
+      });
   }, [diagrams]);
 
   useEffect(() => {
@@ -186,7 +189,6 @@ export default function Project({
                     }`}
                     alt="Diagram image"
                     onClick={() => {
-                      console.log(diagram);
                       handleSelectDiagram(diagram);
                     }}
                     style={{

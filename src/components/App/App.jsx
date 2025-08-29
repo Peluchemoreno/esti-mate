@@ -24,7 +24,6 @@ import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
-import Estimates from "../Estimates/Estimates.jsx";
 import {
   updateDiagram,
   createProduct,
@@ -44,9 +43,11 @@ function App() {
   const [originalDiagram, setOriginalDiagram] = useState({});
   const [currentDiagram, setCurrentDiagram] = useState({});
   const [userData, setUserData] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSignInErrorVisible, setIsSignInErrorVisible] = useState(false);
 
   useEffect(() => {
-    console.log(diagrams);
+    // console.log(diagrams);
   }, [diagrams]);
 
   useEffect(() => {
@@ -74,6 +75,7 @@ function App() {
   }, []);
 
   function handleLogin(email, password) {
+    setIsLoading(true);
     signin(email, password)
       .then((data) => {
         const token = data.token;
@@ -83,7 +85,11 @@ function App() {
         });
       })
       .catch((err) => {
+        setIsSignInErrorVisible(true);
         console.error(err);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }
 
@@ -206,11 +212,17 @@ function App() {
                   />
                 }
               />
-              <Route path="estimates" element={<Estimates />} />
             </Route>
             <Route
               path="/signin"
-              element={<Signin handleLogin={handleLogin} />}
+              element={
+                <Signin
+                  handleLogin={handleLogin}
+                  isLoading={isLoading}
+                  isSignInErrorVisible={isSignInErrorVisible}
+                  setIsSignInErrorVisible={setIsSignInErrorVisible}
+                />
+              }
             />
             <Route
               path="/signup"

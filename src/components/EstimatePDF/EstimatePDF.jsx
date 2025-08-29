@@ -32,149 +32,32 @@ function EstimatePDF({
   currentUser,
   logoUrl,
   estimateData,
+  // If callers pass `estimate` instead of `estimateData`, we’ll still work:
+  estimate,
 }) {
   const [token, setToken] = useState("");
   const [itemizedArray, setItemizedArray] = useState([]);
 
+  // Resolve estimate fields regardless of prop name
+  const estimateDataResolved = estimateData || estimate || {};
+
   useEffect(() => {
-    const token = localStorage.getItem("jwt");
-    setToken(token);
+    const t = localStorage.getItem("jwt");
+    setToken(t || "");
   }, []);
 
-  function formatLineItems(lines) {
-    const downspoutItems = [];
-    const nonDownspoutItems = [];
-    const lineItemTable = {};
-    const tempArray = [];
-    let splashBlocks = 0;
-    let miters = 0;
-
-    lines.forEach((line) => {
-      if (line.isDownspout) {
-        downspoutItems.push(line);
-      } else if (line.isNote) {
-        return;
-      } else {
-        nonDownspoutItems.push(line);
-      }
-    });
-
-    for (let i = 0; i < downspoutItems.length; i++) {
-      if (!lineItemTable[downspoutItems[i].downspoutSize]) {
-        lineItemTable[downspoutItems[i].downspoutSize] =
-          downspoutItems[i].measurement;
-      } else {
-        lineItemTable[downspoutItems[i].downspoutSize] +=
-          downspoutItems[i].measurement;
-      }
-    }
-
-    for (let i = 0; i < nonDownspoutItems.length; i++) {
-      if (lineItemTable[nonDownspoutItems[i].currentProduct?.name]) {
-        lineItemTable[nonDownspoutItems[i].currentProduct.name] +=
-          nonDownspoutItems[i].measurement;
-      } else {
-        lineItemTable[nonDownspoutItems[i].currentProduct?.name] =
-          nonDownspoutItems[i].measurement;
-      }
-    }
-
-    Object.keys(lineItemTable).forEach((item) => {
-      console.log(item);
-      if (item === undefined) {
-        console.log(item, "is undefined");
-        return;
-      } else {
-        const formattedItem = {
-          item: selectedDiagram.lines.filter((line) => {
-            if (line.isDownspout) {
-              return line.downspoutSize === item;
-            } else {
-              return line.currentProduct?.name === item;
-            }
-          })[0].currentProduct?.name,
-          quantity: lineItemTable[item],
-          price: selectedDiagram.lines.filter((line) => {
-            if (line.isDownspout) {
-              return line.downspoutSize === item;
-            } else {
-              return line.currentProduct?.name === item;
-            }
-          })[0].currentProduct.price,
-          description: selectedDiagram.lines.filter((line) => {
-            if (!line.isDownspout) {
-              return line.currentProduct?.name === item;
-            } else {
-              return line.downspoutSize === item;
-            }
-          })[0].currentProduct.description,
-        };
-        tempArray.push(formattedItem);
-      }
-    });
-
-    setItemizedArray(tempArray);
-    console.log(downspoutItems);
-    return downspoutItems;
-  }
-
-  function injectMiscItem({ name, quantity, price, description }) {
-    const formattedMiscItem = {
-      item: name,
-      quantity: quantity,
-      price: price,
-      description,
-    };
-
-    setItemizedArray([...itemizedArray, formattedMiscItem]);
-  }
-
-  function countSharedPoints({ lines }) {
-    const pointMap = new Map();
-    let sharedPointCount = 0;
-
-    // Helper: format a point as a string
-    function pointKey(x, y) {
-      return `${x},${y}`;
-    }
-
-    // First pass: record how many times each point appears
-    lines.forEach((line) => {
-      if (!line.isDownspout) {
-        const start = pointKey(line.startX, line.startY);
-        const end = pointKey(line.endX, line.endY);
-
-        pointMap.set(start, (pointMap.get(start) || 0) + 1);
-        pointMap.set(end, (pointMap.get(end) || 0) + 1);
-      }
-    });
-
-    // Second pass: count points that are shared
-    pointMap.forEach((count) => {
-      if (count > 1) {
-        sharedPointCount += 1;
-      }
-    });
-
-    return sharedPointCount;
-  }
+  // ===== Helpers =====
 
   function getMiscItems(diagram) {
     let splashBlocks = 0;
     let rainBarrelConnections = 0;
     let undergroundDrainageConnections = 0;
 
-    selectedDiagram.lines.forEach((line) => {
+    (diagram?.lines || []).forEach((line) => {
       if (line.isDownspout) {
-        if (line.splashBlock) {
-          splashBlocks++;
-        }
-        if (line.rainBarrel) {
-          rainBarrelConnections++;
-        }
-        if (line.undergroundDrainage) {
-          undergroundDrainageConnections++;
-        }
+        if (line.splashBlock) splashBlocks++;
+        if (line.rainBarrel) rainBarrelConnections++;
+        if (line.undergroundDrainage) undergroundDrainageConnections++;
       }
     });
 
@@ -185,21 +68,150 @@ function EstimatePDF({
     };
   }
 
-  useEffect(() => {
-    formatLineItems(selectedDiagram.lines);
-  }, [activeModal]);
+  // Build a single combined list of items from lines + accessoryData
+  function buildItemized(diagram) {
+    if (!diagram) return [];
+    const { lines = [], accessoryData = [] } = diagram;
+    const items = [];
 
+    // 1) Aggregate line items (downspouts + non-downspouts)
+    const table = {}; // key => { quantity, refLine }
+    lines.forEach((line) => {
+      if (!line || line.isNote) return;
+
+      let key;
+      let refLine = line;
+
+      if (line.isDownspout) {
+        // Group by size/type for downspouts
+        const sizeLabel = line.downspoutSize || "";
+        key = `Downspout ${sizeLabel}`.trim();
+      } else {
+        key = line.currentProduct?.name || "Unknown Item";
+      }
+
+      const qty = Number(line.measurement || 0);
+      if (table[key]) {
+        table[key] = {
+          quantity: table[key].quantity + qty,
+          refLine: table[key].refLine,
+        };
+      } else {
+        table[key] = { quantity: qty, refLine };
+      }
+    });
+
+    Object.entries(table).forEach(([key, { quantity, refLine }]) => {
+      const price =
+        Number(refLine?.currentProduct?.price ?? refLine?.price ?? 0) || 0;
+
+      const description =
+        (refLine?.currentProduct?.description ??
+          (refLine?.isDownspout
+            ? `Downspout ${refLine.downspoutSize || ""}`.trim()
+            : "")) ||
+        "";
+
+      items.push({
+        item: key,
+        quantity,
+        price,
+        description,
+      });
+    });
+
+    // 2) Accessory data: [0]=endcaps, [1]=miters, [2]=custom miters
+    const endCapsObj = accessoryData?.[0] || {};
+    const mitersObj = accessoryData?.[1] || {};
+    const customObj = accessoryData?.[2] || {};
+
+    function pushAccessoryObject(obj) {
+      if (!obj) return;
+      Object.keys(obj).forEach((profile) => {
+        const row = obj[profile];
+        if (!row) return;
+
+        const name = row.product?.name || row.name || `${profile} accessory`;
+
+        const price = Number(row.price ?? row.product?.price ?? 0) || 0;
+
+        const quantity = Number(row.quantity || 0);
+        const description = row.product?.description || "";
+
+        if (quantity > 0) {
+          items.push({
+            item: name,
+            quantity,
+            price,
+            description,
+          });
+        }
+      });
+    }
+
+    pushAccessoryObject(endCapsObj);
+    pushAccessoryObject(mitersObj);
+    pushAccessoryObject(customObj);
+
+    // 3) Optional: add misc counters as separate rows (with price=0 by default)
+    const misc = getMiscItems(diagram);
+    if (misc.splashBlocks > 0) {
+      items.push({
+        item: "Splash Block",
+        quantity: misc.splashBlocks,
+        price: 0,
+        description: "",
+      });
+    }
+    if (misc.rainBarrelConnections > 0) {
+      items.push({
+        item: "Rain Barrel Connection",
+        quantity: misc.rainBarrelConnections,
+        price: 0,
+        description: "",
+      });
+    }
+    if (misc.undergroundDrainageConnections > 0) {
+      items.push({
+        item: "Underground Drainage Connection",
+        quantity: misc.undergroundDrainageConnections,
+        price: 0,
+        description: "",
+      });
+    }
+
+    return items;
+  }
+
+  // (Optional) If you add ad-hoc items elsewhere, use functional setter to avoid races
+  function injectMiscItem({ name, quantity, price, description = "" }) {
+    const formattedMiscItem = {
+      item: name,
+      quantity,
+      price,
+      description,
+    };
+    setItemizedArray((prev) => [...prev, formattedMiscItem]);
+  }
+
+  // Rebuild the items when the diagram (or modal trigger) changes
+  useEffect(() => {
+    const next = buildItemized(selectedDiagram);
+    setItemizedArray(next);
+  }, [selectedDiagram, activeModal]);
+
+  // ===== Render =====
   return (
     <Document>
       <Page style={styles.page}>
         <Text style={styles.header}>ESTIMATE</Text>
-        <View style={{}}>
+        <View>
           <View style={[styles.section, { paddingBottom: 40 }]}>
             <Text style={[styles.text, styles.bold, { textAlign: "right" }]}>
-              {project.siteName}
+              {project?.siteName}
             </Text>
             <Text style={[styles.text, { textAlign: "right" }]}>
-              {project.siteAddress}
+              {project?.siteAddress}
             </Text>
             <Text
               style={[
@@ -207,7 +219,7 @@ function EstimatePDF({
                 { textAlign: "right", color: "#444", marginTop: 10 },
               ]}
             >
-              {project.sitePrimaryPhone}
+              {project?.sitePrimaryPhone}
             </Text>
           </View>
           <View
@@ -228,14 +240,14 @@ function EstimatePDF({
                 BILL TO
               </Text>
               <Text style={[styles.smallerText, styles.bold]}>
-                {project.billingName}
+                {project?.billingName}
               </Text>
               <Text style={[styles.smallerText, { marginBottom: 10 }]}>
-                {project.billingAddress}
+                {project?.billingAddress}
               </Text>
               <Text style={[styles.smallerText, { color: "#444" }]}></Text>
               <Text style={[styles.smallerText, { color: "#444" }]}>
-                {project.billingPrimaryPhone}
+                {project?.billingPrimaryPhone}
               </Text>
             </View>
             <View
@@ -246,12 +258,7 @@ function EstimatePDF({
                 width: 250,
               }}
             >
-              <View
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                }}
-              >
+              <View style={{ display: "flex", flexDirection: "row" }}>
                 <Text
                   style={[
                     styles.smallerText,
@@ -262,7 +269,7 @@ function EstimatePDF({
                   Estimate Number:
                 </Text>
                 <Text style={[styles.smallerText]}>
-                  {estimateData.estimateNumber}
+                  {estimateDataResolved.estimateNumber}
                 </Text>
               </View>
               <View style={{ display: "flex", flexDirection: "row" }}>
@@ -277,12 +284,7 @@ function EstimatePDF({
                 </Text>
                 <Text style={[styles.smallerText]}>{getCurrentDate()}</Text>
               </View>
-              <View
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                }}
-              >
+              <View style={{ display: "flex", flexDirection: "row" }}>
                 <Text
                   style={[
                     styles.smallerText,
@@ -293,7 +295,7 @@ function EstimatePDF({
                   Payment Due:
                 </Text>
                 <Text style={[styles.smallerText]}>
-                  {estimateData.paymentDue}
+                  {estimateDataResolved.paymentDue}
                 </Text>
               </View>
               <View
@@ -318,7 +320,11 @@ function EstimatePDF({
                 <Text
                   style={[styles.smallerText, styles.bold, { paddingTop: 2 }]}
                 >
-                  ${selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
+                  $
+                  {selectedDiagram?.price !== undefined &&
+                  selectedDiagram?.price !== null
+                    ? String(selectedDiagram.price)
+                    : "N/A"}
                 </Text>
               </View>
             </View>
@@ -340,7 +346,6 @@ function EstimatePDF({
                 alignItems: "center",
               }}
             >
-              {/* <Text>Company Logo Here</Text> */}
               {logoUrl && (
                 <Image
                   src={logoUrl}
@@ -354,6 +359,8 @@ function EstimatePDF({
             </View>
           </View>
         </View>
+
+        {/* Items Header */}
         <View>
           <View
             style={{
@@ -391,59 +398,62 @@ function EstimatePDF({
             </Text>
           </View>
 
+          {/* Item Rows */}
           {itemizedArray.map((line, index) => {
+            const qty = Number(line.quantity || 0);
+            const price = Number(line.price || 0);
+            const amount = (qty * price).toFixed(2);
             return (
-              <>
-                <View
-                  key={index}
+              <View
+                key={index}
+                style={{
+                  flexDirection: "row",
+                  padding: 8,
+                  borderBottom: "1px solid #eee",
+                  alignItems: "center",
+                }}
+              >
+                <View style={{ width: "60%" }}>
+                  <Text style={{ fontSize: "12px", fontWeight: "bold" }}>
+                    {line.item || "N/A"}
+                  </Text>
+                  {line.description ? (
+                    <Text
+                      style={{
+                        fontSize: "10px",
+                        color: "#555",
+                        marginTop: 2,
+                      }}
+                    >
+                      {line.description}
+                    </Text>
+                  ) : null}
+                </View>
+
+                <Text
                   style={{
-                    flexDirection: "row",
-                    padding: 8,
-                    borderBottom: "1px solid #eee",
-                    alignItems: "center",
+                    width: "20%",
+                    textAlign: "center",
+                    fontSize: "12px",
                   }}
                 >
-                  <View style={{ width: "60%" }}>
-                    <Text style={{ fontSize: "12px", fontWeight: "bold" }}>
-                      {line.item || "N/A"}
-                    </Text>
-                    {line.description && (
-                      <Text
-                        style={{
-                          fontSize: "10px",
-                          color: "#555",
-                          marginTop: 2,
-                        }}
-                      >
-                        {line.description}
-                      </Text>
-                    )}
-                  </View>
-
-                  <Text
-                    style={{
-                      width: "20%",
-                      textAlign: "center",
-                      fontSize: "12px",
-                    }}
-                  >
-                    {line.quantity || "-"}
-                  </Text>
-                  <Text
-                    style={{
-                      width: "20%",
-                      textAlign: "right",
-                      fontSize: "12px",
-                    }}
-                  >
-                    ${(line.price * line.quantity).toFixed(2)}
-                  </Text>
-                </View>
-              </>
+                  {qty || "-"}
+                </Text>
+                <Text
+                  style={{
+                    width: "20%",
+                    textAlign: "right",
+                    fontSize: "12px",
+                  }}
+                >
+                  ${amount}
+                </Text>
+              </View>
             );
           })}
         </View>
-        <View></View>
+
+        {/* Footer Total */}
         <View
           style={{
             position: "absolute",
@@ -462,10 +472,15 @@ function EstimatePDF({
             Total Amount Due (USD):
           </Text>
           <Text style={{ fontSize: 12, fontWeight: "bold" }}>
-            ${selectedDiagram?.price ? `${selectedDiagram.price}` : "N/A"}
+            $
+            {selectedDiagram?.price !== undefined &&
+            selectedDiagram?.price !== null
+              ? String(selectedDiagram.price)
+              : "N/A"}
           </Text>
         </View>
       </Page>
+
       <Page>
         <Text>This is some sample page text</Text>
       </Page>
@@ -473,17 +488,30 @@ function EstimatePDF({
   );
 }
 
-function EstimatePDFButton({ estimate }) {
+function EstimatePDFButton({
+  estimate,
+  selectedDiagram,
+  project,
+  logoUrl,
+  estimateData,
+  activeModal,
+  currentUser,
+  fileName = "estimate.pdf",
+}) {
   return (
     <PDFDownloadLink
       document={
         <EstimatePDF
           estimate={estimate}
+          estimateData={estimateData}
           selectedDiagram={selectedDiagram}
           project={project}
+          logoUrl={logoUrl}
+          activeModal={activeModal}
+          currentUser={currentUser}
         />
       }
-      fileName="estimate.pdf"
+      fileName={fileName}
     >
       {({ loading }) => (loading ? "Generating PDF..." : "Download Estimate")}
     </PDFDownloadLink>
