@@ -16,13 +16,16 @@ export function deleteProject(projectId, token) {
 }
 
 export function deleteDiagram(projectId, diagramId, token) {
-  return fetch(BASE_URL + `dashboard/projects/${projectId}/${diagramId}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  })
+  return fetch(
+    BASE_URL + `dashboard/projects/${projectId}/${diagramId}/delete`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  )
     .then(processServerResponse)
     .then((response) => {
       return response;
@@ -31,6 +34,21 @@ export function deleteDiagram(projectId, diagramId, token) {
 
 export function addDiagramToProject(projectId, token, data) {
   return fetch(BASE_URL + `dashboard/projects/${projectId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  })
+    .then(processServerResponse)
+    .then((response) => {
+      return response;
+    });
+}
+
+export function updateDiagram(projectId, diagramId, token, data) {
+  return fetch(BASE_URL + `dashboard/projects/${projectId}/${diagramId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -117,7 +135,7 @@ export function createProduct(productData, token) {
 }
 
 export function updateProduct(productData, token) {
-  return fetch(BASE_URL + "dashboard/products", {
+  return fetch(BASE_URL + `dashboard/products/${productData.productId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

@@ -24,8 +24,11 @@ import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
-import Estimates from "../Estimates/Estimates.jsx";
-import { addDiagramToProject, createProduct } from "../../utils/api";
+import {
+  updateDiagram,
+  createProduct,
+  addDiagramToProject,
+} from "../../utils/api";
 
 function App() {
   const [currentUser, setCurrentUser] = useState({});
@@ -40,6 +43,12 @@ function App() {
   const [originalDiagram, setOriginalDiagram] = useState({});
   const [currentDiagram, setCurrentDiagram] = useState({});
   const [userData, setUserData] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSignInErrorVisible, setIsSignInErrorVisible] = useState(false);
+
+  useEffect(() => {
+    // console.log(diagrams);
+  }, [diagrams]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -66,6 +75,7 @@ function App() {
   }, []);
 
   function handleLogin(email, password) {
+    setIsLoading(true);
     signin(email, password)
       .then((data) => {
         const token = data.token;
@@ -75,7 +85,11 @@ function App() {
         });
       })
       .catch((err) => {
+        setIsSignInErrorVisible(true);
         console.error(err);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }
 
@@ -91,7 +105,7 @@ function App() {
             "creating item: ",
             item,
             " with description: ",
-            item.description,
+            item.description
           );
           createProduct(item, token);
         });
@@ -122,7 +136,6 @@ function App() {
   }
 
   function handlePassDiagramData(data) {
-    console.log(data);
     setDiagrams((prevDiagrams) => [...prevDiagrams, data]);
   }
 
@@ -199,11 +212,17 @@ function App() {
                   />
                 }
               />
-              <Route path="estimates" element={<Estimates />} />
             </Route>
             <Route
               path="/signin"
-              element={<Signin handleLogin={handleLogin} />}
+              element={
+                <Signin
+                  handleLogin={handleLogin}
+                  isLoading={isLoading}
+                  isSignInErrorVisible={isSignInErrorVisible}
+                  setIsSignInErrorVisible={setIsSignInErrorVisible}
+                />
+              }
             />
             <Route
               path="/signup"
@@ -231,6 +250,7 @@ function App() {
                 closeModal={closeModal}
                 isMobile={isMobile}
                 currentProjectId={currentProjectId}
+                updateDiagram={updateDiagram}
                 addDiagramToProject={addDiagramToProject}
                 setDiagrams={setDiagrams}
                 handlePassDiagramData={handlePassDiagramData}
@@ -238,6 +258,7 @@ function App() {
                 originalDiagram={originalDiagram}
                 setSelectedDiagram={setCurrentDiagram}
                 setActiveModal={setActiveModal}
+                diagrams={diagrams}
               />
             </>
           ) : (
@@ -246,6 +267,7 @@ function App() {
               closeModal={closeModal}
               isMobile={isMobile}
               currentProjectId={currentProjectId}
+              updateDiagram={updateDiagram}
               addDiagramToProject={addDiagramToProject}
               setDiagrams={setDiagrams}
               handlePassDiagramData={handlePassDiagramData}
@@ -253,6 +275,7 @@ function App() {
               setSelectedDiagram={setCurrentDiagram}
               originalDiagram={originalDiagram}
               setActiveModal={setActiveModal}
+              diagrams={diagrams}
             />
           )}
         </>

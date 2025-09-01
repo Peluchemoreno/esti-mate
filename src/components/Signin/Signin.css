@@ -39,6 +39,7 @@
   margin-top: 20px;
   cursor: pointer;
   transition: background-color .2s ease;
+  min-height: 40px;
 }
 
 .signin__button:hover {
@@ -74,6 +75,57 @@
 .signin__link:hover {
   color: var(--blue-secondary);
 }
+
+.signin__loader {
+  background-color: transparent;
+}
+
+.signin__preloader-container {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.ball {
+  height: 10px;
+  width: 10px;
+  background-color: white;
+  border-radius: 50%;
+}
+
+.ball1 {
+  animation: fade 750ms linear alternate infinite;
+}
+
+.ball2 {
+  animation: fade 750ms linear 250ms alternate infinite;
+}
+
+.ball3 {
+  animation: fade 750ms linear 500ms alternate infinite;
+}
+
+.ball4 {
+  animation: fade 750ms linear 750ms alternate infinite;
+}
+
+.signin__error-message {
+  color: red;
+  margin: 0;
+}
+
+
+
+
+@keyframes fade {
+ 0% {
+  opacity: 0;
+ } 
+ 100% {
+  opacity: 1; }
+}
+
+
 
 @media screen and (max-width: 650px) {
   .signin-form {

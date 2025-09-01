@@ -14,10 +14,11 @@ export default function DownspoutModal({
   const [splashBlock, setSplashBlock] = useState(false);
   const [rainBarrel, setRainBarrel] = useState(false);
   const [undergroundDrainage, setUndergroundDrainage] = useState(false);
-  const [downspoutSize, setDownspoutSize] = useState("2x3");
+  const [downspoutSize, setDownspoutSize] = useState("2x3 corrugated");
   const [downspoutMaterial, setDownspoutMaterial] = useState("aluminum");
   const [footageIsValid, setFootageIsValid] = useState(null);
   const [elbowSequenceIsValid, setElbowSequenceIsValid] = useState(true);
+  const [profile, setProfile] = useState("");
 
   useEffect(() => {
     clearInputs();
@@ -25,6 +26,8 @@ export default function DownspoutModal({
 
   function handleDownspoutSubmit(e) {
     e.preventDefault();
+    console.log(downspoutSize);
+    console.log(downspoutSize.split(" "));
     const downspoutData = {
       elbowSequence,
       totalFootage,
@@ -33,7 +36,12 @@ export default function DownspoutModal({
       undergroundDrainage,
       downspoutSize,
       downspoutMaterial,
+      profile:
+        downspoutSize.split(" ").length > 1
+          ? downspoutSize.split(" ")[1]
+          : downspoutSize.split(" ")[0],
     };
+    console.log(downspoutData);
     addDownspout(downspoutData);
 
     setActiveModal("diagram");
@@ -51,6 +59,7 @@ export default function DownspoutModal({
   }
 
   function handleChangeDownspoutSize(e) {
+    console.log(e.target.value);
     setDownspoutSize(e.target.value);
   }
 
@@ -64,7 +73,7 @@ export default function DownspoutModal({
     setSplashBlock(false);
     setRainBarrel(false);
     setUndergroundDrainage(false);
-    setDownspoutSize("2x3");
+    setDownspoutSize("2x3 corrugated");
     setDownspoutMaterial("aluminum");
   }
 
@@ -163,84 +172,6 @@ export default function DownspoutModal({
               value={totalFootage}
             />
           </label>
-          <label className="downspout__radio-label">
-            Splash Block
-            <div className="downspout-modal__div">
-              <input
-                name="splashBlock"
-                type="radio"
-                value="yes"
-                onChange={() => {
-                  setSplashBlock(true);
-                }}
-                checked={splashBlock === true}
-              />{" "}
-              Yes
-              <input
-                className="downspout-modal__second-radio"
-                name="splashBlock"
-                type="radio"
-                value="no"
-                onChange={() => {
-                  setSplashBlock(false);
-                }}
-                checked={splashBlock === false}
-              />
-              No
-            </div>
-          </label>
-          <label className="downspout__radio-label">
-            Rain Barrel
-            <div className="downspout-modal__div">
-              <input
-                type="radio"
-                name="rainBarrel"
-                value="yes"
-                onChange={() => {
-                  setRainBarrel(true);
-                }}
-                checked={rainBarrel === true}
-              />
-              Yes
-              <input
-                className="downspout-modal__second-radio"
-                type="radio"
-                name="rainBarrel"
-                value="no"
-                onChange={() => {
-                  setRainBarrel(false);
-                }}
-                checked={rainBarrel === false}
-              />
-              No
-            </div>
-          </label>
-          <label className="downspout__radio-label">
-            Underground Drainage
-            <div className="downspout-modal__div">
-              <input
-                type="radio"
-                name="undergroundDrainage"
-                value="yes"
-                onChange={() => {
-                  setUndergroundDrainage(true);
-                }}
-                checked={undergroundDrainage === true}
-              />{" "}
-              Yes
-              <input
-                className="downspout-modal__second-radio"
-                type="radio"
-                name="undergroundDrainage"
-                value="no"
-                onChange={() => {
-                  setUndergroundDrainage(false);
-                }}
-                checked={undergroundDrainage === false}
-              />{" "}
-              No
-            </div>
-          </label>
           <label className="downspout__drop-label">
             Downspout Size
             <select
@@ -248,14 +179,17 @@ export default function DownspoutModal({
               onChange={handleChangeDownspoutSize}
               value={downspoutSize}
             >
-              <option className="input__drop" value="2x3">
-                2x3
+              <option className="input__drop" value="2x3 corrugated">
+                2x3 Corrugated
               </option>
-              <option className="input__drop" value="3x4">
-                3x4
+              <option className="input__drop" value="3x4 corrugated">
+                3x4 Corrugated
               </option>
-              <option className="input__drop" value="4x5">
-                4x5
+              <option className="input__drop" value="3x4 smooth">
+                3x4 Smooth
+              </option>
+              <option className="input__drop" value="4x5 corrugated">
+                4x5 Corrugated
               </option>
               <option className="input__drop" value='3" Round'>
                 3" Round

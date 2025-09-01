@@ -1,16 +1,31 @@
 import "./Signin.css";
 import logo from "../../assets/estimate-nobackground-blue.png";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
-export default function Signin({ handleLogin }) {
+export default function Signin({
+  handleLogin,
+  isLoading,
+  isSignInErrorVisible,
+  setIsSignInErrorVisible,
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const navigator = useNavigate();
 
   useEffect(() => {
     resetInputs();
   }, []);
 
+  useEffect(() => {
+    setIsSignInErrorVisible(false);
+  }, []);
+
+  useEffect(() => {
+    if (localStorage.jwt) {
+      navigator("/dashboard/projects");
+    }
+  });
   function resetInputs() {
     setEmail("");
     setPassword("");
@@ -62,8 +77,23 @@ export default function Signin({ handleLogin }) {
               onChange={handlePasswordChange}
             />
           </label>
+          {isSignInErrorVisible && (
+            <p className="signin__error-message">
+              Incorrect email or password.
+            </p>
+          )}
+
           <button type="submit" className="signin__button">
-            Login
+            {isLoading ? (
+              <div className="signin__preloader-container">
+                <div className="ball ball1"></div>
+                <div className="ball ball2"></div>
+                <div className="ball ball3"></div>
+                <div className="ball ball4"></div>
+              </div>
+            ) : (
+              "Login"
+            )}
           </button>
         </form>
         <p className="signin__signup-or-forgot-password">
