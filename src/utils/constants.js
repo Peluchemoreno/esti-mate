@@ -380,8 +380,9 @@ export const starterItems = [
 ];
 // when testing the app on the network and not on local host run the second baseUrl
 // export const BASE_URL = "http://127.0.0.1:4000/";
-export const BASE_URL = "http://192.168.1.14:4000/";
+// export const BASE_URL = "http://192.168.1.14:4000/";
 // export const BASE_URL = "http://192.168.1.192:4000/";
+export const BASE_URL = "https://api.tryestimate.io/";
 
 export function processServerResponse(res) {
   if (res.ok) {
