@@ -46,6 +46,10 @@ function EstimatePDF({
     setToken(t || "");
   }, []);
 
+  useEffect(() => {
+    console.log(selectedDiagram);
+  }, [selectedDiagram]);
+
   // ===== Helpers =====
 
   function getMiscItems(diagram) {
@@ -68,10 +72,17 @@ function EstimatePDF({
     };
   }
 
+  function capitalizeWords(str) {
+    return str
+      .split(" ")
+      .map((w) => capitalizeFirstLetter(w))
+      .join(" ");
+  }
+
   // Build a single combined list of items from lines + accessoryData
   function buildItemized(diagram) {
     if (!diagram) return [];
-    const { lines = [], accessoryData = [] } = diagram;
+    const { lines = [], accessoryData = [], unfilteredProducts = [] } = diagram;
     const items = [];
 
     // 1) Aggregate line items (downspouts + non-downspouts)
@@ -128,23 +139,38 @@ function EstimatePDF({
     function pushAccessoryObject(obj) {
       if (!obj) return;
       Object.keys(obj).forEach((profile) => {
-        const row = obj[profile];
-        if (!row) return;
-
-        const name = row.product?.name || row.name || `${profile} accessory`;
-
-        const price = Number(row.price ?? row.product?.price ?? 0) || 0;
-
-        const quantity = Number(row.quantity || 0);
-        const description = row.product?.description || "";
-
-        if (quantity > 0) {
-          items.push({
-            item: name,
-            quantity,
-            price,
-            description,
+        const val = obj[profile];
+        if (Array.isArray(val)) {
+          val.forEach((row) => {
+            if (!row) return;
+            const name =
+              row.product?.name || row.name || `${profile} accessory`;
+            const price = Number(row.price ?? row.product?.price ?? 0) || 0;
+            const quantity = Number(row.quantity || 0);
+            const description = row.product?.description || "";
+            if (quantity > 0) {
+              items.push({
+                item: name,
+                quantity,
+                price,
+                description,
+              });
+            }
           });
+        } else if (val && typeof val === "object") {
+          // Single object (like end cap)
+          const name = val.product?.name || val.name || `${profile} accessory`;
+          const price = Number(val.price ?? val.product?.price ?? 0) || 0;
+          const quantity = Number(val.quantity || 0);
+          const description = val.product?.description || "";
+          if (quantity > 0) {
+            items.push({
+              item: name,
+              quantity,
+              price,
+              description,
+            });
+          }
         }
       });
     }
@@ -153,7 +179,60 @@ function EstimatePDF({
     pushAccessoryObject(mitersObj);
     pushAccessoryObject(customObj);
 
-    // 3) Optional: add misc counters as separate rows (with price=0 by default)
+    // 3) Downspout parts (A, B, C, 2", 4", 6" offsets) by type and material
+    const downspoutPartsTable = {}; // { "type|material": { A: n, B: n, ... } }
+
+    lines.forEach((line) => {
+      if (!line.isDownspout) return;
+      const type = line.downspoutSize || "";
+      const material = line.downspoutMaterial || "aluminum";
+      const key = `${type}|${material}`;
+      if (!downspoutPartsTable[key]) {
+        downspoutPartsTable[key] = { A: 0, B: 0, C: 0, 2: 0, 4: 0, 6: 0 };
+      }
+      // Count each letter/number in the elbow sequence
+      (line.elbowSequence || "")
+        .toUpperCase()
+        .split("")
+        .forEach((char) => {
+          if (["A", "B", "C", "2", "4", "6"].includes(char)) {
+            downspoutPartsTable[key][char]++;
+          }
+        });
+    });
+
+    Object.entries(downspoutPartsTable).forEach(([key, parts]) => {
+      const [type, material] = key.split("|");
+      Object.entries(parts).forEach(([part, qty]) => {
+        if (qty > 0) {
+          // Find the matching product for this part, type, and material
+          const product = unfilteredProducts.find((p) => {
+            // Example: '2x3 A Elbow', '3x4 2" Offset', etc.
+            const partName = ["2", "4", "6"].includes(part)
+              ? `${type} ${part}" Offset`
+              : `${type} ${part} Elbow`;
+            return (
+              p.name.toLowerCase() === partName.toLowerCase() &&
+              (p.name.toLowerCase().includes(material.toLowerCase()) ||
+                p.description?.toLowerCase().includes(material.toLowerCase()))
+            );
+          });
+          const price = Number(product?.price ?? 0) || 0;
+          items.push({
+            item: `${type} ${material} ${
+              ["2", "4", "6"].includes(part)
+                ? part + '" Offset'
+                : part + " Elbow"
+            }`,
+            quantity: qty,
+            price,
+            description: product?.description || "",
+          });
+        }
+      });
+    });
+
+    // 4) Optional: add misc counters as separate rows (with price=0 by default)
     const misc = getMiscItems(diagram);
     if (misc.splashBlocks > 0) {
       items.push({
@@ -415,19 +494,17 @@ function EstimatePDF({
               >
                 <View style={{ width: "60%" }}>
                   <Text style={{ fontSize: "12px", fontWeight: "bold" }}>
-                    {line.item || "N/A"}
+                    {capitalizeWords(line.item || "N/A")}
                   </Text>
-                  {line.description ? (
-                    <Text
-                      style={{
-                        fontSize: "10px",
-                        color: "#555",
-                        marginTop: 2,
-                      }}
-                    >
-                      {line.description}
-                    </Text>
-                  ) : null}
+                  <Text
+                    style={{
+                      fontSize: "10px",
+                      color: "#555",
+                      marginTop: 2,
+                    }}
+                  >
+                    {line.description || ""}
+                  </Text>
                 </View>
 
                 <Text

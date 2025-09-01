@@ -16,6 +16,7 @@ import DownspoutModal from "../DownspoutModal/DownspoutModal";
 import { capitalizeFirstLetter } from "../../utils/constants";
 import { OverwriteDiagramModal } from "../OverwriteDiagramModal/OverwriteDiagramModal";
 import { AnnotationModal } from "../AnnotationModal/AnnotationModal";
+import { formControlClasses } from "@mui/material";
 
 // Stable id generator for lines (works in all browsers)
 const newId = () =>
@@ -105,7 +106,7 @@ const Diagram = ({
 
   useEffect(() => {
     console.log(lines);
-  }, []);
+  }, [lines]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1751,11 +1752,9 @@ const Diagram = ({
     const miters = {};
     const customMiters = {};
     const allAccessories = [endCaps, miters, customMiters];
+    console.log(data.mitersByProduct);
 
-    console.log(unfilteredProducts);
-    console.log(data.endCapsByProduct);
     Object.keys(data.endCapsByProduct).forEach((profile) => {
-      console.log(profile + " End Cap");
       unfilteredProducts.forEach((product) => {
         if (
           product.name === `${profile} End Cap` ||
@@ -1779,8 +1778,129 @@ const Diagram = ({
         }
       });
     });
+
+    /* Object.keys(data.mitersByProduct).forEach((profile) => {
+      let stripMiters = 0;
+      let bayMiters = 0;
+      let customMiters = 0;
+
+      console.log(`${profile} Miter`);
+      console.log(data.mitersByProduct[profile]);
+      stripMiters += data.mitersByProduct[profile].inside90;
+      stripMiters += data.mitersByProduct[profile].outside90;
+      bayMiters += data.mitersByProduct[profile].bay135;
+      customMiters = data.mitersByProduct[profile].custom.length;
+
+      unfilteredProducts.forEach((product) => {
+        
+      });
+    }); */
+    Object.keys(data.mitersByProduct).forEach((profile) => {
+      const miterCounts = data.mitersByProduct[profile];
+
+      // Combine inside and outside 90s as "Strip Miters"
+      const stripMitersQty =
+        (miterCounts.inside90 || 0) + (miterCounts.outside90 || 0);
+      const bayMitersQty = miterCounts.bay135 || 0;
+      const customMitersArr = miterCounts.custom || [];
+
+      // Find matching products for each miter type
+      if (stripMitersQty > 0) {
+        const stripMiterProduct = unfilteredProducts.find(
+          (product) =>
+            product.name.toLowerCase().includes(profile.toLowerCase()) &&
+            product.name.toLowerCase().includes("strip miter")
+        );
+        console.log(stripMiterProduct);
+        if (stripMiterProduct) {
+          miters[profile] = miters[profile] || [];
+          miters[profile].push({
+            type: "Strip Miter",
+            price: stripMiterProduct.price,
+            quantity: stripMitersQty,
+            product: stripMiterProduct,
+          });
+          setLines((prev) => [
+            ...prev,
+            {
+              isMiter: true,
+              name: stripMiterProduct.name,
+              product: stripMiterProduct,
+              price: stripMiterProduct.price,
+              quantity: stripMitersQty,
+              miterType: "Strip Miter",
+            },
+          ]);
+        }
+      }
+
+      if (bayMitersQty > 0) {
+        const bayMiterProduct = unfilteredProducts.find(
+          (product) =>
+            product.name.toLowerCase().includes(profile.toLowerCase()) &&
+            product.name.toLowerCase().includes("bay") &&
+            product.name.toLowerCase().includes("miter")
+        );
+        console.log(bayMiterProduct);
+        if (bayMiterProduct) {
+          miters[profile] = miters[profile] || [];
+          miters[profile].push({
+            type: "Bay 135 Miter",
+            price: bayMiterProduct.price,
+            quantity: bayMitersQty,
+            product: bayMiterProduct,
+          });
+          setLines((prev) => [
+            ...prev,
+            {
+              isMiter: true,
+              name: bayMiterProduct.name,
+              product: bayMiterProduct,
+              price: bayMiterProduct.price,
+              quantity: bayMitersQty,
+              miterType: "Bay 135 Miter",
+            },
+          ]);
+        }
+      }
+
+      // Handle custom miters
+      customMitersArr.forEach(({ angle, count }) => {
+        if (count > 0) {
+          const customMiterProduct = unfilteredProducts.find(
+            (product) =>
+              product.name.toLowerCase().includes(profile.toLowerCase()) &&
+              product.name.toLowerCase().includes("custom") &&
+              product.name.toLowerCase().includes("miter")
+          );
+          console.log(customMiterProduct);
+          if (customMiterProduct) {
+            customMiters[profile] = customMiters[profile] || [];
+            customMiters[profile].push({
+              type: `Custom Miter (${angle}°)`,
+              price: customMiterProduct.price,
+              quantity: count,
+              product: customMiterProduct,
+              angle,
+            });
+            setLines((prev) => [
+              ...prev,
+              {
+                isMiter: true,
+                name: customMiterProduct.name,
+                product: customMiterProduct,
+                price: customMiterProduct.price,
+                quantity: count,
+                miterType: `Custom Miter (${angle}°)`,
+              },
+            ]);
+          }
+        }
+      });
+    });
     // iterate over the .endCapsByProduct property and take each key of that property and search for the corresponding product
     // do the same thing for the .mitersByProduct property
+
     // do something about the mixed miters
     return allAccessories;
   }
@@ -1910,15 +2030,16 @@ const Diagram = ({
     console.log(endcapMiterData, "DATA");
 
     const accessoryData = calculateEndCapsAndMiters(endcapMiterData);
-    console.log(accessoryData);
+
     Object.keys(accessoryData[0]).forEach((accessory) => {
       console.log(accessoryData[0][accessory]);
       console.log(typeof price);
       price +=
         accessoryData[0][accessory].price *
         accessoryData[0][accessory].quantity;
-      console.log(price);
     });
+
+    console.log(accessoryData);
 
     const data = {
       lines: [...lines],
@@ -1927,7 +2048,6 @@ const Diagram = ({
       price: parseFloat(price).toFixed(2),
       accessoryData,
     };
-    console.log(price);
 
     console.log("data", data);
     function handleAddDiagramToProject() {

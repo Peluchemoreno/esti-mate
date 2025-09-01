@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BASE_URL } from "../../utils/constants";
 import { getCompanyLogo } from "../../utils/auth";
 import { useNavigate } from "react-router-dom";
+import { use } from "react";
 
 Modal.setAppElement("#root"); // Required for accessibility
 
@@ -25,7 +26,6 @@ const EstimateModal = ({
     paymentDue: "Upon completion",
     notes: "",
   });
-
   const navigator = useNavigate();
 
   useEffect(() => {
@@ -71,10 +71,6 @@ const EstimateModal = ({
         );
     }
   }, [activeModal]);
-
-  useEffect(() => {
-    console.log(selectedDiagram);
-  }, []);
 
   return (
     <Modal
