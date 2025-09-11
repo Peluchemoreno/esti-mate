@@ -25,6 +25,24 @@ export default function Project({
   currentUser,
 }) {
   // console.log(setMobileDiagramActive)
+
+  const formatDateTime = (value, tz = "America/Chicago") => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d
+      .toLocaleString("en-US", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      })
+      .replace(",", ""); // "09/09/2025 21:07:23"
+  };
+
   const { data: allProducts = [] } = useProducts();
   const allUnfilteredProducts = allProducts;
   const params = useParams();
@@ -180,19 +198,15 @@ export default function Project({
           </div>
           <div className="project__diagram-container">
             {diagramData.length > 0 ? (
-              diagramData.map((diagram, index) => (
-                <div className="project__drawing-container">
+              diagramData.map((diagram) => (
+                <div className="project__drawing-container" key={diagram._id}>
                   <div
-                    key={index}
                     className={`${
                       diagram._id === selectedDiagram._id
                         ? "project__drawing_selected"
                         : "project__drawing"
                     }`}
-                    alt="Diagram image"
-                    onClick={() => {
-                      handleSelectDiagram(diagram);
-                    }}
+                    onClick={() => handleSelectDiagram(diagram)}
                     style={{
                       width: "200px",
                       height: "200px",
@@ -202,9 +216,9 @@ export default function Project({
                       backgroundRepeat: "no-repeat",
                       borderRadius: "5px",
                     }}
-                  ></div>
+                  />
                   <p className="diagram__details">
-                    {diagram.createdAt.replace(",", " |")}
+                    {formatDateTime(diagram.createdAt)}
                   </p>
                 </div>
               ))
