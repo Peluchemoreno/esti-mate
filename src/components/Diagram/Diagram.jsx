@@ -10,14 +10,14 @@ import {
   calculateDistance,
   isLineNearPoint,
 } from "../../utils/constants";
-import { getProducts } from "../../utils/api";
 import { useParams } from "react-router-dom";
 import DownspoutModal from "../DownspoutModal/DownspoutModal";
 import { capitalizeFirstLetter } from "../../utils/constants";
 import { OverwriteDiagramModal } from "../OverwriteDiagramModal/OverwriteDiagramModal";
 import { AnnotationModal } from "../AnnotationModal/AnnotationModal";
 import { formControlClasses } from "@mui/material";
-
+import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
+import { useProducts, useGutterProducts } from "../../hooks/useProducts";
 // Stable id generator for lines (works in all browsers)
 const newId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
@@ -38,6 +38,10 @@ const Diagram = ({
   diagrams,
   setActiveModal,
 }) => {
+  const { data: allProducts = [] } = useProducts();
+  const { data: gutterProducts = [], isLoading, error } = useGutterProducts();
+  const filteredProducts = gutterProducts.filter((p) => p.type === "gutter");
+  const unfilteredProducts = allProducts;
   const canvasRef = useRef(null);
   // NEW: unified selection + dragging state
   const [selectedIndex, setSelectedIndex] = useState(null); // which element in `lines` is selected
@@ -47,6 +51,10 @@ const Diagram = ({
     lastX: 0,
     lastY: 0,
   });
+
+  useEffect(() => {
+    console.log(filteredProducts);
+  }, []);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [gridSize, setGridSize] = useState(10);
@@ -74,17 +82,11 @@ const Diagram = ({
   const [productsVisible, setProductsVisible] = useState(true);
   const [tool, setTool] = useState("");
   const [unitPerTools, setUnitPerTools] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   // const [selectedLine, setSelectedLine] = useState({});
   const [selectedLineId, setSelectedLineId] = useState(null);
 
   const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
-  const [unfilteredProducts, setUnfilteredProducts] = useState([]);
 
-  useEffect(() => {
-    console.log(diagrams);
-  }, [diagrams]);
   // const selectedLine = lines.find((l) => l.id === selectedLineId); If you still want a selectedLine handy for quick checks:
   useEffect(() => {
     function onKeyDown(e) {
@@ -105,13 +107,15 @@ const Diagram = ({
   }, [tool, selectedIndex]); // depends on current tool + selection
 
   useEffect(() => {
-    console.log(lines);
-  }, [lines]);
+    if (!tool && filteredProducts.length > 0) {
+      setTool(filteredProducts[0].name);
+    }
+  }, [filteredProducts, tool]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas?.getContext("2d");
-
     if (!ctx) return;
 
     // setTimeout(() => {
@@ -134,42 +138,6 @@ const Diagram = ({
   }, [selectedDiagram]);
 
   useEffect(() => {
-    console.log(draggingEndpoint);
-  }, [draggingEndpoint]);
-
-  useEffect(() => {
-    const token = localStorage.getItem("jwt");
-    getProducts(token).then((data) => {
-      if (data.products) {
-        const products = data.products;
-        setUnfilteredProducts(products);
-
-        const filteredProducts = products.filter((product) => {
-          if (product.type === "gutter") {
-            return product;
-          }
-        });
-        setFilteredProducts(filteredProducts);
-
-        // Important: only set default tool once when products load
-
-        if (filteredProducts.length > 0 && tool === "") {
-          setTool(filteredProducts[0].name);
-        }
-      } else {
-        setProducts([
-          {
-            name: "Test",
-            visual: "#badbad",
-            price: "0.00",
-            quantity: "length/feet",
-          },
-        ]);
-      }
-    });
-  }, [activeModal]); // <-- empty dependency array: only runs once on first mount
-
-  useEffect(() => {
     if (activeModal !== "selectedLine") {
       setLines((prevLines) =>
         prevLines.map((line) => ({ ...line, isSelected: false }))
@@ -180,7 +148,9 @@ const Diagram = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
 
@@ -201,7 +171,9 @@ const Diagram = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
     drawAllLines(ctx); // Redraw all lines whenever currentLine or lines change
   }, [currentLine, lines, isDrawing]);
@@ -220,6 +192,65 @@ const Diagram = ({
   const hasExistingDiagrams = diagramsKnown ? diagrams.length > 0 : true;
 
   // helper functions
+  // --- Elbow helpers ---
+
+  // Pulls a normalized size key (e.g. "2x3", "3x4") from a downspout line.
+  // Prefers explicit `line.downspoutSize`, falls back to `line.currentProduct.name`.
+  function getDownspoutSizeKey(line) {
+    // Common cases: "2x3", '2" x 3"', '2 x 3', etc.
+    const fromProp = (line.downspoutSize || "").toString().trim();
+    const rxSize = /(\d+)\s*[xX]\s*(\d+)/; // 2x3, 3x4
+    const rxQuoted = /(\d+)\s*"?\s*[xX]\s*(\d+)\s*"?/; // 2" x 3", etc.
+
+    let m = fromProp.match(rxSize) || fromProp.match(rxQuoted);
+    if (!m && line.currentProduct?.name) {
+      const n = line.currentProduct.name;
+      m = n.match(rxSize) || n.match(rxQuoted);
+    }
+    if (!m) return "unknown";
+    return `${m[1]}x${m[2]}`;
+  }
+
+  // Optional: translate elbow letters to friendly names per size.
+  // If you want A/B/C to become “2x3 A Elbow” etc., keep this; otherwise you can skip.
+  const ELBOW_LABELS = {
+    // These are examples; change to match your own naming/SKU language.
+    "2x3": {
+      A: "2x3 A Elbow",
+      B: "2x3 B Elbow",
+      C: "2x3 C Elbow",
+      D: "2x3 D Elbow",
+    },
+    "3x4": {
+      A: "3x4 A Elbow",
+      B: "3x4 B Elbow",
+      C: "3x4 C Elbow",
+      D: "3x4 D Elbow",
+    },
+    // Add more sizes if you use them…
+  };
+
+  // Given a single elbowSequence string, return a counts object like { A: 2, B: 1 }
+  function countElbowsInSequence(seq) {
+    const counts = {};
+    if (!seq) return counts;
+
+    for (const ch of String(seq)) {
+      if (!/[a-z]/i.test(ch)) continue; // ignore digits or misc chars
+      const code = ch.toUpperCase(); // 'a' -> 'A'
+      counts[code] = (counts[code] || 0) + 1;
+    }
+    return counts;
+  }
+
+  // Merge counts: {A:2} + {A:1,B:3} => {A:3,B:3}
+  function mergeCounts(into, add) {
+    for (const [k, v] of Object.entries(add || {})) {
+      into[k] = (into[k] || 0) + v;
+    }
+    return into;
+  }
+
   // ----- Product key helpers -----
   // Pull a stable "product key" for gutter lines.
   // Default: use the product's name. Customize if you want to extract just the size/profile.
@@ -715,7 +746,6 @@ const Diagram = ({
   }
 
   function addNote(note) {
-    console.log(note);
     const formattedNote = {
       id: newId(),
       startX: noteCoordinates[0],
@@ -732,9 +762,7 @@ const Diagram = ({
   }
 
   function handleAddDownspout(downspoutData) {
-    console.log(downspoutData);
-    const currentDownspout = unfilteredProducts.filter((product) => {
-      console.log(product.name);
+    const currentDownspout = unfilteredProducts.find((product) => {
       return (
         product.name.includes("ownspout") &&
         product.name
@@ -744,8 +772,6 @@ const Diagram = ({
       );
     });
 
-    console.log(currentDownspout);
-
     const formattedDownspout = {
       id: newId(),
       startX: downspoutCoordinates[0],
@@ -754,21 +780,19 @@ const Diagram = ({
       endY: downspoutCoordinates[1],
       midpoint: null,
       measurement: parseInt(downspoutData.totalFootage),
-      color: currentDownspout[0].visual,
+      color: currentDownspout.visual,
       isSelected: false,
       isDownspout: true,
-      price: currentDownspout[0].price,
+      price: currentDownspout.price,
       elbowSequence: downspoutData.elbowSequence,
       downspoutSize: downspoutData.downspoutSize,
       currentProduct: {
-        price: currentDownspout[0].price,
+        price: currentDownspout.price,
         name:
           downspoutData.downspoutSize.split(" ")[0] +
-          ` ${capitalizeFirstLetter(
-            downspoutData.downspoutSize.split(" ")[1]
-          )}` +
+          downspoutData.downspoutSize.split(" ")[1] +
           " Downspout",
-        description: currentDownspout[0].description,
+        description: currentDownspout.description,
       },
       rainBarrel: downspoutData.rainBarrel,
       splashBlock: downspoutData.splashBlock,
@@ -1534,9 +1558,10 @@ const Diagram = ({
     );
 
     updateLineComputedProps(updated);
-    updated.color = currentProduct?.colorCode;
     updated.currentProduct = currentProduct;
-
+    const productColor =
+      currentProduct?.colorCode ?? currentProduct?.visual ?? "black";
+    updated.color = productColor;
     // ignore zero-length
     if (updated.startX === updated.endX && updated.startY === updated.endY) {
       setIsDrawing(false);
@@ -1582,7 +1607,6 @@ const Diagram = ({
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Clear canvas
     drawGrid(ctx);
     diagram?.forEach((line) => {
-      console.log(line);
       drawLine(ctx, line);
     });
   }
@@ -1747,162 +1771,154 @@ const Diagram = ({
     // setSelectedProduct(currentProduct)
   }
 
-  function calculateEndCapsAndMiters(data) {
-    const endCaps = {};
-    const miters = {};
-    const customMiters = {};
-    const allAccessories = [endCaps, miters, customMiters];
-    console.log(data.mitersByProduct);
+  function calculateEndCapsAndMiters(analysisData) {
+    // analysisData shape:
+    // {
+    //   endCapsByProduct: { '<profileKey>': qty, ... },
+    //   mitersByProduct: {
+    //     '<profileKey>': { inside90, outside90, bay135, custom: [{angle,count}, ...] },
+    //     ...
+    //   },
+    //   mixedMiters: { ... } // (not priced here unless you want to handle it)
+    // }
 
-    Object.keys(data.endCapsByProduct).forEach((profile) => {
-      unfilteredProducts.forEach((product) => {
-        if (
-          product.name === `${profile} End Cap` ||
-          (profile === "Custom Profile Gutter" &&
-            product.name.includes("ustom End Cap"))
-        ) {
-          // calculate the end caps
-          endCaps[profile] = {
-            price: product.price,
-            quantity: data.endCapsByProduct[profile],
-            product,
-          };
-          let tempLineData = {
-            isEndCap: true,
-            name: product.name,
-            product: product,
-            price: product.price,
-          };
+    const endCaps = {}; // { profileKey: { price, quantity, product } }
+    const miters = {}; // { profileKey: [ { type, price, quantity, product }, ... ] }
+    const customMiters = {}; // { profileKey: [ { type, price, quantity, product, angle }, ... ] }
 
-          setLines([...lines, tempLineData]);
-        }
-      });
+    const accessoryLineItems = []; // <- flat list for PDF: {name, quantity, price, product, meta}
+
+    // ---- helpers ----
+    const caseIncludes = (hay, needle) =>
+      String(hay).toLowerCase().includes(String(needle).toLowerCase());
+
+    function pushLineItem({ name, quantity, price, product, meta }) {
+      accessoryLineItems.push({ name, quantity, price, product, meta });
+    }
+
+    // -------- End Caps --------
+    Object.keys(analysisData.endCapsByProduct || {}).forEach((profileKey) => {
+      const qty = analysisData.endCapsByProduct[profileKey] || 0;
+      if (!qty) return;
+
+      // Find a matching product: "<profileKey> ... End Cap"
+      // e.g. profileKey: 5" K-Style → product name like `5" K-Style End Cap Left/Right`
+      const match = unfilteredProducts.find(
+        (p) =>
+          caseIncludes(p.name, profileKey) && caseIncludes(p.name, "end cap")
+      );
+
+      if (match) {
+        endCaps[profileKey] = {
+          price: match.price,
+          quantity: qty,
+          product: match,
+        };
+
+        pushLineItem({
+          name: match.name,
+          quantity: qty,
+          price: match.price,
+          product: match,
+          meta: { kind: "endCap", profileKey },
+        });
+      }
     });
 
-    /* Object.keys(data.mitersByProduct).forEach((profile) => {
-      let stripMiters = 0;
-      let bayMiters = 0;
-      let customMiters = 0;
+    // -------- Miters (per product) --------
+    Object.keys(analysisData.mitersByProduct || {}).forEach((profileKey) => {
+      const m = analysisData.mitersByProduct[profileKey] || {};
+      const stripQty = (m.inside90 || 0) + (m.outside90 || 0);
+      const bayQty = m.bay135 || 0;
 
-      console.log(`${profile} Miter`);
-      console.log(data.mitersByProduct[profile]);
-      stripMiters += data.mitersByProduct[profile].inside90;
-      stripMiters += data.mitersByProduct[profile].outside90;
-      bayMiters += data.mitersByProduct[profile].bay135;
-      customMiters = data.mitersByProduct[profile].custom.length;
-
-      unfilteredProducts.forEach((product) => {
-        
-      });
-    }); */
-    Object.keys(data.mitersByProduct).forEach((profile) => {
-      const miterCounts = data.mitersByProduct[profile];
-
-      // Combine inside and outside 90s as "Strip Miters"
-      const stripMitersQty =
-        (miterCounts.inside90 || 0) + (miterCounts.outside90 || 0);
-      const bayMitersQty = miterCounts.bay135 || 0;
-      const customMitersArr = miterCounts.custom || [];
-
-      // Find matching products for each miter type
-      if (stripMitersQty > 0) {
-        const stripMiterProduct = unfilteredProducts.find(
-          (product) =>
-            product.name.toLowerCase().includes(profile.toLowerCase()) &&
-            product.name.toLowerCase().includes("strip miter")
+      // Strip Miter
+      if (stripQty > 0) {
+        const strip = unfilteredProducts.find(
+          (p) =>
+            caseIncludes(p.name, profileKey) &&
+            caseIncludes(p.name, "strip") &&
+            caseIncludes(p.name, "miter")
         );
-        console.log(stripMiterProduct);
-        if (stripMiterProduct) {
-          miters[profile] = miters[profile] || [];
-          miters[profile].push({
+        if (strip) {
+          (miters[profileKey] ||= []).push({
             type: "Strip Miter",
-            price: stripMiterProduct.price,
-            quantity: stripMitersQty,
-            product: stripMiterProduct,
+            price: strip.price,
+            quantity: stripQty,
+            product: strip,
           });
-          setLines((prev) => [
-            ...prev,
-            {
-              isMiter: true,
-              name: stripMiterProduct.name,
-              product: stripMiterProduct,
-              price: stripMiterProduct.price,
-              quantity: stripMitersQty,
-              miterType: "Strip Miter",
-            },
-          ]);
+          pushLineItem({
+            name: strip.name,
+            quantity: stripQty,
+            price: strip.price,
+            product: strip,
+            meta: { kind: "miter", profileKey, type: "Strip Miter" },
+          });
         }
       }
 
-      if (bayMitersQty > 0) {
-        const bayMiterProduct = unfilteredProducts.find(
-          (product) =>
-            product.name.toLowerCase().includes(profile.toLowerCase()) &&
-            product.name.toLowerCase().includes("bay") &&
-            product.name.toLowerCase().includes("miter")
+      // Bay 135 Miter
+      if (bayQty > 0) {
+        const bay = unfilteredProducts.find(
+          (p) =>
+            caseIncludes(p.name, profileKey) &&
+            caseIncludes(p.name, "bay") &&
+            caseIncludes(p.name, "miter")
         );
-        console.log(bayMiterProduct);
-        if (bayMiterProduct) {
-          miters[profile] = miters[profile] || [];
-          miters[profile].push({
+        if (bay) {
+          (miters[profileKey] ||= []).push({
             type: "Bay 135 Miter",
-            price: bayMiterProduct.price,
-            quantity: bayMitersQty,
-            product: bayMiterProduct,
+            price: bay.price,
+            quantity: bayQty,
+            product: bay,
           });
-          setLines((prev) => [
-            ...prev,
-            {
-              isMiter: true,
-              name: bayMiterProduct.name,
-              product: bayMiterProduct,
-              price: bayMiterProduct.price,
-              quantity: bayMitersQty,
-              miterType: "Bay 135 Miter",
-            },
-          ]);
+          pushLineItem({
+            name: bay.name,
+            quantity: bayQty,
+            price: bay.price,
+            product: bay,
+            meta: { kind: "miter", profileKey, type: "Bay 135 Miter" },
+          });
         }
       }
 
-      // Handle custom miters
-      customMitersArr.forEach(({ angle, count }) => {
-        if (count > 0) {
-          const customMiterProduct = unfilteredProducts.find(
-            (product) =>
-              product.name.toLowerCase().includes(profile.toLowerCase()) &&
-              product.name.toLowerCase().includes("custom") &&
-              product.name.toLowerCase().includes("miter")
-          );
-          console.log(customMiterProduct);
-          if (customMiterProduct) {
-            customMiters[profile] = customMiters[profile] || [];
-            customMiters[profile].push({
-              type: `Custom Miter (${angle}°)`,
-              price: customMiterProduct.price,
-              quantity: count,
-              product: customMiterProduct,
-              angle,
-            });
-            setLines((prev) => [
-              ...prev,
-              {
-                isMiter: true,
-                name: customMiterProduct.name,
-                product: customMiterProduct,
-                price: customMiterProduct.price,
-                quantity: count,
-                miterType: `Custom Miter (${angle}°)`,
-              },
-            ]);
-          }
+      // Custom Miters
+      (m.custom || []).forEach(({ angle, count }) => {
+        if (!count) return;
+        const custom = unfilteredProducts.find(
+          (p) =>
+            caseIncludes(p.name, profileKey) &&
+            caseIncludes(p.name, "custom") &&
+            caseIncludes(p.name, "miter")
+        );
+        if (custom) {
+          (customMiters[profileKey] ||= []).push({
+            type: `Custom Miter (${angle}°)`,
+            price: custom.price,
+            quantity: count,
+            product: custom,
+            angle,
+          });
+          pushLineItem({
+            name: custom.name,
+            quantity: count,
+            price: custom.price,
+            product: custom,
+            meta: { kind: "miter", profileKey, type: "Custom", angle },
+          });
         }
       });
     });
-    // iterate over the .endCapsByProduct property and take each key of that property and search for the corresponding product
-    // do the same thing for the .mitersByProduct property
 
-    // do something about the mixed miters
-    return allAccessories;
+    // Mixed miters (different profiles at one corner) — optional handling.
+    // If you want to price these, add similar find() logic using the combo key.
+    // Object.keys(analysisData.mixedMiters || {}).forEach((comboKey) => { ... });
+
+    return {
+      endCaps,
+      miters,
+      customMiters,
+      accessoryLineItems, // <- use this in your PDF
+    };
   }
 
   function saveDiagram(saveType) {
@@ -2000,14 +2016,12 @@ const Diagram = ({
       destHeight
     );
 
-    console.log("generating image url");
     const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
     let totalFootage = 0;
     let price = 0;
     let downspoutCentsPrice;
 
     lines.forEach((line) => {
-      // console.log(line);
       if (line.isDownspout) {
         const downspoutPrice = parseFloat(line.price).toFixed(2);
 
@@ -2027,29 +2041,77 @@ const Diagram = ({
       mixedMiters: analysis.mixedMiters,
     };
 
-    console.log(endcapMiterData, "DATA");
+    const { endCaps, miters, customMiters, accessoryLineItems } =
+      calculateEndCapsAndMiters(endcapMiterData);
 
-    const accessoryData = calculateEndCapsAndMiters(endcapMiterData);
+    // Add accessory costs to price
+    for (const item of accessoryLineItems) {
+      // unit price * qty
+      price += Number(item.price) * Number(item.quantity || 0);
+    }
+    // --- aggregate elbow counts by size ---
+    const elbowCountsBySize = {}; // e.g. { "2x3": { A: 3, B: 2 }, "3x4": { A: 1 } }
 
-    Object.keys(accessoryData[0]).forEach((accessory) => {
-      console.log(accessoryData[0][accessory]);
-      console.log(typeof price);
-      price +=
-        accessoryData[0][accessory].price *
-        accessoryData[0][accessory].quantity;
+    lines.forEach((line) => {
+      if (!line.isDownspout || !line.elbowSequence) return;
+
+      const sizeKey = getDownspoutSizeKey(line); // "2x3", "3x4", "unknown"
+      if (!elbowCountsBySize[sizeKey]) elbowCountsBySize[sizeKey] = {};
+
+      const seqCounts = countElbowsInSequence(line.elbowSequence);
+      mergeCounts(elbowCountsBySize[sizeKey], seqCounts);
     });
 
-    console.log(accessoryData);
+    // If you want a flat array of line items (useful for your estimate modal/PDF):
+    const elbowLineItems = [];
+    for (const [sizeKey, counts] of Object.entries(elbowCountsBySize)) {
+      for (const [code, qty] of Object.entries(counts)) {
+        // Prefer a human label from ELBOW_LABELS; otherwise fall back to "<size> <code> Elbow"
+        const label =
+          ELBOW_LABELS[sizeKey]?.[code] || `${sizeKey} ${code} Elbow`;
+
+        elbowLineItems.push({
+          key: `${sizeKey}:${code}`, // stable key if you render lists
+          size: sizeKey,
+          code, // A/B/C…
+          quantity: qty,
+          description: label, // what you’ll show in your PDF
+        });
+      }
+    }
+
+    // (Optional) sort for stable output
+    elbowLineItems.sort((a, b) =>
+      a.size === b.size
+        ? a.code.localeCompare(b.code)
+        : a.size.localeCompare(b.size)
+    );
+
+    const accessoryDataArray = [endCaps, miters, customMiters]; // legacy shape
 
     const data = {
       lines: [...lines],
       imageData: thumbnailDataUrl,
       totalFootage,
       price: parseFloat(price).toFixed(2),
-      accessoryData,
+      miterSummary: analysis.miters,
+      endCaps: analysis.endCaps,
+      endCapsByProduct: analysis.endCapsByProduct,
+      mitersByProduct: analysis.mitersByProduct,
+      mixedMiters: analysis.mixedMiters,
+      accessoryData: accessoryDataArray,
+      accessories: {
+        endCaps,
+        miters,
+        customMiters,
+        accessoryLineItems, // <- iterate this in the PDF
+      },
+
+      // NEW:
+      elbowsBySize: elbowCountsBySize, // grouped object map
+      elbowLineItems, // flat array for rendering
     };
 
-    console.log("data", data);
     function handleAddDiagramToProject() {
       addDiagramToProject(currentProjectId, token, data)
         .then((newDiagramData) => {
@@ -2087,12 +2149,16 @@ const Diagram = ({
     }
 
     if (saveType === "overwrite") {
-      console.log("overwriting");
       handleUpdateDiagram();
     } else {
-      console.log("adding");
       handleAddDiagramToProject();
     }
+  }
+  if (isLoading) {
+    return <div className="diagram">Loading products…</div>;
+  }
+  if (error) {
+    return <div className="diagram">Failed to load products.</div>;
   }
 
   return (
@@ -2172,7 +2238,6 @@ const Diagram = ({
           className="diagram__select-product"
           name="select product dropdown"
           id="select-product-dropdown"
-          defaultValue={products[0]?.name}
         >
           {filteredProducts?.map((product) => {
             return (

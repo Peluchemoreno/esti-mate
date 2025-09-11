@@ -37,3 +37,7 @@ table {
 .add-item__temp_field {
   border: 1px solid red;
 }
+
+.input_disabled {
+  color: rgb(92, 92, 92);
+}

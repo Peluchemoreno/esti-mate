@@ -7,18 +7,14 @@ import {
   PDFDownloadLink,
   Image,
 } from "@react-pdf/renderer";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getCurrentDate } from "../../utils/constants";
 import { capitalizeFirstLetter } from "../../utils/constants";
 
 const styles = StyleSheet.create({
   page: { padding: 20, paddingBottom: 100 },
   section: { marginBottom: 15, borderBottom: "1px solid grey" },
-  header: {
-    fontSize: 28,
-    marginBottom: 15,
-    textAlign: "right",
-  },
+  header: { fontSize: 28, marginBottom: 15, textAlign: "right" },
   text: { fontSize: 14, marginBottom: 5 },
   smallerText: { fontSize: 12, marginBottom: 5 },
   bold: { fontWeight: "bold" },
@@ -32,13 +28,11 @@ function EstimatePDF({
   currentUser,
   logoUrl,
   estimateData,
-  // If callers pass `estimate` instead of `estimateData`, we’ll still work:
-  estimate,
+  products,
+  estimate, // fallback name
 }) {
   const [token, setToken] = useState("");
   const [itemizedArray, setItemizedArray] = useState([]);
-
-  // Resolve estimate fields regardless of prop name
   const estimateDataResolved = estimateData || estimate || {};
 
   useEffect(() => {
@@ -48,10 +42,18 @@ function EstimatePDF({
 
   useEffect(() => {
     console.log(selectedDiagram);
-  }, [selectedDiagram]);
+    console.log(products);
+  }, [selectedDiagram, products]);
+
+  const grandTotal = useMemo(() => {
+    return (itemizedArray || []).reduce((sum, row) => {
+      const qty = Number(row.quantity || 0);
+      const price = Number(row.price || 0);
+      return sum + qty * price;
+    }, 0);
+  }, [itemizedArray]);
 
   // ===== Helpers =====
-
   function getMiscItems(diagram) {
     let splashBlocks = 0;
     let rainBarrelConnections = 0;
@@ -73,16 +75,147 @@ function EstimatePDF({
   }
 
   function capitalizeWords(str) {
-    return str
+    return String(str || "")
       .split(" ")
       .map((w) => capitalizeFirstLetter(w))
       .join(" ");
   }
 
-  // Build a single combined list of items from lines + accessoryData
+  // ---------- Normalization / parsing utilities (shared) ----------
+  const normalize = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/["“”]/g, '"')
+      .replace(/\b(in|inch|inches)\b/g, '"')
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const hasMaterial = (nameOrDesc, material) => {
+    if (!material) return false;
+    const n = normalize(nameOrDesc);
+    const m = normalize(material);
+    if (m === "aluminum")
+      return n.includes("alum") || n.includes("aluminum") || n.includes("al");
+    if (m === "copper") return n.includes("copper") || n.includes("cu");
+    return n.includes(m);
+  };
+
+  const extractSize = (nameOrDesc) => {
+    const n = normalize(nameOrDesc).replace(/×/g, "x");
+    // Common sizes; expand if you support more
+    const m = n.match(/\b(\d\s*x\s*\d)\b/);
+    return m ? m[1].replace(/\s*/g, "") : null; // "2x3"
+  };
+
+  const extractKind = (nameOrDesc) => {
+    const n = normalize(nameOrDesc);
+    if (n.includes("offset")) return "offset";
+    if (n.includes("elbow") || n.includes("elb")) return "elbow";
+    return null;
+  };
+
+  const extractElbowLetter = (nameOrDesc) => {
+    const n = normalize(nameOrDesc);
+    // Look for standalone A/B/C or patterns around "elbow"
+    const m =
+      n.match(/\b([abc])\b/) ||
+      n.match(/\belbow\s*([abc])\b/) ||
+      n.match(/\b([abc])\s*elbow\b/);
+    return m ? m[1].toUpperCase() : null;
+  };
+
+  const extractOffsetInches = (nameOrDesc) => {
+    const n = normalize(nameOrDesc);
+    const m = n.match(/\b(2|4|6)\s*(?:"|in)\b/);
+    return m ? m[1] : null;
+  };
+
+  const hasSizeLoose = (nameOrDesc, size) => {
+    if (!size) return false;
+    const n = normalize(nameOrDesc).replace(/×/g, "x");
+    const sz = normalize(size);
+    return (
+      n.includes(sz) ||
+      n.includes(sz.replace("x", " x ")) ||
+      n.includes(sz.replace("x", "×"))
+    );
+  };
+
+  const isElbow = (nameOrDesc) => {
+    const n = normalize(nameOrDesc);
+    return n.includes("elbow") || n.includes("elb");
+  };
+
+  const isOffset = (nameOrDesc) => {
+    const n = normalize(nameOrDesc);
+    return n.includes("offset");
+  };
+
+  const hasOffsetInches = (nameOrDesc, inches) => {
+    const n = normalize(nameOrDesc);
+    return (
+      n.includes(`${inches}"`) ||
+      n.includes(`${inches} "`) ||
+      n.includes(`${inches}in`)
+    );
+  };
+
+  // ---------- Index builder ----------
+  function buildProductIndex(list) {
+    // key: `${size}|${kind}|${material}|${detail}`
+    // detail = elbow letter ("A"/"B"/"C") OR offset inches ("2"/"4"/"6")
+    const index = new Map();
+
+    const put = (key, product) => {
+      if (!key) return;
+      const existing = index.get(key);
+      // Prefer entries that actually have a numeric price
+      const priceScore = (p) => (typeof p?.price === "number" ? 1 : 0);
+      if (!existing || priceScore(product) > priceScore(existing)) {
+        index.set(key, product);
+      }
+    };
+
+    (list || []).forEach((p) => {
+      const name = p?.name || "";
+      const desc = p?.description || "";
+      const both = `${name} ${desc}`;
+
+      const size = extractSize(both);
+      const kind = extractKind(both); // elbow | offset | null
+      if (!size || !kind) return;
+
+      const materialAlum = hasMaterial(both, "aluminum");
+      const materialCu = hasMaterial(both, "copper");
+      const material = materialAlum ? "aluminum" : materialCu ? "copper" : "";
+
+      if (kind === "elbow") {
+        // Try to capture the letter; some catalogs omit it
+        const letter = extractElbowLetter(both);
+        const detailCandidates = letter ? [letter] : ["A", "B", "C"]; // if unknown, index under all letters as a fallback
+        detailCandidates.forEach((detail) => {
+          put(`${size}|elbow|${material}|${detail}`, p);
+          // also material-agnostic fallback
+          put(`${size}|elbow||${detail}`, p);
+        });
+      } else if (kind === "offset") {
+        const inches = extractOffsetInches(both);
+        const detailCandidates = inches ? [inches] : ["2", "4", "6"]; // if unknown, index under all common inches
+        detailCandidates.forEach((detail) => {
+          put(`${size}|offset|${material}|${detail}`, p);
+          // material-agnostic fallback
+          put(`${size}|offset||${detail}`, p);
+        });
+      }
+    });
+
+    return index;
+  }
+
+  // ---------- Main builder ----------
   function buildItemized(diagram) {
     if (!diagram) return [];
-    const { lines = [], accessoryData = [], unfilteredProducts = [] } = diagram;
+    const { lines = [], accessoryData = [] } = diagram;
     const items = [];
 
     // 1) Aggregate line items (downspouts + non-downspouts)
@@ -94,7 +227,6 @@ function EstimatePDF({
       let refLine = line;
 
       if (line.isDownspout) {
-        // Group by size/type for downspouts
         const sizeLabel = line.downspoutSize || "";
         key = `Downspout ${sizeLabel}`.trim();
       } else {
@@ -131,66 +263,141 @@ function EstimatePDF({
       });
     });
 
-    // 2) Accessory data: [0]=endcaps, [1]=miters, [2]=custom miters
-    const endCapsObj = accessoryData?.[0] || {};
-    const mitersObj = accessoryData?.[1] || {};
-    const customObj = accessoryData?.[2] || {};
+    // 2) Accessories – new shape if present, else legacy fallback
+    if (diagram?.accessories?.accessoryLineItems?.length) {
+      const mapped = diagram.accessories.accessoryLineItems.map((li) => ({
+        item: li.name,
+        quantity: Number(li.quantity || 0),
+        price: Number(li.price || 0),
+        description: li.product?.description || "",
+      }));
+      items.push(...mapped);
+    } else {
+      const endCapsObj = accessoryData?.[0] || {};
+      const mitersObj = accessoryData?.[1] || {};
+      const customObj = accessoryData?.[2] || {};
 
-    function pushAccessoryObject(obj) {
-      if (!obj) return;
-      Object.keys(obj).forEach((profile) => {
-        const val = obj[profile];
-        if (Array.isArray(val)) {
-          val.forEach((row) => {
-            if (!row) return;
-            const name =
-              row.product?.name || row.name || `${profile} accessory`;
-            const price = Number(row.price ?? row.product?.price ?? 0) || 0;
-            const quantity = Number(row.quantity || 0);
-            const description = row.product?.description || "";
-            if (quantity > 0) {
-              items.push({
-                item: name,
-                quantity,
-                price,
-                description,
-              });
-            }
-          });
-        } else if (val && typeof val === "object") {
-          // Single object (like end cap)
-          const name = val.product?.name || val.name || `${profile} accessory`;
-          const price = Number(val.price ?? val.product?.price ?? 0) || 0;
-          const quantity = Number(val.quantity || 0);
-          const description = val.product?.description || "";
-          if (quantity > 0) {
-            items.push({
-              item: name,
-              quantity,
-              price,
-              description,
+      function pushAccessoryObject(obj) {
+        if (!obj) return;
+        Object.keys(obj).forEach((profile) => {
+          const val = obj[profile];
+          if (Array.isArray(val)) {
+            val.forEach((row) => {
+              if (!row) return;
+              const name =
+                row.product?.name || row.name || `${profile} accessory`;
+              const price = Number(row.price ?? row.product?.price ?? 0) || 0;
+              const quantity = Number(row.quantity || 0);
+              const description = row.product?.description || "";
+              if (quantity > 0) {
+                items.push({ item: name, quantity, price, description });
+              }
             });
+          } else if (val && typeof val === "object") {
+            const name =
+              val.product?.name || val.name || `${profile} accessory`;
+            const price = Number(val.price ?? val.product?.price ?? 0) || 0;
+            const quantity = Number(val.quantity || 0);
+            const description = val.product?.description || "";
+            if (quantity > 0) {
+              items.push({ item: name, quantity, price, description });
+            }
           }
-        }
-      });
+        });
+      }
+
+      pushAccessoryObject(endCapsObj);
+      pushAccessoryObject(mitersObj);
+      pushAccessoryObject(customObj);
     }
 
-    pushAccessoryObject(endCapsObj);
-    pushAccessoryObject(mitersObj);
-    pushAccessoryObject(customObj);
-
     // 3) Downspout parts (A, B, C, 2", 4", 6" offsets) by type and material
-    const downspoutPartsTable = {}; // { "type|material": { A: n, B: n, ... } }
+    const downspoutPartsTable = {}; // { "type|material": { A: n, B: n, C: n, 2: n, 4: n, 6: n } }
 
+    // Prefer a richer product list if available
+    const allProductsList =
+      Array.isArray(diagram?.unfilteredProducts) &&
+      diagram.unfilteredProducts.length
+        ? diagram.unfilteredProducts
+        : Array.isArray(products)
+        ? products
+        : [];
+
+    // Build index ONCE
+    const productIndex = buildProductIndex(allProductsList);
+
+    // Fallback fuzzy matcher (only if index misses)
+    function fuzzyMatchPartProduct({ part, type, material }) {
+      const isOffsetPart = ["2", "4", "6"].includes(part);
+
+      let candidates = allProductsList.filter((p) => {
+        const both = `${p.name || ""} ${p.description || ""}`;
+        if (!hasSizeLoose(both, type)) return false;
+
+        if (isOffsetPart) {
+          if (!isOffset(both)) return false;
+          if (!hasOffsetInches(both, part)) return false;
+        } else {
+          if (!isElbow(both)) return false;
+          const letter = part.toUpperCase();
+          const nm = normalize(both);
+          if (
+            !(
+              nm.includes(` ${letter} `) ||
+              nm.endsWith(` ${letter}`) ||
+              nm.includes(`${letter}-`) ||
+              nm.includes(` ${letter} elbow`)
+            )
+          ) {
+            // allow loose match when catalogs omit the letter
+          }
+        }
+
+        return material ? hasMaterial(both, material) : true;
+      });
+
+      if (!candidates.length) {
+        candidates = allProductsList.filter((p) => {
+          const both = `${p.name || ""} ${p.description || ""}`;
+          if (!hasSizeLoose(both, type)) return false;
+          if (isOffsetPart) {
+            if (!isOffset(both)) return false;
+            if (!hasOffsetInches(both, part)) return false;
+          } else {
+            if (!isElbow(both)) return false;
+          }
+          return true;
+        });
+      }
+
+      const best = candidates.sort((a, b) => {
+        const aMat =
+          material && hasMaterial(`${a.name} ${a.description}`, material)
+            ? 1
+            : 0;
+        const bMat =
+          material && hasMaterial(`${b.name} ${b.description}`, material)
+            ? 1
+            : 0;
+        const aPrice = typeof a.price === "number" ? 1 : 0;
+        const bPrice = typeof b.price === "number" ? 1 : 0;
+        return bMat - aMat || bPrice - aPrice;
+      })[0];
+
+      return best;
+    }
+
+    // Count parts by size/material
     lines.forEach((line) => {
-      if (!line.isDownspout) return;
-      const type = line.downspoutSize || "";
-      const material = line.downspoutMaterial || "aluminum";
-      const key = `${type}|${material}`;
+      if (!line?.isDownspout) return;
+      const type = line.downspoutSize || ""; // "2x3" | "3x4"
+      const material = line.downspoutMaterial || ""; // "aluminum" | "copper" | ""
+
+      const key = `${type}|${material || "unknown"}`;
       if (!downspoutPartsTable[key]) {
         downspoutPartsTable[key] = { A: 0, B: 0, C: 0, 2: 0, 4: 0, 6: 0 };
       }
-      // Count each letter/number in the elbow sequence
+
       (line.elbowSequence || "")
         .toUpperCase()
         .split("")
@@ -201,34 +408,49 @@ function EstimatePDF({
         });
     });
 
+    // Emit items with indexed (O(1)) lookups first, then fuzzy fallback
     Object.entries(downspoutPartsTable).forEach(([key, parts]) => {
-      const [type, material] = key.split("|");
+      const [type, materialRaw] = key.split("|");
+      const material = materialRaw === "unknown" ? "" : materialRaw;
+
       Object.entries(parts).forEach(([part, qty]) => {
-        if (qty > 0) {
-          // Find the matching product for this part, type, and material
-          const product = unfilteredProducts.find((p) => {
-            // Example: '2x3 A Elbow', '3x4 2" Offset', etc.
-            const partName = ["2", "4", "6"].includes(part)
-              ? `${type} ${part}" Offset`
-              : `${type} ${part} Elbow`;
-            return (
-              p.name.toLowerCase() === partName.toLowerCase() &&
-              (p.name.toLowerCase().includes(material.toLowerCase()) ||
-                p.description?.toLowerCase().includes(material.toLowerCase()))
-            );
-          });
-          const price = Number(product?.price ?? 0) || 0;
-          items.push({
-            item: `${type} ${material} ${
-              ["2", "4", "6"].includes(part)
-                ? part + '" Offset'
-                : part + " Elbow"
-            }`,
-            quantity: qty,
-            price,
-            description: product?.description || "",
+        if (qty <= 0) return;
+
+        const kind = ["2", "4", "6"].includes(part) ? "offset" : "elbow";
+        const detail = part; // "A"/"B"/"C" or "2"/"4"/"6"
+
+        // 1) exact with material
+        let product = productIndex.get(`${type}|${kind}|${material}|${detail}`);
+        // 2) exact without material
+        if (!product) product = productIndex.get(`${type}|${kind}||${detail}`);
+        // 3) fuzzy as last resort
+        if (!product) product = fuzzyMatchPartProduct({ part, type, material });
+
+        const label =
+          kind === "offset"
+            ? `${type} ${material ? material + " " : ""}${detail}" Offset`
+            : `${type} ${material ? material + " " : ""}${detail} Elbow`;
+
+        const priceNum = Number(product?.price);
+        const price = Number.isFinite(priceNum) ? priceNum : 0;
+
+        if (!price) {
+          console.warn("No price matched for part:", {
+            label,
+            part,
+            type,
+            material,
+            via: product ? "no-price-product" : "not-found",
           });
         }
+
+        items.push({
+          item: label.trim(),
+          quantity: qty,
+          price,
+          description: product?.description || "",
+          missingPrice: !price,
+        });
       });
     });
 
@@ -262,22 +484,17 @@ function EstimatePDF({
     return items;
   }
 
-  // (Optional) If you add ad-hoc items elsewhere, use functional setter to avoid races
+  // (Optional) add ad-hoc items elsewhere
   function injectMiscItem({ name, quantity, price, description = "" }) {
-    const formattedMiscItem = {
-      item: name,
-      quantity,
-      price,
-      description,
-    };
+    const formattedMiscItem = { item: name, quantity, price, description };
     setItemizedArray((prev) => [...prev, formattedMiscItem]);
   }
 
-  // Rebuild the items when the diagram (or modal trigger) changes
+  // Rebuild items on changes
   useEffect(() => {
     const next = buildItemized(selectedDiagram);
     setItemizedArray(next);
-  }, [selectedDiagram, activeModal]);
+  }, [selectedDiagram, activeModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ===== Render =====
   return (
@@ -399,11 +616,7 @@ function EstimatePDF({
                 <Text
                   style={[styles.smallerText, styles.bold, { paddingTop: 2 }]}
                 >
-                  $
-                  {selectedDiagram?.price !== undefined &&
-                  selectedDiagram?.price !== null
-                    ? String(selectedDiagram.price)
-                    : "N/A"}
+                  ${grandTotal.toFixed(2)}
                 </Text>
               </View>
             </View>
@@ -428,11 +641,7 @@ function EstimatePDF({
               {logoUrl && (
                 <Image
                   src={logoUrl}
-                  style={{
-                    width: 150,
-                    height: 150,
-                    objectFit: "contain",
-                  }}
+                  style={{ width: 150, height: 150, objectFit: "contain" }}
                 />
               )}
             </View>
@@ -477,11 +686,11 @@ function EstimatePDF({
             </Text>
           </View>
 
-          {/* Item Rows */}
           {itemizedArray.map((line, index) => {
             const qty = Number(line.quantity || 0);
             const price = Number(line.price || 0);
             const amount = (qty * price).toFixed(2);
+
             return (
               <View
                 key={index}
@@ -497,11 +706,7 @@ function EstimatePDF({
                     {capitalizeWords(line.item || "N/A")}
                   </Text>
                   <Text
-                    style={{
-                      fontSize: "10px",
-                      color: "#555",
-                      marginTop: 2,
-                    }}
+                    style={{ fontSize: "10px", color: "#555", marginTop: 2 }}
                   >
                     {line.description || ""}
                   </Text>
@@ -517,11 +722,7 @@ function EstimatePDF({
                   {qty || "-"}
                 </Text>
                 <Text
-                  style={{
-                    width: "20%",
-                    textAlign: "right",
-                    fontSize: "12px",
-                  }}
+                  style={{ width: "20%", textAlign: "right", fontSize: "12px" }}
                 >
                   ${amount}
                 </Text>
@@ -549,11 +750,7 @@ function EstimatePDF({
             Total Amount Due (USD):
           </Text>
           <Text style={{ fontSize: 12, fontWeight: "bold" }}>
-            $
-            {selectedDiagram?.price !== undefined &&
-            selectedDiagram?.price !== null
-              ? String(selectedDiagram.price)
-              : "N/A"}
+            ${grandTotal.toFixed(2)}
           </Text>
         </View>
       </Page>

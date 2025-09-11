@@ -142,11 +142,12 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
           <label className="add-item__label " htmlFor="item-name">
             Name
             <input
-              className="add-item-name__input add-item-form__input"
+              className="add-item-name__input add-item-form__input input_disabled"
               type="text"
               id="item-name"
               onChange={handleItemNameChange}
               value={itemName}
+              disabled={true}
               required
             />
           </label>
@@ -175,7 +176,7 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               value={itemVisualColor}
             />
           </label>
-          <label
+          {/* <label
             htmlFor="category"
             className="add-item__label add-item__quantity-select-label"
           >
@@ -201,8 +202,8 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               </option>
             </select>
           </label>
-
-          <label
+ */}
+          {/*           <label
             htmlFor="quantity"
             className="add-item__label add-item__quantity-select-label"
           >
@@ -221,7 +222,7 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
                 Unit/Per
               </option>
             </select>
-          </label>
+          </label> */}
           <label
             htmlFor="price"
             className="add-item__label add-item__price-label"
@@ -237,7 +238,7 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               required
             />
           </label>
-          <label
+          {/* <label
             htmlFor="price_removal"
             className="add-item__label add-item__price-label"
           >
@@ -281,9 +282,9 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
               onChange={handleIsListedChange}
               checked={isListed}
             />
-          </label>
+          </label> */}
 
-          {product.type === "gutter" && (
+          {/* {product.type === "gutter" && (
             <label htmlFor="quantity" className="add-item__label">
               <div>Screen Options</div>
               <div>
@@ -350,16 +351,16 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
                 + Add Screen
               </button>
             </label>
-          )}
+          )} */}
         </div>
         <div className="add-item-form__footer">
-          <button
+          {/* <button
             type="button"
             onClick={handleItemDeleteClick}
             className="edit-product-delete-button"
           >
             Delete product
-          </button>
+          </button> */}
           <div>
             <button
               onClick={handleCloseModal}

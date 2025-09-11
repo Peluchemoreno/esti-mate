@@ -113,6 +113,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
   );
   useEffect(() => {
     const token = localStorage.getItem("jwt");
+    console.log("here we are grabbing the products for the products component");
     getProducts(token).then((data) => {
       const productList = data.products;
       setTableRows(productList);

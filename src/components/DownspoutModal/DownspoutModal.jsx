@@ -127,7 +127,7 @@ export default function DownspoutModal({
                   : "elbow-sequence__input"
               }
             >
-              Use: A, B, C, 2, 4, and 6 for elbows and offsets.
+              Use: A, B, 2, 4, and 6 for elbows and offsets.
             </span>
             <span
               className={

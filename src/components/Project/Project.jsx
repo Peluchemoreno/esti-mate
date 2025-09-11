@@ -8,8 +8,8 @@ import {
   deleteProject,
   retrieveProjectDiagrams,
 } from "../../utils/api";
-import { EstimatePDFButton, EstimatePDF } from "../EstimatePDF/EstimatePDF";
 import EstimateModal from "../EstimateModal/EstimateModal";
+import { useProducts } from "../../hooks/useProducts";
 
 export default function Project({
   projects,
@@ -25,6 +25,8 @@ export default function Project({
   currentUser,
 }) {
   // console.log(setMobileDiagramActive)
+  const { data: allProducts = [] } = useProducts();
+  const allUnfilteredProducts = allProducts;
   const params = useParams();
   const projectId = params.projectId;
   const [testData, setTestData] = useState({
@@ -220,6 +222,7 @@ export default function Project({
         selectedDiagram={selectedDiagram}
         activeModal={activeModal}
         currentUser={currentUser}
+        products={allUnfilteredProducts}
       />
     </>
   );

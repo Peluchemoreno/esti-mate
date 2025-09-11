@@ -17,6 +17,7 @@ const EstimateModal = ({
   selectedDiagram,
   activeModal,
   currentUser,
+  products,
 }) => {
   const [logoUrl, setLogoUrl] = useState(null);
 
@@ -102,6 +103,7 @@ const EstimateModal = ({
           currentUser={currentUser}
           logoUrl={logoUrl}
           estimateData={estimateData}
+          products={products}
         />
       </PDFViewer>
       <button onClick={onClose} style={{ marginTop: "20px" }}>
