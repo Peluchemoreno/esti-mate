@@ -24,7 +24,7 @@ const EstimateModal = ({
   const [estimateData, setEstimateData] = useState({
     estimateNumber: "001",
     estimateDate: new Date().toISOString().split("T")[0],
-    paymentDue: "Upon completion",
+    // paymentDue: "Upon completion",
     notes: "",
   });
   const navigator = useNavigate();

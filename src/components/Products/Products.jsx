@@ -1,123 +1,142 @@
+// src/components/Products/Products.jsx
 import "./Products.css";
-import { DataGrid, gridClasses, GridToolbar } from "@mui/x-data-grid";
+import { DataGrid } from "@mui/x-data-grid";
 import { Box } from "@mui/material/";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AddProductModal from "../AddProductModal/AddProductModal";
-import { getProducts, createProduct } from "../../utils/api";
 import EditProductModal from "../EditProductModal/EditProductModal";
+import { getProducts, createProduct } from "../../utils/api";
 
 export default function Products({ activeModal, setActiveModal, closeModal }) {
   const [tableRows, setTableRows] = useState([]);
-  const [currentItem, setCurrentItem] = useState({});
+  const [currentItem, setCurrentItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [tableColumns, setTableColumns] = useState([
-    {
-      field: "name",
-      headerName: "Name",
-      width: 250,
-      headerClassName: "products__column-header",
-      renderCell: (params) => (
-        <Box
-          onClick={() => {
-            const selectedItem = params.row;
-            handleEditItemClick(selectedItem);
-          }}
-          sx={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: params.value,
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-          }}
-        >
-          <div className="cell-data">{params.value}</div>
-        </Box>
-      ),
-    },
-    {
-      field: "visual",
-      headerName: "Visual",
-      width: 150,
-      headerClassName: "products__column-header",
-      renderCell: (params) => (
-        <Box
-          onClick={() => {
-            console.log(params.row);
-          }}
-          sx={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: params.row.colorCode,
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            paddingLeft: 1,
-          }}
-        >
-          <div>{params.row.colorCode}</div>
-        </Box>
-      ),
-    },
-    {
-      field: "quantity",
-      headerName: "Quantity",
-      width: 150,
-      headerClassName: "products__column-header",
-      renderCell: (params) => (
-        <Box
-          sx={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: params.value,
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            paddingLeft: 1,
-          }}
-        >
-          <div>{params.row.unit === "foot" ? "per/foot" : "per/unit"}</div>
-        </Box>
-      ),
-    },
-    {
-      field: "price",
-      headerName: "Price",
-      width: 150,
-      headerClassName: "products__column-header",
-      renderCell: (params) => (
-        <Box
-          sx={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: params.value,
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            paddingLeft: 1,
-          }}
-        >
-          <div>${params.row.price.toFixed(2)}</div>
-        </Box>
-      ),
-    },
-  ]);
+  // Deduplicate defensively by _id (guards against double fetches/StrictMode)
+  const uniqueRows = useMemo(() => {
+    const m = new Map();
+    for (const r of tableRows) {
+      if (r && r._id) m.set(r._id, r);
+    }
+    return Array.from(m.values());
+  }, [tableRows]);
 
-  const filteredRows = tableRows.filter((row) =>
-    row.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filter by search
+  const filteredRows = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return uniqueRows;
+    return uniqueRows.filter((row) => row.name?.toLowerCase().includes(q));
+  }, [uniqueRows, searchTerm]);
+
+  // Columns
+  const columns = useMemo(
+    () => [
+      {
+        field: "name",
+        headerName: "Name",
+        width: 250,
+        headerClassName: "products__column-header",
+        renderCell: (params) => (
+          <Box
+            onClick={() => handleEditItemClick(params.row)}
+            sx={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-start",
+            }}
+          >
+            <div className="cell-data">{params.value}</div>
+          </Box>
+        ),
+      },
+      {
+        field: "visual",
+        headerName: "Visual",
+        width: 150,
+        headerClassName: "products__column-header",
+        renderCell: (params) => (
+          <Box
+            onClick={() => console.log(params.row)}
+            sx={{
+              width: "100%",
+              height: "100%",
+              backgroundColor: params.row?.colorCode || "transparent",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-start",
+              paddingLeft: 1,
+            }}
+          >
+            <div>{params.row?.colorCode ?? "-"}</div>
+          </Box>
+        ),
+      },
+      {
+        field: "quantity",
+        headerName: "Quantity",
+        width: 150,
+        headerClassName: "products__column-header",
+        renderCell: (params) => (
+          <Box
+            sx={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-start",
+              paddingLeft: 1,
+            }}
+          >
+            <div>{params.row?.unit === "foot" ? "per/foot" : "per/unit"}</div>
+          </Box>
+        ),
+      },
+      {
+        field: "price",
+        headerName: "Price",
+        width: 150,
+        headerClassName: "products__column-header",
+        renderCell: (params) => {
+          const n = Number(params.row?.price);
+          const val = Number.isFinite(n) ? n : 0;
+          return (
+            <Box
+              sx={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                paddingLeft: 1,
+              }}
+            >
+              <div>${val.toFixed(2)}</div>
+            </Box>
+          );
+        },
+      },
+    ],
+    []
   );
+
+  // Fetch once (and when modal closes after create/edit)
   useEffect(() => {
-    const token = localStorage.getItem("jwt");
-    console.log("here we are grabbing the products for the products component");
-    getProducts(token).then((data) => {
-      const productList = data.products;
-      setTableRows(productList);
-    });
+    let cancelled = false;
+    (async () => {
+      const token = localStorage.getItem("jwt");
+      const res = await getProducts(token);
+      const list = Array.isArray(res?.products) ? res.products : [];
+      if (!cancelled) {
+        setTableRows(list); // replace, don't append
+        console.log("Products fetched from API:", list.length);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeModal]);
 
   function handleAddItemClick() {
@@ -130,17 +149,21 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
   }
 
   function handleCreateItemSubmit(itemData) {
-    const { itemName, itemVisualColor, quantityUnit } = itemData;
     const token = localStorage.getItem("jwt");
-
-    const formattedData = {
-      name: itemName,
-      visual: itemVisualColor,
-      quantity: quantityUnit,
-      price: `$${parseFloat(itemData.itemPrice).toFixed(2).toString()}`,
+    // IMPORTANT: send a NUMBER for price (backend casts Number)
+    const payload = {
+      name: itemData.itemName,
+      visual: itemData.itemVisualColor,
+      quantity: itemData.quantityUnit,
+      price: Number(itemData.itemPrice), // no "$"
     };
-    createProduct(formattedData, token).then((data) => {
-      setTableRows([...tableRows, data.data]);
+    console.log("createProduct payload:", payload);
+    createProduct(payload, token).then((res) => {
+      if (res?.data) {
+        // Prepend new row and let dedupe take care of repeats
+        setTableRows((prev) => [res.data, ...prev]);
+        closeModal();
+      }
     });
   }
 
@@ -149,22 +172,12 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
       <div className="products">
         <div className="products__header">
           <h3 className="products__header-title">Products</h3>
-          {/*<button
-            className="products__create-item-button"
-            onClick={handleAddItemClick}
-          >
+          {/* <button className="products__create-item-button" onClick={handleAddItemClick}>
             + Item
-          </button>*/}
+          </button> */}
         </div>
-        <Box
-          sx={{
-            padding: 2.5,
-            width: "100%",
-            "&.products__column-header": {
-              bgcolor: "transparent",
-            },
-          }}
-        >
+
+        <Box sx={{ padding: 2.5, width: "100%" }}>
           <div style={{ marginBottom: "1rem" }}>
             <input
               type="text"
@@ -182,21 +195,24 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
               }}
             />
           </div>
+
           <DataGrid
             rows={filteredRows}
-            columns={tableColumns}
+            columns={columns}
             getRowId={(row) => row._id}
-            sx={{
-              color: "white",
-            }}
+            sx={{ color: "white" }}
+            autoHeight
+            disableRowSelectionOnClick
           />
         </Box>
       </div>
+
       <AddProductModal
         activeModal={activeModal}
         closeModal={closeModal}
         submitItem={handleCreateItemSubmit}
       />
+
       <EditProductModal
         activeModal={activeModal}
         closeModal={closeModal}

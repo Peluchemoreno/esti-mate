@@ -28,7 +28,7 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     setDescription(
       product?.description || "No description, how about we add one?"
     );
-    setScreenOptions(product.gutterGuardOptions);
+    // setScreenOptions(product.gutterGuardOptions);
   }, [product, activeModal]);
 
   function handleCategoryChange(e) {

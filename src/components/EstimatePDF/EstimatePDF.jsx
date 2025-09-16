@@ -1,3 +1,4 @@
+// src/components/EstimatePDF/EstimatePDF.jsx
 import {
   Document,
   Page,
@@ -7,9 +8,9 @@ import {
   PDFDownloadLink,
   Image,
 } from "@react-pdf/renderer";
-import { useEffect, useState, useMemo } from "react";
-import { getCurrentDate } from "../../utils/constants";
-import { capitalizeFirstLetter } from "../../utils/constants";
+import { useEffect, useMemo, useState } from "react";
+import { getCurrentDate, capitalizeFirstLetter } from "../../utils/constants";
+import { makePriceResolver } from "../../utils/priceResolver";
 
 const styles = StyleSheet.create({
   page: { padding: 20, paddingBottom: 100 },
@@ -21,6 +22,29 @@ const styles = StyleSheet.create({
   itemsHeader: { display: "flex", flexDirection: "row" },
 });
 
+// --- tiny helpers ---
+const toNum = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const n = parseFloat(String(v || "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+};
+const norm = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase();
+const slugOf = (obj) => {
+  // stable identity without depending on display name
+  const type = norm(obj?.type);
+  const profile = norm(obj?.profile);
+  const size = norm(obj?.size);
+  return `${type}|${profile}|${size}`.replace(/\s+/g, "-");
+};
+const capWords = (str) =>
+  String(str || "")
+    .split(" ")
+    .map((w) => capitalizeFirstLetter(w))
+    .join(" ");
+
 function EstimatePDF({
   project,
   selectedDiagram,
@@ -31,476 +55,277 @@ function EstimatePDF({
   products,
   estimate, // fallback name
 }) {
-  const [token, setToken] = useState("");
   const [itemizedArray, setItemizedArray] = useState([]);
   const estimateDataResolved = estimateData || estimate || {};
 
-  useEffect(() => {
-    const t = localStorage.getItem("jwt");
-    setToken(t || "");
-  }, []);
+  // Build a resolver that can answer: given {productId/templateId/slug/name/...} → user product with price
+  const resolveProduct = useMemo(() => {
+    const list = Array.isArray(products) ? products : [];
+    return makePriceResolver(list);
+  }, [products]);
 
-  useEffect(() => {
-    console.log(selectedDiagram);
-    console.log(products);
-  }, [selectedDiagram, products]);
+  // ---- Build itemized rows from the diagram, resolving prices robustly ----
+  const buildItemized = useMemo(() => {
+    return function buildItemizedInner(diagram) {
+      if (!diagram) return [];
+      const items = [];
+      const lines = Array.isArray(diagram.lines) ? diagram.lines : [];
 
-  const grandTotal = useMemo(() => {
-    return (itemizedArray || []).reduce((sum, row) => {
-      const qty = Number(row.quantity || 0);
-      const price = Number(row.price || 0);
-      return sum + qty * price;
-    }, 0);
-  }, [itemizedArray]);
+      // 1) Combine linear items (gutters, fascia wrap, etc.)
+      const combined = new Map(); // key -> { quantity, refLine }
+      for (const line of lines) {
+        if (!line || line.isNote) continue;
 
-  // ===== Helpers =====
-  function getMiscItems(diagram) {
-    let splashBlocks = 0;
-    let rainBarrelConnections = 0;
-    let undergroundDrainageConnections = 0;
+        // Prefer using the product identity carried by the line when available
+        const cp = line.currentProduct || {};
+        const key =
+          cp._id || cp.id || cp.templateId || cp.slug
+            ? // identity key (not display name)
+              `${cp._id || ""}|${cp.templateId || ""}|${cp.slug || ""}`
+            : // fall back to a display label that won't explode totals if names vary
+            line.isDownspout
+            ? `DOWN-${line.downspoutSize || ""}-${line.downspoutMaterial || ""}`
+            : `ITEM-${norm(cp.type)}|${norm(cp.profile)}|${norm(
+                cp.size
+              )}|${norm(cp.name)}`;
 
-    (diagram?.lines || []).forEach((line) => {
-      if (line.isDownspout) {
-        if (line.splashBlock) splashBlocks++;
-        if (line.rainBarrel) rainBarrelConnections++;
-        if (line.undergroundDrainage) undergroundDrainageConnections++;
-      }
-    });
-
-    return {
-      splashBlocks,
-      rainBarrelConnections,
-      undergroundDrainageConnections,
-    };
-  }
-
-  function capitalizeWords(str) {
-    return String(str || "")
-      .split(" ")
-      .map((w) => capitalizeFirstLetter(w))
-      .join(" ");
-  }
-
-  // ---------- Normalization / parsing utilities (shared) ----------
-  const normalize = (s) =>
-    String(s || "")
-      .toLowerCase()
-      .replace(/["“”]/g, '"')
-      .replace(/\b(in|inch|inches)\b/g, '"')
-      .replace(/\s+/g, " ")
-      .trim();
-
-  const hasMaterial = (nameOrDesc, material) => {
-    if (!material) return false;
-    const n = normalize(nameOrDesc);
-    const m = normalize(material);
-    if (m === "aluminum")
-      return n.includes("alum") || n.includes("aluminum") || n.includes("al");
-    if (m === "copper") return n.includes("copper") || n.includes("cu");
-    return n.includes(m);
-  };
-
-  const extractSize = (nameOrDesc) => {
-    const n = normalize(nameOrDesc).replace(/×/g, "x");
-    // Common sizes; expand if you support more
-    const m = n.match(/\b(\d\s*x\s*\d)\b/);
-    return m ? m[1].replace(/\s*/g, "") : null; // "2x3"
-  };
-
-  const extractKind = (nameOrDesc) => {
-    const n = normalize(nameOrDesc);
-    if (n.includes("offset")) return "offset";
-    if (n.includes("elbow") || n.includes("elb")) return "elbow";
-    return null;
-  };
-
-  const extractElbowLetter = (nameOrDesc) => {
-    const n = normalize(nameOrDesc);
-    // Look for standalone A/B/C or patterns around "elbow"
-    const m =
-      n.match(/\b([abc])\b/) ||
-      n.match(/\belbow\s*([abc])\b/) ||
-      n.match(/\b([abc])\s*elbow\b/);
-    return m ? m[1].toUpperCase() : null;
-  };
-
-  const extractOffsetInches = (nameOrDesc) => {
-    const n = normalize(nameOrDesc);
-    const m = n.match(/\b(2|4|6)\s*(?:"|in)\b/);
-    return m ? m[1] : null;
-  };
-
-  const hasSizeLoose = (nameOrDesc, size) => {
-    if (!size) return false;
-    const n = normalize(nameOrDesc).replace(/×/g, "x");
-    const sz = normalize(size);
-    return (
-      n.includes(sz) ||
-      n.includes(sz.replace("x", " x ")) ||
-      n.includes(sz.replace("x", "×"))
-    );
-  };
-
-  const isElbow = (nameOrDesc) => {
-    const n = normalize(nameOrDesc);
-    return n.includes("elbow") || n.includes("elb");
-  };
-
-  const isOffset = (nameOrDesc) => {
-    const n = normalize(nameOrDesc);
-    return n.includes("offset");
-  };
-
-  const hasOffsetInches = (nameOrDesc, inches) => {
-    const n = normalize(nameOrDesc);
-    return (
-      n.includes(`${inches}"`) ||
-      n.includes(`${inches} "`) ||
-      n.includes(`${inches}in`)
-    );
-  };
-
-  // ---------- Index builder ----------
-  function buildProductIndex(list) {
-    // key: `${size}|${kind}|${material}|${detail}`
-    // detail = elbow letter ("A"/"B"/"C") OR offset inches ("2"/"4"/"6")
-    const index = new Map();
-
-    const put = (key, product) => {
-      if (!key) return;
-      const existing = index.get(key);
-      // Prefer entries that actually have a numeric price
-      const priceScore = (p) => (typeof p?.price === "number" ? 1 : 0);
-      if (!existing || priceScore(product) > priceScore(existing)) {
-        index.set(key, product);
-      }
-    };
-
-    (list || []).forEach((p) => {
-      const name = p?.name || "";
-      const desc = p?.description || "";
-      const both = `${name} ${desc}`;
-
-      const size = extractSize(both);
-      const kind = extractKind(both); // elbow | offset | null
-      if (!size || !kind) return;
-
-      const materialAlum = hasMaterial(both, "aluminum");
-      const materialCu = hasMaterial(both, "copper");
-      const material = materialAlum ? "aluminum" : materialCu ? "copper" : "";
-
-      if (kind === "elbow") {
-        // Try to capture the letter; some catalogs omit it
-        const letter = extractElbowLetter(both);
-        const detailCandidates = letter ? [letter] : ["A", "B", "C"]; // if unknown, index under all letters as a fallback
-        detailCandidates.forEach((detail) => {
-          put(`${size}|elbow|${material}|${detail}`, p);
-          // also material-agnostic fallback
-          put(`${size}|elbow||${detail}`, p);
-        });
-      } else if (kind === "offset") {
-        const inches = extractOffsetInches(both);
-        const detailCandidates = inches ? [inches] : ["2", "4", "6"]; // if unknown, index under all common inches
-        detailCandidates.forEach((detail) => {
-          put(`${size}|offset|${material}|${detail}`, p);
-          // material-agnostic fallback
-          put(`${size}|offset||${detail}`, p);
-        });
-      }
-    });
-
-    return index;
-  }
-
-  // ---------- Main builder ----------
-  function buildItemized(diagram) {
-    if (!diagram) return [];
-    const { lines = [], accessoryData = [] } = diagram;
-    const items = [];
-
-    // 1) Aggregate line items (downspouts + non-downspouts)
-    const table = {}; // key => { quantity, refLine }
-    lines.forEach((line) => {
-      if (!line || line.isNote) return;
-
-      let key;
-      let refLine = line;
-
-      if (line.isDownspout) {
-        const sizeLabel = line.downspoutSize || "";
-        key = `Downspout ${sizeLabel}`.trim();
-      } else {
-        key = line.currentProduct?.name || "Unknown Item";
-      }
-
-      const qty = Number(line.measurement || 0);
-      if (table[key]) {
-        table[key] = {
-          quantity: table[key].quantity + qty,
-          refLine: table[key].refLine,
-        };
-      } else {
-        table[key] = { quantity: qty, refLine };
-      }
-    });
-
-    Object.entries(table).forEach(([key, { quantity, refLine }]) => {
-      const price =
-        Number(refLine?.currentProduct?.price ?? refLine?.price ?? 0) || 0;
-
-      const description =
-        (refLine?.currentProduct?.description ??
-          (refLine?.isDownspout
-            ? `Downspout ${refLine.downspoutSize || ""}`.trim()
-            : "")) ||
-        "";
-
-      items.push({
-        item: key,
-        quantity,
-        price,
-        description,
-      });
-    });
-
-    // 2) Accessories – new shape if present, else legacy fallback
-    if (diagram?.accessories?.accessoryLineItems?.length) {
-      const mapped = diagram.accessories.accessoryLineItems.map((li) => ({
-        item: li.name,
-        quantity: Number(li.quantity || 0),
-        price: Number(li.price || 0),
-        description: li.product?.description || "",
-      }));
-      items.push(...mapped);
-    } else {
-      const endCapsObj = accessoryData?.[0] || {};
-      const mitersObj = accessoryData?.[1] || {};
-      const customObj = accessoryData?.[2] || {};
-
-      function pushAccessoryObject(obj) {
-        if (!obj) return;
-        Object.keys(obj).forEach((profile) => {
-          const val = obj[profile];
-          if (Array.isArray(val)) {
-            val.forEach((row) => {
-              if (!row) return;
-              const name =
-                row.product?.name || row.name || `${profile} accessory`;
-              const price = Number(row.price ?? row.product?.price ?? 0) || 0;
-              const quantity = Number(row.quantity || 0);
-              const description = row.product?.description || "";
-              if (quantity > 0) {
-                items.push({ item: name, quantity, price, description });
-              }
-            });
-          } else if (val && typeof val === "object") {
-            const name =
-              val.product?.name || val.name || `${profile} accessory`;
-            const price = Number(val.price ?? val.product?.price ?? 0) || 0;
-            const quantity = Number(val.quantity || 0);
-            const description = val.product?.description || "";
-            if (quantity > 0) {
-              items.push({ item: name, quantity, price, description });
-            }
-          }
-        });
-      }
-
-      pushAccessoryObject(endCapsObj);
-      pushAccessoryObject(mitersObj);
-      pushAccessoryObject(customObj);
-    }
-
-    // 3) Downspout parts (A, B, C, 2", 4", 6" offsets) by type and material
-    const downspoutPartsTable = {}; // { "type|material": { A: n, B: n, C: n, 2: n, 4: n, 6: n } }
-
-    // Prefer a richer product list if available
-    const allProductsList =
-      Array.isArray(diagram?.unfilteredProducts) &&
-      diagram.unfilteredProducts.length
-        ? diagram.unfilteredProducts
-        : Array.isArray(products)
-        ? products
-        : [];
-
-    // Build index ONCE
-    const productIndex = buildProductIndex(allProductsList);
-
-    // Fallback fuzzy matcher (only if index misses)
-    function fuzzyMatchPartProduct({ part, type, material }) {
-      const isOffsetPart = ["2", "4", "6"].includes(part);
-
-      let candidates = allProductsList.filter((p) => {
-        const both = `${p.name || ""} ${p.description || ""}`;
-        if (!hasSizeLoose(both, type)) return false;
-
-        if (isOffsetPart) {
-          if (!isOffset(both)) return false;
-          if (!hasOffsetInches(both, part)) return false;
+        const qty = toNum(line.measurement || 0);
+        if (combined.has(key)) {
+          const prev = combined.get(key);
+          prev.quantity += qty;
         } else {
-          if (!isElbow(both)) return false;
-          const letter = part.toUpperCase();
-          const nm = normalize(both);
-          if (
-            !(
-              nm.includes(` ${letter} `) ||
-              nm.endsWith(` ${letter}`) ||
-              nm.includes(`${letter}-`) ||
-              nm.includes(` ${letter} elbow`)
-            )
-          ) {
-            // allow loose match when catalogs omit the letter
-          }
+          combined.set(key, { quantity: qty, refLine: line });
         }
-
-        return material ? hasMaterial(both, material) : true;
-      });
-
-      if (!candidates.length) {
-        candidates = allProductsList.filter((p) => {
-          const both = `${p.name || ""} ${p.description || ""}`;
-          if (!hasSizeLoose(both, type)) return false;
-          if (isOffsetPart) {
-            if (!isOffset(both)) return false;
-            if (!hasOffsetInches(both, part)) return false;
-          } else {
-            if (!isElbow(both)) return false;
-          }
-          return true;
-        });
       }
 
-      const best = candidates.sort((a, b) => {
-        const aMat =
-          material && hasMaterial(`${a.name} ${a.description}`, material)
-            ? 1
-            : 0;
-        const bMat =
-          material && hasMaterial(`${b.name} ${b.description}`, material)
-            ? 1
-            : 0;
-        const aPrice = typeof a.price === "number" ? 1 : 0;
-        const bPrice = typeof b.price === "number" ? 1 : 0;
-        return bMat - aMat || bPrice - aPrice;
-      })[0];
+      // Emit line items with resolved prices
+      for (const [key, { quantity, refLine }] of combined.entries()) {
+        const cp = refLine.currentProduct || {};
+        const lineIdentity = {
+          productId: cp._id || cp.id,
+          templateId: cp.templateId,
+          slug: cp.slug || slugOf(cp),
+          name: cp.name,
+          type: cp.type,
+          profile: cp.profile,
+          size: cp.size,
+        };
+        const resolved = resolveProduct(lineIdentity);
 
-      return best;
-    }
+        const priceResolved = toNum(
+          resolved?.price ?? cp.price ?? refLine.price ?? 0
+        );
 
-    // Count parts by size/material
-    lines.forEach((line) => {
-      if (!line?.isDownspout) return;
-      const type = line.downspoutSize || ""; // "2x3" | "3x4"
-      const material = line.downspoutMaterial || ""; // "aluminum" | "copper" | ""
-
-      const key = `${type}|${material || "unknown"}`;
-      if (!downspoutPartsTable[key]) {
-        downspoutPartsTable[key] = { A: 0, B: 0, C: 0, 2: 0, 4: 0, 6: 0 };
-      }
-
-      (line.elbowSequence || "")
-        .toUpperCase()
-        .split("")
-        .forEach((char) => {
-          if (["A", "B", "C", "2", "4", "6"].includes(char)) {
-            downspoutPartsTable[key][char]++;
-          }
-        });
-    });
-
-    // Emit items with indexed (O(1)) lookups first, then fuzzy fallback
-    Object.entries(downspoutPartsTable).forEach(([key, parts]) => {
-      const [type, materialRaw] = key.split("|");
-      const material = materialRaw === "unknown" ? "" : materialRaw;
-
-      Object.entries(parts).forEach(([part, qty]) => {
-        if (qty <= 0) return;
-
-        const kind = ["2", "4", "6"].includes(part) ? "offset" : "elbow";
-        const detail = part; // "A"/"B"/"C" or "2"/"4"/"6"
-
-        // 1) exact with material
-        let product = productIndex.get(`${type}|${kind}|${material}|${detail}`);
-        // 2) exact without material
-        if (!product) product = productIndex.get(`${type}|${kind}||${detail}`);
-        // 3) fuzzy as last resort
-        if (!product) product = fuzzyMatchPartProduct({ part, type, material });
-
-        const label =
-          kind === "offset"
-            ? `${type} ${material ? material + " " : ""}${detail}" Offset`
-            : `${type} ${material ? material + " " : ""}${detail} Elbow`;
-
-        const priceNum = Number(product?.price);
-        const price = Number.isFinite(priceNum) ? priceNum : 0;
-
-        if (!price) {
-          console.warn("No price matched for part:", {
-            label,
-            part,
-            type,
-            material,
-            via: product ? "no-price-product" : "not-found",
-          });
-        }
+        const label = refLine.isDownspout
+          ? `Downspout ${refLine.downspoutSize || ""} ${
+              refLine.downspoutMaterial || ""
+            }`.trim()
+          : cp.name || "Unknown Item";
 
         items.push({
-          item: label.trim(),
-          quantity: qty,
-          price,
-          description: product?.description || "",
-          missingPrice: !price,
+          item: label,
+          quantity: toNum(quantity),
+          price: priceResolved,
+          description:
+            cp.description ||
+            (refLine.isDownspout
+              ? `Downspout ${refLine.downspoutSize || ""} ${
+                  refLine.downspoutMaterial || ""
+                }`.trim()
+              : ""),
         });
-      });
-    });
+      }
 
-    // 4) Optional: add misc counters as separate rows (with price=0 by default)
-    const misc = getMiscItems(diagram);
-    if (misc.splashBlocks > 0) {
-      items.push({
-        item: "Splash Block",
-        quantity: misc.splashBlocks,
-        price: 0,
-        description: "",
-      });
-    }
-    if (misc.rainBarrelConnections > 0) {
-      items.push({
-        item: "Rain Barrel Connection",
-        quantity: misc.rainBarrelConnections,
-        price: 0,
-        description: "",
-      });
-    }
-    if (misc.undergroundDrainageConnections > 0) {
-      items.push({
-        item: "Underground Drainage Connection",
-        quantity: misc.undergroundDrainageConnections,
-        price: 0,
-        description: "",
-      });
-    }
+      // 2) Accessory lines (new structure)
+      const acc = diagram?.accessories?.accessoryLineItems;
+      if (Array.isArray(acc) && acc.length) {
+        for (const li of acc) {
+          const p = li.product || {};
+          const identity = {
+            productId: p._id || p.id,
+            templateId: p.templateId,
+            slug: p.slug || slugOf(p),
+            name: p.name,
+            type: p.type,
+            profile: p.profile,
+            size: p.size,
+          };
+          const resolved = resolveProduct(identity);
+          const priceResolved = toNum(
+            li.price ?? resolved?.price ?? p.price ?? 0
+          );
+          const qty = toNum(li.quantity || 0);
+          if (qty > 0) {
+            items.push({
+              item: p.name || li.name || "Accessory",
+              quantity: qty,
+              price: priceResolved,
+              description: p.description || "",
+            });
+          }
+        }
+      } else {
+        // 2b) Legacy accessory shape
+        const accessoryData = Array.isArray(diagram?.accessoryData)
+          ? diagram.accessoryData
+          : [];
 
-    return items;
-  }
+        const pushObj = (obj) => {
+          if (!obj) return;
+          Object.keys(obj).forEach((k) => {
+            const v = obj[k];
+            const emit = (row) => {
+              if (!row) return;
+              const p = row.product || {};
+              const identity = {
+                productId: p._id || p.id,
+                templateId: p.templateId,
+                slug: p.slug || slugOf(p),
+                name: p.name || row.name,
+                type: p.type,
+                profile: p.profile,
+                size: p.size,
+              };
+              const resolved = resolveProduct(identity);
+              const qty = toNum(row.quantity || 0);
+              if (qty <= 0) return;
+              const priceResolved = toNum(
+                row.price ?? resolved?.price ?? p.price ?? 0
+              );
+              items.push({
+                item: p.name || row.name || `${k} accessory`,
+                quantity: qty,
+                price: priceResolved,
+                description: p.description || "",
+              });
+            };
 
-  // (Optional) add ad-hoc items elsewhere
-  function injectMiscItem({ name, quantity, price, description = "" }) {
-    const formattedMiscItem = { item: name, quantity, price, description };
-    setItemizedArray((prev) => [...prev, formattedMiscItem]);
-  }
+            if (Array.isArray(v)) v.forEach(emit);
+            else if (v && typeof v === "object") emit(v);
+          });
+        };
 
-  // Rebuild items on changes
+        // indices 0/1/2 per your previous shape
+        pushObj(accessoryData[0]);
+        pushObj(accessoryData[1]);
+        pushObj(accessoryData[2]);
+      }
+
+      // 3) Downspout parts (A/B/C elbows and 2/4/6" offsets)
+      const partsByKey = {}; // `${size}|${material}` -> { A,B,C,2,4,6 }
+      for (const line of lines) {
+        if (!line?.isDownspout) continue;
+        const type = String(line.downspoutSize || "").trim(); // "2x3" | "3x4"
+        const material = String(line.downspoutMaterial || "").trim(); // "aluminum" | "copper" | ""
+        const k = `${type}|${material}`;
+        if (!partsByKey[k])
+          partsByKey[k] = { A: 0, B: 0, C: 0, 2: 0, 4: 0, 6: 0 };
+        const seq = String(line.elbowSequence || "").toUpperCase();
+        for (const ch of seq) {
+          if (["A", "B", "C", "2", "4", "6"].includes(ch)) partsByKey[k][ch]++;
+        }
+      }
+
+      for (const [k, counts] of Object.entries(partsByKey)) {
+        const [type, material] = k.split("|");
+        for (const [part, qtyRaw] of Object.entries(counts)) {
+          const qty = toNum(qtyRaw);
+          if (qty <= 0) continue;
+
+          const isOffset = ["2", "4", "6"].includes(part);
+          const label = isOffset
+            ? `${type} ${material ? material + " " : ""}${part}" Offset`
+            : `${type} ${material ? material + " " : ""}${part} Elbow`;
+
+          // try to resolve by a synthetic "product-like" identity using slug first
+          const pseudoProduct = {
+            // using consistent type/profile helps slug resolver
+            type: "downspout",
+            profile: isOffset ? "offset" : "elbow",
+            size: type,
+            name: label,
+          };
+          const resolved = resolveProduct({
+            slug: slugOf(pseudoProduct),
+            name: label,
+            // give the resolver multiple angles
+            type: pseudoProduct.type,
+            profile: pseudoProduct.profile,
+            size: pseudoProduct.size,
+          });
+
+          const priceResolved = toNum(resolved?.price || 0);
+          items.push({
+            item: label,
+            quantity: qty,
+            price: priceResolved, // 0 if not found; you can set these in catalog
+            description: resolved?.description || "",
+          });
+        }
+      }
+
+      // 4) Optional counters (0-priced placeholders you may price later)
+      const miscCounters = (() => {
+        let splashBlocks = 0;
+        let rainBarrelConnections = 0;
+        let undergroundDrainageConnections = 0;
+        for (const line of lines) {
+          if (!line?.isDownspout) continue;
+          if (line.splashBlock) splashBlocks++;
+          if (line.rainBarrel) rainBarrelConnections++;
+          if (line.undergroundDrainage) undergroundDrainageConnections++;
+        }
+        return {
+          splashBlocks,
+          rainBarrelConnections,
+          undergroundDrainageConnections,
+        };
+      })();
+
+      if (miscCounters.splashBlocks > 0)
+        items.push({
+          item: "Splash Block",
+          quantity: miscCounters.splashBlocks,
+          price: 0,
+          description: "",
+        });
+      if (miscCounters.rainBarrelConnections > 0)
+        items.push({
+          item: "Rain Barrel Connection",
+          quantity: miscCounters.rainBarrelConnections,
+          price: 0,
+          description: "",
+        });
+      if (miscCounters.undergroundDrainageConnections > 0)
+        items.push({
+          item: "Underground Drainage Connection",
+          quantity: miscCounters.undergroundDrainageConnections,
+          price: 0,
+          description: "",
+        });
+
+      return items;
+    };
+  }, [resolveProduct]);
+
+  // Rebuild items when the diagram/modal changes
   useEffect(() => {
     const next = buildItemized(selectedDiagram);
     setItemizedArray(next);
-  }, [selectedDiagram, activeModal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDiagram, activeModal, buildItemized]);
+
+  const grandTotal = useMemo(() => {
+    return (itemizedArray || []).reduce((sum, row) => {
+      return sum + toNum(row.quantity) * toNum(row.price);
+    }, 0);
+  }, [itemizedArray]);
 
   // ===== Render =====
   return (
     <Document>
       <Page style={styles.page}>
         <Text style={styles.header}>ESTIMATE</Text>
+
         <View>
           <View style={[styles.section, { paddingBottom: 40 }]}>
             <Text style={[styles.text, styles.bold, { textAlign: "right" }]}>
@@ -518,6 +343,7 @@ function EstimatePDF({
               {project?.sitePrimaryPhone}
             </Text>
           </View>
+
           <View
             style={[
               styles.section,
@@ -546,6 +372,7 @@ function EstimatePDF({
                 {project?.billingPrimaryPhone}
               </Text>
             </View>
+
             <View
               style={{
                 display: "flex",
@@ -621,6 +448,8 @@ function EstimatePDF({
               </View>
             </View>
           </View>
+
+          {/* Logo */}
           <View
             style={{
               position: "absolute",
@@ -686,14 +515,12 @@ function EstimatePDF({
             </Text>
           </View>
 
-          {itemizedArray.map((line, index) => {
-            const qty = Number(line.quantity || 0);
-            const price = Number(line.price || 0);
-            const amount = (qty * price).toFixed(2);
-
+          {itemizedArray.map((line, i) => {
+            const qty = toNum(line.quantity);
+            const amount = (qty * toNum(line.price)).toFixed(2);
             return (
               <View
-                key={index}
+                key={i}
                 style={{
                   flexDirection: "row",
                   padding: 8,
@@ -703,7 +530,7 @@ function EstimatePDF({
               >
                 <View style={{ width: "60%" }}>
                   <Text style={{ fontSize: "12px", fontWeight: "bold" }}>
-                    {capitalizeWords(line.item || "N/A")}
+                    {capWords(line.item || "N/A")}
                   </Text>
                   <Text
                     style={{ fontSize: "10px", color: "#555", marginTop: 2 }}
@@ -711,7 +538,6 @@ function EstimatePDF({
                     {line.description || ""}
                   </Text>
                 </View>
-
                 <Text
                   style={{
                     width: "20%",
@@ -783,6 +609,9 @@ function EstimatePDFButton({
           logoUrl={logoUrl}
           activeModal={activeModal}
           currentUser={currentUser}
+          products={
+            estimate?.products /* pass products if you store them here */
+          }
         />
       }
       fileName={fileName}
