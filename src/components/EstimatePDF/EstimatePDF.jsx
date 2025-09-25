@@ -8,8 +8,7 @@ import {
   Image,
 } from "@react-pdf/renderer";
 
-import { useEffect } from "react";
-
+// ---- styles ----
 const styles = StyleSheet.create({
   page: {
     fontFamily: "Helvetica",
@@ -42,11 +41,10 @@ const styles = StyleSheet.create({
 
   section: { marginBottom: 16 },
   sectionTitle: { fontSize: 10, marginBottom: 6, fontWeight: "bold" },
-  row: { flexDirection: "row", justifyContent: "space-between" },
   billTo: { flex: 1, marginRight: 20 },
   jobSite: { marginLeft: "auto" },
 
-  // table (no grid lines – only header band + row separators)
+  // table (no grid)
   table: { marginTop: 8 },
   tableHeader: {
     flexDirection: "row",
@@ -55,10 +53,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   th: { fontSize: 10, fontWeight: "bold" },
-  colItem: { width: "50%" },
-  colQty: { width: "15%", textAlign: "right" },
-  colUnit: { width: "15%", textAlign: "right" }, // retained, not rendered
-  colAmount: { width: "20%", textAlign: "right" },
   tableRow: {
     flexDirection: "row",
     paddingVertical: 6,
@@ -66,8 +60,6 @@ const styles = StyleSheet.create({
     borderBottom: "1pt solid #e6e6e6",
   },
   cell: { fontSize: 10 },
-
-  notes: { marginTop: 14, padding: 10, border: "1pt solid #ccc", fontSize: 10 },
 
   amountDueWrap: {
     marginTop: 16,
@@ -78,8 +70,8 @@ const styles = StyleSheet.create({
   amountText: { fontSize: 12, fontWeight: "bold", textAlign: "right" },
 
   keySection: { marginTop: 16 },
-  keyRow: { flexDirection: "row", gap: 12 },
-  keyItem: { flexDirection: "row", alignItems: "center" },
+  keyRow: { flexDirection: "row" },
+  keyItem: { flexDirection: "row", alignItems: "center", marginRight: 12 },
   swatch: { width: 10, height: 10, marginRight: 6, border: "1pt solid #333" },
 
   // page 2
@@ -93,6 +85,7 @@ const styles = StyleSheet.create({
   page2Notes: { marginTop: 10, fontSize: 10 },
 });
 
+// ---- helpers ----
 const fmt = (n) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     Number(n || 0)
@@ -108,8 +101,8 @@ function fold(items) {
         it.name,
         it.meta?.kind || "",
         it.meta?.miterType || "",
-        it.meta?.code || "", // A/B/C elbows
-        it.meta?.inches || "", // offsets
+        it.meta?.code || "",
+        it.meta?.inches || "",
         it.meta?.side || "",
         it.meta?.size || it.meta?.sizeKey || "",
         it.meta?.profile || "",
@@ -135,6 +128,37 @@ const prettyDs = (raw = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+// normalize CSS color -> hex for @react-pdf
+function normalizeColor(c) {
+  if (!c) return "#000";
+  const s = String(c).trim();
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) return s;
+  const m = s.match(/^rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) {
+    const toHex = (n) =>
+      Math.max(0, Math.min(255, parseInt(n, 10)))
+        .toString(16)
+        .padStart(2, "0");
+    return `#${toHex(m[1])}${toHex(m[2])}${toHex(m[3])}`;
+  }
+  const NAMED = {
+    red: "#ff0000",
+    blue: "#0000ff",
+    green: "#008000",
+    black: "#000000",
+    white: "#ffffff",
+    gray: "#808080",
+    grey: "#808080",
+    orange: "#ffa500",
+    yellow: "#ffff00",
+    purple: "#800080",
+    pink: "#ffc0cb",
+    brown: "#a52a2a",
+  };
+  const lower = s.toLowerCase();
+  return NAMED[lower] || s;
+}
+
 export default function EstimatePDF({
   estimate,
   selectedDiagram,
@@ -143,15 +167,15 @@ export default function EstimatePDF({
   estimateData,
   project,
   products,
-  showPrices = true, // now controls visibility of Amount column
+  showPrices = true, // controls visibility of Amount column
   extraItems = [],
-  items = [], // saved items (viewer mode)
+  items = [], // saved items
 }) {
-  // Base rows from diagram
+  // ---- rows from diagram ----
   const lines = selectedDiagram?.lines || [];
   const baseRows = [];
 
-  // capture first seen colors for the legend (prefer drawn color)
+  // legend colors (prefer drawn color)
   let gutterColor = null;
   let downspoutColor = null;
 
@@ -163,7 +187,7 @@ export default function EstimatePDF({
         unitPrice: Number(l.price || 0),
         meta: { kind: "downspout" },
       });
-      if (!downspoutColor) downspoutColor = l.color || "#000";
+      if (!downspoutColor) downspoutColor = normalizeColor(l.color || "#000");
     } else if (l.currentProduct) {
       baseRows.push({
         name: l.currentProduct.name,
@@ -172,22 +196,23 @@ export default function EstimatePDF({
         meta: { kind: "gutter" },
       });
       if (!gutterColor)
-        gutterColor =
+        gutterColor = normalizeColor(
           l.color ||
-          l.currentProduct?.colorCode ||
-          l.currentProduct?.visual ||
-          l.currentProduct?.color ||
-          "#000";
+            l.currentProduct?.colorCode ||
+            l.currentProduct?.visual ||
+            l.currentProduct?.color ||
+            "#000"
+        );
     }
   });
 
-  // Accessories (elbows/offsets/etc.)
+  // accessories
   const accessoryItems =
     selectedDiagram?.accessories?.items ||
     selectedDiagram?.accessoryItems ||
     [];
 
-  // Prefer saved items if provided; else build from diagram + accessories
+  // prefer saved items (viewer/download) else build from diagram+accessories
   const presetRows =
     Array.isArray(items) && items.length
       ? items.map((it) => ({
@@ -212,19 +237,33 @@ export default function EstimatePDF({
     0
   );
 
-  // Legend squares (we’ll render these under the diagram on page 2)
-  const legend = [];
-  if (gutterColor) legend.push({ label: "Gutter", color: gutterColor });
-  if (downspoutColor)
-    legend.push({ label: "Downspout", color: downspoutColor });
-
+  // diagram image
   const diagramImage =
     selectedDiagram?.imageDataLarge || selectedDiagram?.imageData || null;
 
-  // Widths when Amount is hidden vs shown
+  // widths when Amount hidden vs shown
   const itemHeaderWidth = showPrices ? "70%" : "85%";
   const qtyHeaderWidth = showPrices ? "10%" : "15%";
   const amtHeaderWidth = "20%";
+
+  // Payment due default
+  const paymentDueText = estimateData?.paymentDue || "Upon completion.";
+
+  // pull Bill To / Job Site exactly as requested, with safe fallbacks
+  const billToName = project?.billingName || "";
+  const billToAddress = project?.billingAddress || "";
+  const billToPhone = project?.billingPrimaryPhone || "";
+
+  const jobName =
+    project?.projectName ||
+    estimate?.projectSnapshot?.name ||
+    project?.name ||
+    "";
+  const jobAddress =
+    project?.projectAddress ||
+    estimate?.projectSnapshot?.address ||
+    project?.address ||
+    "";
 
   return (
     <Document>
@@ -247,7 +286,7 @@ export default function EstimatePDF({
                 Estimate Number: {estimateData?.estimateNumber || "—"}
               </Text>
               <Text>Estimate Date: {estimateData?.estimateDate || ""}</Text>
-              <Text>Payment Due: {estimateData?.paymentDue || ""}</Text>
+              <Text>Payment Due: {paymentDueText}</Text>
             </View>
 
             <View style={styles.amountPillRow}>
@@ -260,20 +299,23 @@ export default function EstimatePDF({
 
         {/* Bill To / Job Site */}
         <View style={[styles.section, { flexDirection: "row" }]}>
+          {/* BILL TO — exact fields */}
           <View style={styles.billTo}>
             <Text style={styles.sectionTitle}>BILL TO</Text>
-            <Text>{project?.billingName}</Text>
-            <Text>{project?.billingAddress}</Text>
-            <Text>{project?.billingPrimaryPhone}</Text>
+            <Text>{billToName}</Text>
+            <Text>{billToAddress}</Text>
+            <Text>{billToPhone}</Text>
           </View>
+
+          {/* JOB SITE — exact fields with fallbacks */}
           <View style={styles.jobSite}>
             <Text style={styles.sectionTitle}>JOB SITE</Text>
-            <Text>{project?.name}</Text>
-            <Text>{project?.address}</Text>
+            <Text>{jobName}</Text>
+            <Text>{jobAddress}</Text>
           </View>
         </View>
 
-        {/* Items table (Unit column removed; Amount shown only when showPrices) */}
+        {/* Items table (Unit Price removed; Amount shown only when showPrices) */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
             <View style={{ width: itemHeaderWidth }}>
@@ -317,7 +359,7 @@ export default function EstimatePDF({
         </View>
       </Page>
 
-      {/* PAGE 2 — Big diagram and notes, with legend under the diagram */}
+      {/* PAGE 2 — Big diagram, legend under image, notes */}
       <Page size="LETTER" style={styles.page}>
         <View style={styles.headerRow}>
           <View>
@@ -336,22 +378,33 @@ export default function EstimatePDF({
           <Text>(No diagram image)</Text>
         )}
 
-        {/* Legend under the diagram, using actual drawn colors */}
-        {legend.length ? (
+        {/* Legend under the diagram with real draw colors */}
+        {gutterColor || downspoutColor ? (
           <View style={[styles.keySection, { marginTop: 8 }]}>
             <Text style={styles.sectionTitle}>Key</Text>
             <View style={styles.keyRow}>
-              {legend.map((k, idx) => (
-                <View key={idx} style={styles.keyItem}>
+              {gutterColor ? (
+                <View style={styles.keyItem}>
                   <View
                     style={[
                       styles.swatch,
-                      { backgroundColor: k.color || "#000" },
+                      { backgroundColor: normalizeColor(gutterColor) },
                     ]}
                   />
-                  <Text>{k.label}</Text>
+                  <Text>Gutter</Text>
                 </View>
-              ))}
+              ) : null}
+              {downspoutColor ? (
+                <View style={styles.keyItem}>
+                  <View
+                    style={[
+                      styles.swatch,
+                      { backgroundColor: normalizeColor(downspoutColor) },
+                    ]}
+                  />
+                  <Text>Downspout</Text>
+                </View>
+              ) : null}
             </View>
           </View>
         ) : null}

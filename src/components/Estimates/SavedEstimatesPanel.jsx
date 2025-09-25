@@ -27,6 +27,7 @@ export default function SavedEstimatesPanel({
   const [loading, setLoading] = useState(false);
   const [estimates, setEstimates] = useState([]);
   const [error, setError] = useState(null);
+  const [logoUrl, setLogoUrl] = useState(null);
 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [activeEstimate, setActiveEstimate] = useState(null);
@@ -64,6 +65,34 @@ export default function SavedEstimatesPanel({
     window.addEventListener("estimate-created", onCreated);
     return () => window.removeEventListener("estimate-created", onCreated);
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?._id || !token) return;
+    fetch(`${BASE_URL}users/${currentUser._id}/logo`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Logo fetch failed");
+        return res.blob();
+      })
+      .then(
+        (blob) =>
+          new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onloadend = () => resolve(r.result); // base64 data URL
+            r.onerror = reject;
+            r.readAsDataURL(blob);
+          })
+      )
+      .then((b64) => setLogoUrl(b64))
+      .catch((err) => {
+        console.warn(
+          "No logo available or failed to load:",
+          err?.message || err
+        );
+        setLogoUrl(null);
+      });
+  }, [currentUser?._id, token]);
 
   useEffect(() => {
     fetchEstimates();
@@ -188,7 +217,7 @@ export default function SavedEstimatesPanel({
           const padded = String(est.estimateNumber || 0).padStart(3, "0");
           const proj = est.projectSnapshot || {};
           const docProps = {
-            estimate: null,
+            estimate: est, // pass full estimate so PDF can use projectSnapshot fallbacks when needed
             selectedDiagram: {
               imageData: est?.diagram?.imageData || null,
               lines: Array.isArray(est?.diagram?.lines)
@@ -196,22 +225,28 @@ export default function SavedEstimatesPanel({
                 : [],
             },
             activeModal: null,
-            currentUser: currentUser,
-            logoUrl: null,
+            currentUser,
+            logoUrl, // base64 logo you fetch in this component
             estimateData: {
-              estimateNumber: padded,
+              estimateNumber: String(est.estimateNumber || 0).padStart(3, "0"),
               estimateDate: est.estimateDate || "",
+              paymentDue: est.paymentDue || "Upon completion.", // ensure default text
               notes: est.notes || "",
             },
-            project: { name: proj.name, address: proj.address },
+            // IMPORTANT: pass the live project so Bill To has billingName/billingAddress/billingPrimaryPhone,
+            // and Job Site can take projectName/projectAddress.
+            // If you *don’t* have `project` in scope, keep passing whatever you already pass here
+            // that contains those fields. Otherwise, we’ll fall back to estimate.projectSnapshot inside the PDF.
+            project,
+
             products,
             items: (est.items || []).map((it) => ({
               name: it.name,
               quantity: Number(it.quantity || 0),
               price: Number(it.price || 0),
             })),
+            // showPrices: true, // or whatever your toggle dictates for downloads
           };
-
           return (
             <div
               key={est._id}

@@ -1,4 +1,4 @@
-// src/components/EstimateModal/EstimateViewerModal.jsx
+// src/components/Estimates/EstimateViewerModal.jsx
 import Modal from "react-modal";
 import { useEffect, useMemo, useState } from "react";
 import { PDFViewer } from "@react-pdf/renderer";
@@ -19,7 +19,7 @@ export default function EstimateViewerModal({
   estimateId,
   fallbackEstimate, // optional preloaded doc (from list row)
   currentUser,
-  selectedProject,
+  selectedProject, // <-- live project (has billingName, etc.)
   products,
 }) {
   const token =
@@ -29,7 +29,7 @@ export default function EstimateViewerModal({
   const [logoUrl, setLogoUrl] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // fetch one estimate by id
+  // fetch the estimate by id when opened
   useEffect(() => {
     if (!isOpen) return;
     if (!estimateId || !token) {
@@ -51,68 +51,94 @@ export default function EstimateViewerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, estimateId, token]);
 
-  // company logo
+  // company logo as base64 (so @react-pdf can embed it)
   useEffect(() => {
     if (!isOpen || !token || !currentUser?._id) return;
     fetch(`${BASE_URL}users/${currentUser._id}/logo`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => res.blob())
-      .then((blob) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      })
-      .then((base64Image) => setLogoUrl(base64Image))
-      .catch((err) => console.error("Failed to fetch logo:", err));
+      .then((res) => (res.ok ? res.blob() : Promise.reject(res)))
+      .then(
+        (blob) =>
+          new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onloadend = () => resolve(r.result);
+            r.onerror = reject;
+            r.readAsDataURL(blob);
+          })
+      )
+      .then((b64) => setLogoUrl(b64))
+      .catch((err) => {
+        console.warn("No logo or failed to load logo:", err);
+        setLogoUrl(null);
+      });
   }, [isOpen, token, currentUser?._id]);
 
+  // Build the exact props EstimatePDF expects, preferring selectedProject over snapshot
   const pdfProps = useMemo(() => {
     if (!doc) return null;
-    const padded = String(doc.estimateNumber || 0).padStart(3, "0");
-    const proj = doc.projectSnapshot || {};
 
-    // Saved rows exactly as stored:
-    const savedItems = (doc.items || []).map((it) => ({
-      name: it.name,
-      quantity: Number(it.quantity || 0),
-      price: Number(it.price || 0),
-    }));
+    const snap = doc.projectSnapshot || {};
+    const proj = selectedProject || {};
 
-    // Bill To snapshot for PDF (use what the server stored)
-    const billToSnapshot = {
-      name: proj.name || "",
-      address: proj.address || "",
-      email: proj.email || "",
-      phone: proj.phone || "",
-    };
+    // Number padded like preview
+    const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
+
+    // BILL TO — EXACT fields from live project first, then snapshot
+    const billingName = proj.billingName ?? snap.billingName ?? "";
+    const billingAddress = proj.billingAddress ?? snap.billingAddress ?? "";
+    const billingPrimaryPhone =
+      proj.billingPrimaryPhone ?? snap.billingPrimaryPhone ?? "";
+
+    // JOB SITE — EXACT fields from live project first, then snapshot
+    const projectName = proj.projectName ?? snap.projectName ?? proj.name ?? "";
+    const projectAddress =
+      proj.projectAddress ?? snap.projectAddress ?? proj.address ?? "";
 
     return {
-      estimate: null,
+      // Diagram / lines (prefer saved doc)
       selectedDiagram: {
         imageData: doc?.diagram?.imageData || null,
         lines: Array.isArray(doc?.diagram?.lines) ? doc.diagram.lines : [],
+        accessories: doc?.accessories || undefined,
       },
-      activeModal: null,
+
+      // Identity / header info
       currentUser,
       logoUrl,
       estimateData: {
-        estimateNumber: padded,
+        estimateNumber: paddedNum,
         estimateDate: doc.estimateDate || "",
+        paymentDue: doc.paymentDue || "Upon completion.", // ensure default with period
         notes: doc.notes || "",
       },
-      project: { name: proj.name, address: proj.address },
-      projectExtra: selectedProject,
+
+      // PROJECT passed exactly as preview expects
+      project: {
+        billingName,
+        billingAddress,
+        billingPrimaryPhone,
+        projectName,
+        projectAddress,
+        // keep legacy fields too in case EstimatePDF reads name/address:
+        name: projectName,
+        address: projectAddress,
+      },
+
+      // Items saved with estimate (incl. impromptu)
+      items: (doc.items || []).map((it) => ({
+        name: it.name,
+        quantity: Number(it.quantity || 0),
+        price: Number(it.price || 0),
+      })),
+
+      // Pass-throughs
       products,
-      items: savedItems, // ← saved rows (preferred by EstimatePDF)
-      billToSnapshot, // ← snapshot for Bill To
-      showPrices: true,
-      extraItems: [],
+      showPrices: doc.showPrices ?? true,
+      estimate: doc, // let PDF fall back to snapshot if ever needed
+      extraItems: [], // not used for saved docs
     };
-  }, [doc, logoUrl, currentUser, products, selectedProject]);
+  }, [doc, selectedProject, currentUser, logoUrl, products]);
 
   const modalStyle = {
     overlay: { backgroundColor: "rgba(0,0,0,0.5)" },
@@ -164,11 +190,14 @@ export default function EstimateViewerModal({
 
       <div style={{ flex: 1, minHeight: 0 }}>
         {loading && <div style={{ padding: 16, color: "#aaa" }}>Loading…</div>}
+
         {!loading && pdfProps && (
           <PDFViewer style={{ width: "100%", height: "100%" }}>
-            <EstimatePDF selectedProject={selectedProject} {...pdfProps} />
+            {/* IMPORTANT: pass project via pdfProps.project (not selectedProject) */}
+            <EstimatePDF {...pdfProps} />
           </PDFViewer>
         )}
+
         {!loading && !pdfProps && (
           <div style={{ padding: 16, color: "#aaa" }}>
             Estimate not available.
