@@ -8,15 +8,34 @@ export default function Settings({ currentUser, setCurrentUser }) {
   const [token, setToken] = useState("");
   const [companyName, setCompanyName] = useState(currentUser.companyName);
   const [companyAddress, setCompanyAddress] = useState(
-    currentUser.companyAddress,
+    currentUser.companyAddress
   );
   const [companyPhoneNumber, setCompanyPhoneNumber] = useState(
-    currentUser.companyPhone,
+    currentUser.companyPhone
   );
   const [logoFile, setLogoFile] = useState(null);
   const [dummyState, setDummyState] = useState(false);
 
   const [logoUrl, setLogoUrl] = useState(null);
+
+  function ManageBillingButton({ token }) {
+    async function openPortal() {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/billing/portal`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!res.ok) {
+        alert("Could not open billing portal");
+        return;
+      }
+      const { url } = await res.json();
+      window.location.assign(url);
+    }
+    return <button onClick={openPortal}>Manage billing</button>;
+  }
 
   function handleCompanyNameChange(e) {
     setCompanyName(e.target.value);
@@ -50,10 +69,9 @@ export default function Settings({ currentUser, setCurrentUser }) {
 
     if (logoFile) {
       uploadLogo(logoFile, token).then(() => {
-
-    if (currentUser?._id && token) {
-      getCompanyLogo(currentUser._id, token).then(setLogoUrl);
-    }
+        if (currentUser?._id && token) {
+          getCompanyLogo(currentUser._id, token).then(setLogoUrl);
+        }
       });
     }
   }
@@ -62,7 +80,7 @@ export default function Settings({ currentUser, setCurrentUser }) {
     const token = localStorage.getItem("jwt");
     setToken(token);
 
-    console.log('this is the logo call');
+    console.log("this is the logo call");
     if (currentUser?._id && token) {
       getCompanyLogo(currentUser._id, token)
         .then((url) => {
@@ -136,6 +154,7 @@ export default function Settings({ currentUser, setCurrentUser }) {
             </button>
           </div>
         </form>
+        <ManageBillingButton token={token} />
       </div>
     </div>
   );

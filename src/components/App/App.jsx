@@ -10,6 +10,7 @@ import { Routes, Route } from "react-router-dom";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
 import { useState, useEffect, useCallback } from "react";
 import { ProductsProvider } from "../../contexts/ProductsContext";
+import { useSearchParams } from "react-router-dom";
 import {
   signin,
   getUser,
@@ -92,6 +93,27 @@ function App() {
         console.error(err);
       });
   }, []);
+
+  function BillingCancelled() {
+    return (
+      <div style={{ padding: 20 }}>
+        <h1>Payment Cancelled</h1>
+        <a href="/dashboard/projects">Return to projects</a>
+      </div>
+    );
+  }
+
+  function BillingSuccess() {
+    const [params] = useSearchParams();
+    const sessionId = params.get("session_id");
+
+    return (
+      <div style={{ padding: 20 }}>
+        <h1>Payment Successful 🎉 Enjoy using Esti-Mate</h1>
+        <a href="/dashboard/projects">Go back to projects</a>
+      </div>
+    );
+  }
 
   // App.jsx — handleLogin
   function handleLogin(email, password) {
@@ -312,6 +334,8 @@ function App() {
                   />
                 }
               />
+              <Route path="/billing/success" element={<BillingSuccess />} />
+              <Route path="/billing/cancelled" element={<BillingCancelled />} />
             </Routes>
             <>
               {mobileDiagramActive ? (

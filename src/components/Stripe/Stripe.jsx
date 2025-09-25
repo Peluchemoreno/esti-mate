@@ -17,8 +17,8 @@ const API_BASE =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://127.0.0.1:4000";
 
 const plankey = {
-  basic: "price_1S84vkLogbJCypHWKzhe2KJ4",
-  test: "price_1S9FTULogbJCypHWJ2H7eS3Q",
+  basic: "price_1S9FSOLV1NkgtKMpFGrODp7C",
+  test: "price_1SAblmLV1NkgtKMp569jEsoF",
   pro: "price_PRO_PLACEHOLDER", // fill in if/when you have real ids
   enterprise: "price_ENT_PLACEHOLDER", // fill in if/when you have real ids
 };

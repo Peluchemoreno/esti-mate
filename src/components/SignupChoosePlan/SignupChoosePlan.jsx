@@ -20,7 +20,7 @@ export default function SignupPlans() {
       <div className="plans">
         <div className="plan" onClick={() => choose("basic")}>
           <h3>Basic Estimate Package</h3>
-          <p>$49.99/month</p>
+          <p>$59.99/month</p>
           <ul>
             <li>Basic features</li>
             <li>Unlimited projects</li>
@@ -28,33 +28,13 @@ export default function SignupPlans() {
           </ul>
         </div>
 
-        <div className="plan" onClick={() => choose("pro")}>
-          <h3>Pro Estimate Package</h3>
-          <p>$69.99/month</p>
-          <ul>
-            <li>All Free Plan features</li>
-            <li>Unlimited projects</li>
-            <li>Priority email support</li>
-          </ul>
-        </div>
-
         <div className="plan" onClick={() => choose("test")}>
           <h3>Test Estimate Package</h3>
           <p>$0.01/month</p>
           <ul>
-            <li>All Free Plan features</li>
+            <li>All Basic Plan features</li>
             <li>Unlimited projects</li>
             <li>Priority email support</li>
-          </ul>
-        </div>
-
-        <div className="plan" onClick={() => choose("enterprise")}>
-          <h3>Elite Estimate Package</h3>
-          <p>$129.99/month</p>
-          <ul>
-            <li>All Pro Plan features</li>
-            <li>Dedicated account manager</li>
-            <li>Custom integrations</li>
           </ul>
         </div>
       </div>
