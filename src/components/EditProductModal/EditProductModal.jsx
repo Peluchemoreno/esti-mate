@@ -1,8 +1,15 @@
 import "./EditProductModal.css";
 import { useState, useEffect } from "react";
 import { updateProduct, deleteProduct } from "../../utils/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { useProductsCatalog } from "../../contexts/ProductsContext";
 
-export default function EditProductModal({ activeModal, closeModal, product }) {
+export default function EditProductModal({
+  activeModal,
+  closeModal,
+  product,
+  refresh,
+}) {
   const [itemName, setItemName] = useState("");
   const [itemVisualColor, setItemVisualColor] = useState("#000000");
   const [quantityUnit, setQuantityUnit] = useState("length-feet");
@@ -22,7 +29,16 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
   useEffect(() => {
     console.log(product);
     setItemName(product?.name || "defualt name");
-    setItemVisualColor(product?.colorCode || "#000000");
+
+    // Prefer whatever the server now stores (color), else fall back to legacy fields.
+    const seededColor =
+      product?.color ||
+      product?.colorCode ||
+      product?.defaultColor ||
+      product?.visual ||
+      "#000000";
+    setItemVisualColor(seededColor);
+
     setQuantityUnit(product?.unit === "foot" ? "length-feet" : "unit/per");
     setItemPrice(product?.price || "0.00");
     setDescription(
@@ -30,6 +46,12 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     );
     // setScreenOptions(product.gutterGuardOptions);
   }, [product, activeModal]);
+
+  const productsCtx =
+    (typeof useProductsCatalog === "function" ? useProductsCatalog() : null) ||
+    {};
+  const reloadProductsCatalog =
+    productsCtx.reload || productsCtx.refetch || null;
 
   function handleCategoryChange(e) {
     setCategory(e.target.value);
@@ -87,26 +109,77 @@ export default function EditProductModal({ activeModal, closeModal, product }) {
     setScreenInputPrice(e.target.value);
   }
 
-  function handleItemUpdateSubmit(e) {
+  // EditProductModal.jsx  (replace handleItemUpdateSubmit)
+  // ...
+  const queryClient = useQueryClient();
+
+  async function handleItemUpdateSubmit(e) {
     e.preventDefault();
     const token = localStorage.getItem("jwt");
-    const productData = {
+    if (!token) return;
+
+    const payload = {
+      productId: product._id,
       name: itemName,
       colorCode: itemVisualColor,
-      unit: quantityUnit,
-      price: parseFloat(itemPrice).toFixed(2).toString(),
-      productId: product._id,
+      unit: quantityUnit === "length-feet" ? "foot" : "unit",
+      price: Number(itemPrice),
+      type: product?.type || "gutter",
       description,
       category,
       listed: isListed,
-      removalPricePerFoot: removalPrice,
-      repairPricePerFoot: repairPrice,
-      gutterGuardOptions: screenOptions,
+      removalPricePerFoot: removalPrice ? Number(removalPrice) : undefined,
+      repairPricePerFoot: repairPrice ? Number(repairPrice) : undefined,
+      gutterGuardOptions: screenOptions?.map((o) => ({
+        name: o.name,
+        price: Number(o.price),
+      })),
     };
-    updateProduct(productData, token);
 
-    console.log(productData);
-    closeModal();
+    try {
+      await updateProduct(payload, token); // your api helper
+      // invalidate caches used by Products/Diagram/PDF
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["gutterProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["downspoutProducts"] });
+      // tell other tabs/routes to refresh their local lists
+      window.dispatchEvent(new Event("products-updated"));
+      closeModal();
+      // ---- begin: instant catalog propagation ----
+      try {
+        // 1) refresh context (if provided by your app)
+        if (typeof reloadProductsCatalog === "function") {
+          await reloadProductsCatalog(); // make the context push new products to all subscribers
+        }
+
+        // 2) broadcast an in-tab event
+        window.dispatchEvent(
+          new CustomEvent("catalog:updated", { detail: { ts: Date.now() } })
+        );
+
+        // 3) bump a cross-tab version so other tabs/windows pick it up
+        localStorage.setItem("catalogVersion", String(Date.now()));
+      } catch (e) {
+        console.warn("catalog propagation warning:", e);
+      }
+      // ---- end: instant catalog propagation ----
+    } catch (err) {
+      console.error("Update failed", err);
+    }
+    queryClient.setQueryData(["products"], (old = []) =>
+      old.map((p) =>
+        p._id === product._id
+          ? {
+              ...p,
+              price: Number(itemPrice),
+              colorCode: itemVisualColor,
+              description,
+              type: p.type || "gutter",
+              listed: isListed,
+            }
+          : p
+      )
+    );
   }
 
   function handleItemDeleteClick() {

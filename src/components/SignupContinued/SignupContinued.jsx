@@ -2,8 +2,15 @@ import "./SignupContinued.css";
 import { Link, useNavigate } from "react-router-dom";
 import estimateLogo from "../../assets/estimate-nobackground-blue.png";
 import { useEffect, useState } from "react";
+import Loader from "../Loader/Loader";
 
-export default function SignupContinued({ userData, handleSignUp }) {
+export default function SignupContinued({
+  setTempUserData,
+  userData,
+  handleSignUp,
+  setTempLogo,
+  isLoading,
+}) {
   useEffect(() => {
     console.log(userData);
   }, []);
@@ -12,6 +19,7 @@ export default function SignupContinued({ userData, handleSignUp }) {
   const [logo, setLogo] = useState(null);
   const [companyAddress, setCompanyAddress] = useState("");
   const [companyPhone, setCompanyPhone] = useState("");
+  const navigator = useNavigate();
 
   function handleCompanyNameChange(e) {
     setCompanyName(e.target.value);
@@ -22,10 +30,11 @@ export default function SignupContinued({ userData, handleSignUp }) {
   }
 
   function handleSubmit(e) {
+    // change user flow to instead of handling sign up here, navigate to choose plan page, then stripe, then handle sign up
+
     e.preventDefault();
     userData = { ...userData, companyName, companyAddress, companyPhone };
-    console.log(userData);
-
+    console.log("runing handle submit");
     handleSignUp(userData, logo);
   }
 
@@ -97,7 +106,7 @@ export default function SignupContinued({ userData, handleSignUp }) {
         </label>
 
         <button type="submit" className="signin__button signin-cont__button">
-          Sign Up
+          {isLoading ? <Loader /> : "Sign Up"}
         </button>
         <Link to={"/signup"}>
           <button className="signup__form-back-button button">Back</button>

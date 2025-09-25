@@ -1,16 +1,24 @@
 // src/components/Products/Products.jsx
 import "./Products.css";
-import { DataGrid } from "@mui/x-data-grid";
+import { DataGrid, gridNumberComparator } from "@mui/x-data-grid";
 import { Box } from "@mui/material/";
 import { useEffect, useMemo, useState } from "react";
 import AddProductModal from "../AddProductModal/AddProductModal";
 import EditProductModal from "../EditProductModal/EditProductModal";
 import { getProducts, createProduct } from "../../utils/api";
+import { useProductsCatalog } from "../../contexts/ProductsContext";
 
 export default function Products({ activeModal, setActiveModal, closeModal }) {
+  const { refresh } = useProductsCatalog();
   const [tableRows, setTableRows] = useState([]);
   const [currentItem, setCurrentItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+
+  const isGutter = (p) => p?.type === "gutter";
+
+  // prefers a saved user color, falls back to template defaults some UIs use
+  const resolveColor = (p) =>
+    p?.color || p?.colorCode || p?.defaultColor || p?.visual || null;
 
   // Deduplicate defensively by _id (guards against double fetches/StrictMode)
   const uniqueRows = useMemo(() => {
@@ -56,23 +64,34 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
         headerName: "Visual",
         width: 150,
         headerClassName: "products__column-header",
-        renderCell: (params) => (
-          <Box
-            onClick={() => console.log(params.row)}
-            sx={{
-              width: "100%",
-              height: "100%",
-              backgroundColor: params.row?.colorCode || "transparent",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-start",
-              paddingLeft: 1,
-            }}
-          >
-            <div>{params.row?.colorCode ?? "-"}</div>
-          </Box>
-        ),
+        renderCell: (params) => {
+          const isGutter = params.row?.type === "gutter";
+          const gutterColor =
+            params.row?.color ||
+            params.row?.colorCode ||
+            params.row?.defaultColor ||
+            params.row?.visual ||
+            null;
+
+          return (
+            <Box
+              onClick={() => console.log(params.row)}
+              sx={{
+                width: "100%",
+                height: "100%",
+                backgroundColor:
+                  isGutter && gutterColor ? gutterColor : "transparent",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                paddingLeft: 1,
+              }}
+            >
+              <div>{isGutter && gutterColor ? gutterColor : "-"}</div>
+            </Box>
+          );
+        },
       },
       {
         field: "quantity",
@@ -127,7 +146,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
     let cancelled = false;
     (async () => {
       const token = localStorage.getItem("jwt");
-      const res = await getProducts(token);
+      const res = await getProducts(token, "all");
       const list = Array.isArray(res?.products) ? res.products : [];
       if (!cancelled) {
         setTableRows(list); // replace, don't append
@@ -145,6 +164,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
 
   function handleEditItemClick(item) {
     setCurrentItem(item);
+    console.log(item);
     setActiveModal("edit item");
   }
 
@@ -217,6 +237,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
         activeModal={activeModal}
         closeModal={closeModal}
         product={currentItem}
+        refresh={refresh}
       />
     </>
   );

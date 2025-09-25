@@ -52,7 +52,6 @@ export default function Projects({
           Create Project
         </button>
         <label htmlFor="search-projects" className="search-projects-label">
-          
           <input
             id="search-projects"
             type="text"
@@ -61,7 +60,6 @@ export default function Projects({
             value={searchTerm}
             onChange={handleSearchChange}
           />
-
         </label>
       </header>
       <table className="project__table">
@@ -88,7 +86,7 @@ export default function Projects({
                 <ProjectRowData
                   key={project._id}
                   project={project}
-                  owner={`${project.createdBy}`}
+                  owner={`${project.userId}`}
                   created={project.createdAt.replace(/T.+/g, "")}
                 />
               );

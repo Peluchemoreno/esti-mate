@@ -3,6 +3,9 @@ import { useParams } from "react-router-dom";
 import backIcon from "../../assets/icons/back.svg";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+// at top with other imports
+import SavedEstimatesPanel from "../Estimates/SavedEstimatesPanel";
+
 import {
   deleteDiagram,
   deleteProject,
@@ -62,14 +65,8 @@ export default function Project({
   })[0];
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    console.log("Project data:", project);
   }, []);
-
-  useEffect(() => {
-    if (activeModal === "") {
-      setSelectedDiagram({});
-    }
-  }, [activeModal]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -89,6 +86,10 @@ export default function Project({
 
   // console.log(project)
   const navigator = useNavigate();
+
+  useEffect(() => {
+    console.log("activeModal changed", activeModal);
+  }, [activeModal]);
 
   function openDiagramModal() {
     if (isMobile) {
@@ -163,6 +164,12 @@ export default function Project({
             >
               Generate Estimate
             </button>
+            <SavedEstimatesPanel
+              projectId={project?._id}
+              currentUser={currentUser}
+              products={allUnfilteredProducts}
+              project={project}
+            />
 
             <div className="project__body-horizontal-spacer"></div>
             <h2 className="project__body-diagram-header">Diagram</h2>
@@ -232,7 +239,15 @@ export default function Project({
         isOpen={activeModal === "estimate-modal"}
         onClose={closeModal}
         estimate={testData}
-        project={project}
+        project={{
+          name: project?.projectName || project?.name || "",
+          address: project?.siteAddress || project?.address || "",
+          id: projectId || "",
+          billingName: project?.billingName || "",
+          billingAddress: project?.billingAddress || "",
+          billingEmail: project?.billingEmail || "",
+          billingPrimaryPhone: project?.billingPrimaryPhone || "",
+        }}
         selectedDiagram={selectedDiagram}
         activeModal={activeModal}
         currentUser={currentUser}

@@ -105,18 +105,32 @@ export function getProjects(token) {
     });
 }
 
-export function getProducts(token) {
-  return fetch(BASE_URL + "dashboard/products", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      authorization: `Bearer ${token}`,
-    },
-  })
-    .then(processServerResponse)
-    .then((data) => {
-      return data;
-    });
+export function getProducts(token, scope) {
+  if (scope === "all") {
+    return fetch(BASE_URL + "dashboard/products?scope=all", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+    })
+      .then(processServerResponse)
+      .then((data) => {
+        return data;
+      });
+  } else {
+    return fetch(BASE_URL + "dashboard/products", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+    })
+      .then(processServerResponse)
+      .then((data) => {
+        return data;
+      });
+  }
 }
 
 export function createProduct(productData, token) {
@@ -145,6 +159,9 @@ export function updateProduct(productData, token) {
   })
     .then(processServerResponse)
     .then((data) => {
+      // After product update succeeds:
+      window.dispatchEvent(new Event("products-updated"));
+
       return data;
     });
 }

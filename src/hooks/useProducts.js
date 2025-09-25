@@ -1,34 +1,26 @@
+// src/hooks/useProducts.js
 import { useQuery } from "@tanstack/react-query";
 import { getProducts } from "../utils/api";
-
-function getToken() {
-  return localStorage.getItem("jwt") || "";
-}
+import { useProductsCatalog } from "../contexts/ProductsContext";
 
 export function useProducts() {
-  const token = getToken();
+  const { version } = useProductsCatalog() || {};
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
 
   return useQuery({
-    queryKey: ["products", token],
+    queryKey: ["products", version],
     queryFn: async () => {
-      const res = await getProducts(token);
-
-      const products = Array.isArray(res.products) ? res.products : [];
-      return products;
+      if (!token) return [];
+      const data = await getProducts(token); // keep your existing api call signature
+      const list = Array.isArray(data) ? data : data?.products ?? [];
+      return Array.isArray(list) ? list : [];
     },
-    enabled: Boolean(token),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1, // Retry once on failure
-  });
-}
-
-// src/hooks/useProducts.js (add below the export above)
-export function useGutterProducts() {
-  return useProducts({
-    select: (products) =>
-      products.filter((p) => {
-        console.log(p.category);
-        return p.type === "gutter";
-      }),
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    enabled: !!token,
   });
 }

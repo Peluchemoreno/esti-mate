@@ -202,7 +202,7 @@ export default function DownspoutModal({
               </option>
             </select>
           </label>
-          <label className="downspout__drop-label">
+          <label style={{ display: "none" }} className="downspout__drop-label">
             Downspout Material
             <select
               className="downspout__drop-input"

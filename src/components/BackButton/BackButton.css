@@ -1,0 +1,22 @@
+.back-button {
+  background: var(--blue-primary);
+  border: 1px solid var(--white);
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  margin-top: 20px;
+  border-radius: 5px;
+  transition: background 0.3s ease;
+}
+
+.back-button:hover {
+  background: var(--blue-primary-opposite);
+}
+
+.back-button img {
+  width: 20px;
+  height: 20px;
+}

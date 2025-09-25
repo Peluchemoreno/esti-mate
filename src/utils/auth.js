@@ -25,6 +25,7 @@ export function signUp(userData) {
   })
     .then(processServerResponse)
     .then((data) => {
+      console.log("data from signup: ", data);
       return data;
     });
 }
@@ -60,8 +61,6 @@ export function uploadLogo(logo, token) {
     });
 }
 
-
-
 export async function getCompanyLogo(userId, token) {
   const res = await fetch(`${BASE_URL}users/${userId}/logo`, {
     headers: {
@@ -76,7 +75,6 @@ export async function getCompanyLogo(userId, token) {
   const blob = await res.blob();
   return URL.createObjectURL(blob); // ✅ convert blob to browser-usable image URL
 }
-
 
 export function getUser(token) {
   return fetch(BASE_URL + "users/me", {

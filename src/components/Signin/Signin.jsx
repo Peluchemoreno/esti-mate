@@ -2,6 +2,7 @@ import "./Signin.css";
 import logo from "../../assets/estimate-nobackground-blue.png";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import Loader from "../Loader/Loader";
 
 export default function Signin({
   handleLogin,
@@ -46,7 +47,7 @@ export default function Signin({
 
   return (
     <>
-      <Link to="/esti-mate">
+      <Link to="/">
         <img
           src={logo}
           alt="sign in header logo"
@@ -84,16 +85,7 @@ export default function Signin({
           )}
 
           <button type="submit" className="signin__button">
-            {isLoading ? (
-              <div className="signin__preloader-container">
-                <div className="ball ball1"></div>
-                <div className="ball ball2"></div>
-                <div className="ball ball3"></div>
-                <div className="ball ball4"></div>
-              </div>
-            ) : (
-              "Login"
-            )}
+            {isLoading ? <Loader /> : "Login"}
           </button>
         </form>
         <p className="signin__signup-or-forgot-password">
@@ -102,9 +94,9 @@ export default function Signin({
             Sign up.
           </Link>
         </p>
-        <Link className="forgotpw-link" to="/esti-mate">
+        {/* <Link className="forgotpw-link" to="/esti-mate">
           Forgot password?
-        </Link>
+        </Link> */}
       </div>
     </>
   );

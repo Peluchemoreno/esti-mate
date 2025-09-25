@@ -1,12 +1,15 @@
 import "./App.css";
 import LandingPage from "../LandingPage/LandingPage";
+import CheckoutReturn from "../Stripe/CheckoutReturn";
+import Stripe from "../Stripe/Stripe";
 import Dashboard from "../Dashboard/Dashboard";
 import Signin from "../Signin/Signin";
 import Signup from "../Signup/Signup";
 import PageNotFound from "../PageNotFound/PageNotFound";
 import { Routes, Route } from "react-router-dom";
 import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { ProductsProvider } from "../../contexts/ProductsContext";
 import {
   signin,
   getUser,
@@ -15,7 +18,6 @@ import {
   uploadLogo,
   signUp,
 } from "../../utils/auth";
-import { starterItems } from "../../utils/constants";
 import { useNavigate } from "react-router-dom";
 import Projects from "../Projects/Projects";
 import Products from "../Products/Products";
@@ -29,8 +31,11 @@ import {
   createProduct,
   addDiagramToProject,
 } from "../../utils/api";
+import SignupChoosePlan from "../SignupChoosePlan/SignupChoosePlan";
 
 function App() {
+  const [tempUserData, setTempUserData] = useState({});
+  const [tempLogo, setTempLogo] = useState(null);
   const [currentUser, setCurrentUser] = useState({});
   const [activeModal, setActiveModal] = useState("");
   const [currentProjectId, setCurrentProjectId] = useState("");
@@ -45,10 +50,24 @@ function App() {
   const [userData, setUserData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSignInErrorVisible, setIsSignInErrorVisible] = useState(false);
+  const [authState, setAuthState] = useState({
+    token: localStorage.getItem("jwt") || null,
+  });
 
   useEffect(() => {
-    // console.log(diagrams);
-  }, [diagrams]);
+    const onStorage = () => {
+      setAuthState((s) => ({
+        ...s,
+        token: localStorage.getItem("jwt") || null,
+      }));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    console.log(currentUser, userData);
+  }, [currentUser, userData, activeModal]);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -74,48 +93,80 @@ function App() {
       });
   }, []);
 
+  // App.jsx — handleLogin
   function handleLogin(email, password) {
     setIsLoading(true);
     signin(email, password)
       .then((data) => {
         const token = data.token;
-        getUser(token).then((user) => {
-          setCurrentUser(user);
-          navigate("/dashboard/projects");
-        });
+        localStorage.setItem("jwt", token);
+        setAuthState({ token }); // <-- FIX
+        return getUser(token);
+      })
+      .then((user) => {
+        setCurrentUser(user);
+        localStorage.setItem("currentUserId", user._id);
+        navigate("/dashboard/projects");
       })
       .catch((err) => {
         setIsSignInErrorVisible(true);
         console.error(err);
       })
-      .finally(() => {
-        setIsLoading(false);
-      });
+      .finally(() => setIsLoading(false));
   }
 
+  // App.jsx — handleSignUp
+  // App.jsx — replace handleSignUp with this version
+  // App.jsx — replace handleSignUp with this version
   function handleSignUp(userData, logo) {
+    setIsLoading(true);
     const { email, password } = userData;
 
-    signUp(userData).then(() => {
+    // helper: try sign in
+    const doSignin = () =>
       signin(email, password).then((data) => {
         const token = data.token;
-        uploadLogo(logo, token);
-        starterItems.forEach((item) => {
-          console.log(
-            "creating item: ",
-            item,
-            " with description: ",
-            item.description
-          );
-          createProduct(item, token);
-        });
-        getUser(token).then((user) => {
-          setCurrentUser(user);
-          localStorage.setItem("userId", user._id);
-          navigate("/dashboard/projects");
-        });
+        if (!token) throw new Error("No token from signin");
+        localStorage.setItem("jwt", token);
+        setAuthState({ token });
+        return token;
       });
-    });
+
+    signUp(userData)
+      .then(() => doSignin())
+      .catch(async (err) => {
+        // If email already exists, try to sign in instead of bailing
+        const msg = (err?.message || "").toLowerCase();
+        const isDup =
+          err?.status === 409 ||
+          msg.includes("duplicate") ||
+          msg.includes("exists") ||
+          msg.includes("already");
+        if (isDup) {
+          return doSignin(); // proceed by signing in
+        }
+        throw err; // real error → surface it
+      })
+      .then(async (token) => {
+        // upload logo if present (ignore errors)
+        if (logo) {
+          try {
+            await uploadLogo(logo, token);
+          } catch {}
+        }
+        // fetch user and store
+        const user = await getUser(token);
+        setCurrentUser(user);
+        localStorage.setItem("currentUserId", user._id);
+
+        // ✅ only now that we have a JWT go to plan selection
+        navigate("/signup/cont/stripe", { replace: true });
+      })
+      .catch((err) => {
+        console.error("Signup flow failed:", err);
+        // show some UI error if you want
+      })
+      .finally(() => setIsLoading(false));
   }
 
   function handleLogOut() {
@@ -150,137 +201,160 @@ function App() {
   }
 
   return (
-    <>
-      <div className="page">
-        <CurrentUserContext.Provider value={currentUser}>
-          <Routes>
-            <Route path="*" element={<PageNotFound />} />
-            <Route path="/" element={<LandingPage />} />
-            <Route
-              path="/dashboard"
-              element={<Dashboard handleLogOut={handleLogOut} />}
-            >
-              <Route
-                path="projects"
-                element={
-                  <Projects
-                    closeModal={closeModal}
-                    activeModal={activeModal}
-                    setActiveModal={setActiveModal}
-                    handleCreateProjectSubmit={handleCreateProjectSubmit}
-                    projects={projects}
-                    setProjects={setProjects}
-                  />
-                }
-              />
-              <Route
-                path="projects/:projectId"
-                element={
-                  <Project
-                    activeModal={activeModal}
-                    setActiveModal={setActiveModal}
-                    projects={projects}
-                    setMobileDiagramActive={setMobileDiagramActive}
-                    isMobile={isMobile}
-                    setCurrentProjectId={setCurrentProjectId}
-                    diagrams={diagrams} // Pass diagrams state as a prop
-                    setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
-                    handleEditDiagram={handleEditDiagram}
-                    closeModal={closeModal}
-                    currentDiagram={currentDiagram}
-                    currentUser={currentUser}
-                  />
-                }
-              />
-
-              <Route
-                path="products"
-                element={
-                  <Products
-                    activeModal={activeModal}
-                    setActiveModal={setActiveModal}
-                    closeModal={closeModal}
-                  />
-                }
-              />
-              <Route
-                path="settings"
-                element={
-                  <Settings
-                    currentUser={currentUser}
-                    setCurrentUser={setCurrentUser}
-                  />
-                }
-              />
-            </Route>
-            <Route
-              path="/signin"
-              element={
-                <Signin
-                  handleLogin={handleLogin}
-                  isLoading={isLoading}
-                  isSignInErrorVisible={isSignInErrorVisible}
-                  setIsSignInErrorVisible={setIsSignInErrorVisible}
-                />
-              }
-            />
-            <Route
-              path="/signup"
-              element={<Signup handleSignupContinue={continueSignup} />}
-            />
-            <Route
-              path="/signup/cont"
-              element={
-                <SignupContinued
-                  userData={userData}
-                  setUserData={setUserData}
-                  handleLogin={handleLogin}
-                  handleSignUp={handleSignUp}
-                />
-              }
-            />
-          </Routes>
-        </CurrentUserContext.Provider>
+    <CurrentUserContext.Provider value={currentUser}>
+      <ProductsProvider>
         <>
-          {mobileDiagramActive ? (
-            <>
-              <DisablePullToRefresh />
-              <Diagram
-                activeModal={activeModal}
-                closeModal={closeModal}
-                isMobile={isMobile}
-                currentProjectId={currentProjectId}
-                updateDiagram={updateDiagram}
-                addDiagramToProject={addDiagramToProject}
-                setDiagrams={setDiagrams}
-                handlePassDiagramData={handlePassDiagramData}
-                selectedDiagram={currentDiagram}
-                originalDiagram={originalDiagram}
-                setSelectedDiagram={setCurrentDiagram}
-                setActiveModal={setActiveModal}
-                diagrams={diagrams}
+          <div className="page">
+            <Routes>
+              <Route path="*" element={<PageNotFound />} />
+              <Route path="/" element={<LandingPage />} />
+              <Route
+                path="/dashboard"
+                element={<Dashboard handleLogOut={handleLogOut} />}
+              >
+                <Route
+                  path="projects"
+                  element={
+                    <Projects
+                      closeModal={closeModal}
+                      activeModal={activeModal}
+                      setActiveModal={setActiveModal}
+                      handleCreateProjectSubmit={handleCreateProjectSubmit}
+                      projects={projects}
+                      setProjects={setProjects}
+                    />
+                  }
+                />
+                <Route
+                  path="projects/:projectId"
+                  element={
+                    <Project
+                      activeModal={activeModal}
+                      setActiveModal={setActiveModal}
+                      projects={projects}
+                      setMobileDiagramActive={setMobileDiagramActive}
+                      isMobile={isMobile}
+                      setCurrentProjectId={setCurrentProjectId}
+                      diagrams={diagrams} // Pass diagrams state as a prop
+                      setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
+                      handleEditDiagram={handleEditDiagram}
+                      closeModal={closeModal}
+                      currentDiagram={currentDiagram}
+                      currentUser={currentUser}
+                    />
+                  }
+                />
+
+                <Route
+                  path="products"
+                  element={
+                    <Products
+                      activeModal={activeModal}
+                      setActiveModal={setActiveModal}
+                      closeModal={closeModal}
+                    />
+                  }
+                />
+                <Route
+                  path="settings"
+                  element={
+                    <Settings
+                      currentUser={currentUser}
+                      setCurrentUser={setCurrentUser}
+                    />
+                  }
+                />
+              </Route>
+              <Route
+                path="/signin"
+                element={
+                  <Signin
+                    handleLogin={handleLogin}
+                    isLoading={isLoading}
+                    isSignInErrorVisible={isSignInErrorVisible}
+                    setIsSignInErrorVisible={setIsSignInErrorVisible}
+                  />
+                }
               />
+              <Route
+                path="/signup"
+                element={<Signup handleSignupContinue={continueSignup} />}
+              />
+              <Route
+                path="/signup/cont"
+                element={
+                  <SignupContinued
+                    userData={userData}
+                    setUserData={setUserData}
+                    handleLogin={handleLogin}
+                    handleSignUp={handleSignUp}
+                    setTempUserData={setTempUserData}
+                    setTempLogo={setTempLogo}
+                    isLoading={isLoading}
+                  />
+                }
+              />
+              <Route
+                path="/signup/cont/stripe"
+                element={
+                  <SignupChoosePlan
+                    tempLogo={tempLogo}
+                    tempUserData={tempUserData}
+                  />
+                }
+              />
+              <Route path="/checkout/return" element={<CheckoutReturn />} />
+              <Route
+                path="/checkout/embedded"
+                element={
+                  <Stripe
+                    token={authState.token || localStorage.getItem("jwt")}
+                  />
+                }
+              />
+            </Routes>
+            <>
+              {mobileDiagramActive ? (
+                <>
+                  <DisablePullToRefresh />
+                  <Diagram
+                    activeModal={activeModal}
+                    closeModal={closeModal}
+                    isMobile={isMobile}
+                    currentProjectId={currentProjectId}
+                    updateDiagram={updateDiagram}
+                    addDiagramToProject={addDiagramToProject}
+                    setDiagrams={setDiagrams}
+                    handlePassDiagramData={handlePassDiagramData}
+                    selectedDiagram={currentDiagram}
+                    originalDiagram={originalDiagram}
+                    setSelectedDiagram={setCurrentDiagram}
+                    setActiveModal={setActiveModal}
+                    diagrams={diagrams}
+                  />
+                </>
+              ) : (
+                <Diagram
+                  activeModal={activeModal}
+                  closeModal={closeModal}
+                  isMobile={isMobile}
+                  currentProjectId={currentProjectId}
+                  updateDiagram={updateDiagram}
+                  addDiagramToProject={addDiagramToProject}
+                  setDiagrams={setDiagrams}
+                  handlePassDiagramData={handlePassDiagramData}
+                  selectedDiagram={currentDiagram}
+                  setSelectedDiagram={setCurrentDiagram}
+                  originalDiagram={originalDiagram}
+                  setActiveModal={setActiveModal}
+                  diagrams={diagrams}
+                />
+              )}
             </>
-          ) : (
-            <Diagram
-              activeModal={activeModal}
-              closeModal={closeModal}
-              isMobile={isMobile}
-              currentProjectId={currentProjectId}
-              updateDiagram={updateDiagram}
-              addDiagramToProject={addDiagramToProject}
-              setDiagrams={setDiagrams}
-              handlePassDiagramData={handlePassDiagramData}
-              selectedDiagram={currentDiagram}
-              setSelectedDiagram={setCurrentDiagram}
-              originalDiagram={originalDiagram}
-              setActiveModal={setActiveModal}
-              diagrams={diagrams}
-            />
-          )}
+          </div>
         </>
-      </div>
-    </>
+      </ProductsProvider>
+    </CurrentUserContext.Provider>
   );
 }
 
