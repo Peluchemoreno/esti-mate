@@ -3,8 +3,7 @@ import Modal from "react-modal";
 import { useEffect, useMemo, useState } from "react";
 import { PDFViewer } from "@react-pdf/renderer";
 import EstimatePDF from "../EstimatePDF/EstimatePDF";
-import { BASE_URL } from "../../utils/constants";
-
+const BASE_URL = import.meta.env.VITE_API_URL;
 Modal.setAppElement("#root");
 
 const brand = {

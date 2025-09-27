@@ -1,5 +1,6 @@
 import { responsiveFontSizes } from "@mui/material";
-import { BASE_URL, processServerResponse } from "./constants";
+import { processServerResponse } from "./constants";
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 export function deleteProject(projectId, token) {
   return fetch(BASE_URL + `dashboard/projects/${projectId}`, {

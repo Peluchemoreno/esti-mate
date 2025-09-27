@@ -1,5 +1,5 @@
 // src/components/SignupChoosePlan/SignupChoosePlan.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../BackButton/BackButton";
 import "./SignupChoosePlan.css";
@@ -13,6 +13,11 @@ export default function SignupPlans() {
     // ✅ Go to dedicated checkout route so chooser unmounts first
     navigate(`/checkout/embedded?plan=${p}`);
   };
+
+  useEffect(() => {
+    console.log("env vars:");
+    console.log(import.meta.env);
+  }, []);
 
   return (
     <div className="signup-choose-plan">

@@ -8,13 +8,15 @@ import {
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
-const PUBLISHABLE_KEY =
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
-  "pk_test_51S84DVLogbJCypHWSEBTfmoGZ9eTFnynjeDlGlJK6bNoLOsye4w5Dr7hfVMCcYjfeloC2JA7q4dEYPRanGWn0YsY00NjXcKslE";
+const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+if (!/^pk_live_/.test(PUBLISHABLE_KEY || "")) {
+  throw new Error(
+    "Missing or non-live VITE_STRIPE_PUBLISHABLE_KEY in production"
+  );
+}
 const stripePromise = loadStripe(PUBLISHABLE_KEY);
 
-const API_BASE =
-  import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://127.0.0.1:4000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 const plankey = {
   basic: "price_1S9FSOLV1NkgtKMpFGrODp7C",
@@ -46,7 +48,7 @@ export default function Stripe({ token }) {
     if (!authToken) {
       throw new Error("Not authenticated (no JWT). Please sign in again.");
     }
-    const res = await fetch(`${API_BASE}/api/stripe/embedded-session`, {
+    const res = await fetch(`${API_BASE}api/stripe/embedded-session`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

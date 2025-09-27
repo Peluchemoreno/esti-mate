@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import EstimateViewerModal from "../Estimates/EstimateViewerModal";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import EstimatePDF from "../EstimatePDF/EstimatePDF";
-import { BASE_URL } from "../../utils/constants";
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 const brand = {
   bg: "#000000",

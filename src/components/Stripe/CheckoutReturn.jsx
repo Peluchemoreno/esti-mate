@@ -1,7 +1,7 @@
 // src/components/Stripe/CheckoutReturn.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BASE_URL } from "../../utils/constants";
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 export default function CheckoutReturn() {
   const [params] = useSearchParams();
@@ -14,6 +14,7 @@ export default function CheckoutReturn() {
     (async () => {
       try {
         if (!sessionId) throw new Error("Missing session_id");
+        console.log(`${BASE_URL}api/stripe/session/${sessionId}`);
         const res = await fetch(`${BASE_URL}api/stripe/session/${sessionId}`, {
           credentials: "include",
           headers: { "Content-Type": "application/json" },

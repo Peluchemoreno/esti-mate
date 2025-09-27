@@ -3,11 +3,11 @@ import Modal from "react-modal";
 import { PDFViewer } from "@react-pdf/renderer";
 import EstimatePDF from "../EstimatePDF/EstimatePDF";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BASE_URL } from "../../utils/constants";
 import {
   fittingsToLineItemsFromLine,
   computeAccessoriesFromLines,
 } from "../../utils/priceResolver";
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 Modal.setAppElement("#root");
 
