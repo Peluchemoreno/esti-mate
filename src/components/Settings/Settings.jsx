@@ -21,7 +21,7 @@ export default function Settings({ currentUser, setCurrentUser }) {
   function ManageBillingButton({ token }) {
     async function openPortal() {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/billing/portal`,
+        `${import.meta.env.VITE_API_URL}api/billing/portal`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
