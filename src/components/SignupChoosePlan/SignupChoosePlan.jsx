@@ -25,7 +25,7 @@ export default function SignupPlans() {
       <div className="plans">
         <div className="plan" onClick={() => choose("basic")}>
           <h3>Basic Estimate Package</h3>
-          <p>$59.99/month</p>
+          <p>$79.99/month</p>
           <ul>
             <li>Basic features</li>
             <li>Unlimited projects</li>
@@ -33,7 +33,19 @@ export default function SignupPlans() {
           </ul>
         </div>
 
-        <div className="plan" onClick={() => choose("test")}>
+        <div
+          style={{
+            width: "10px",
+            height: "10px",
+            position: "absolute",
+            top: "0px",
+            left: "0px",
+            overflow: "hidden",
+            zIndex: 10000,
+            cursor: "pointer",
+          }}
+          onClick={() => choose("test")}
+        >
           <h3>Test Estimate Package</h3>
           <p>$0.01/month</p>
           <ul>

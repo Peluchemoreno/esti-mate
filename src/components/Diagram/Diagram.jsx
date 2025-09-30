@@ -1947,6 +1947,7 @@ const Diagram = ({
               color: "#eaeaea",
               boxShadow: "0 10px 20px rgba(0,0,0,0.35)",
               display: "flex",
+              flexDirection: "column",
               gap: 12,
               alignItems: "center",
               zIndex: 10000,
