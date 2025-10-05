@@ -233,13 +233,11 @@ function fittingsFromDownspoutLine(line, products = [], opts = {}) {
     m[n] = (m[n] || 0) + 1;
     return m;
   }, {});
-  // console.log(offsetMap);
   Object.entries(offsetMap).forEach(([inchStr, qty]) => {
     const inches = Number(inchStr);
     if (!qty || Number.isNaN(inches)) return;
 
     const prod = findOffsetProduct({ profile, sizeLabel, inches }, products);
-    console.log(prod);
     if (prod) {
       out.push({
         name: `${styleLabel} ${inches}" Offset`,
@@ -251,7 +249,6 @@ function fittingsFromDownspoutLine(line, products = [], opts = {}) {
     }
   });
 
-  console.log(out);
   return out;
 }
 
@@ -425,27 +422,4 @@ export function computeAccessoriesFromLines(
   });
 
   return out;
-}
-
-// ---------- Legacy export: fittingsToLineItemsFromLine ----------
-export function fittingsToLineItemsFromLine(line, allProducts = [], opts = {}) {
-  const rows = fittingsFromDownspoutLine(line, allProducts, opts);
-  console.log(rows);
-
-  return rows.map((r) => ({
-    key: `${r.meta?.kind || "fit"}-${r.meta?.sizeLabel || ""}-${
-      r.meta?.letter || r.meta?.inches || ""
-    }`,
-    name: r.name,
-    qty: Number(r.quantity || 0),
-    unit: "unit",
-    unitPrice: Number(r.price || 0),
-    total: Number(r.price || 0) * Number(r.quantity || 0),
-    productId: r.product?._id,
-    type: "accessory",
-    category:
-      r.meta?.kind === "elbow" || r.meta?.kind === "offset"
-        ? "downspout-fittings"
-        : "gutter-accessories",
-  }));
 }

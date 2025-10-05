@@ -67,10 +67,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    console.log(currentUser, userData);
-  }, [currentUser, userData, activeModal]);
-
-  useEffect(() => {
     const token = localStorage.getItem("jwt");
     if (!token) {
       return;

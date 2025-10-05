@@ -14,11 +14,6 @@ export default function SignupPlans() {
     navigate(`/checkout/embedded?plan=${p}`);
   };
 
-  useEffect(() => {
-    console.log("env vars:");
-    console.log(import.meta.env);
-  }, []);
-
   return (
     <div className="signup-choose-plan">
       <h2>Choose Your Plan</h2>

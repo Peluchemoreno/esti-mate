@@ -3,10 +3,7 @@ import Modal from "react-modal";
 import { PDFViewer } from "@react-pdf/renderer";
 import EstimatePDF from "../EstimatePDF/EstimatePDF";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  fittingsToLineItemsFromLine,
-  computeAccessoriesFromLines,
-} from "../../utils/priceResolver";
+import { computeAccessoriesFromLines } from "../../utils/priceResolver";
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 Modal.setAppElement("#root");
@@ -184,10 +181,6 @@ const EstimateModal = ({
       alert(e.message || "Failed to save estimate.");
     }
   };
-
-  useEffect(() => {
-    console.log("project in the estimate modal: ", project);
-  }, [project]);
 
   // company logo
   useEffect(() => {
