@@ -3,24 +3,58 @@ import { useQuery } from "@tanstack/react-query";
 import { getProducts } from "../utils/api";
 import { useProductsCatalog } from "../contexts/ProductsContext";
 
-export function useProducts() {
+// Shared token getter
+function useToken() {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem("jwt");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * UI list (listed-only). Default endpoint.
+ * Cache key: ["products","listed",version]
+ */
+export function useProductsListed() {
+  const token = useToken();
   const { version } = useProductsCatalog() || {};
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
 
   return useQuery({
-    queryKey: ["products", version],
+    queryKey: ["products", "listed", version],
     queryFn: async () => {
       if (!token) return [];
-      const data = await getProducts(token); // keep your existing api call signature
-      const list = Array.isArray(data) ? data : data?.products ?? [];
-      return Array.isArray(list) ? list : [];
+      return await getProducts(token); // default (listed-only)
     },
-    staleTime: 0,
-    gcTime: 5 * 60 * 1000,
+    enabled: !!token,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Pricing view (ALL items). ?scope=pricing
+ * Cache key: ["products","pricing",version]
+ */
+export function useProductsPricing() {
+  const token = useToken();
+  const { version } = useProductsCatalog() || {};
+
+  return useQuery({
+    queryKey: ["products", "pricing", version],
+    queryFn: async () => {
+      if (!token) return [];
+      return await getProducts(token, "pricing");
+    },
     enabled: !!token,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
   });
 }

@@ -15,7 +15,8 @@ import DownspoutModal from "../DownspoutModal/DownspoutModal";
 import { OverwriteDiagramModal } from "../OverwriteDiagramModal/OverwriteDiagramModal";
 import { AnnotationModal } from "../AnnotationModal/AnnotationModal";
 import { useProductsCatalog } from "../../contexts/ProductsContext";
-import { useProducts } from "../../hooks/useProducts";
+import { useProductsListed, useProductsPricing } from "../../hooks/useProducts";
+
 // ---- fixed palette used by free tools ----
 const COMMON_COLORS = [
   "#ffffff", // white (visible on dark)
@@ -88,12 +89,15 @@ const Diagram = ({
 }) => {
   // Products (context first, then API)
   // ✅ Call hooks once at top-level, never conditionally
-  const productsCtx = useProductsCatalog(); // { products, reload/refetch, ... }
-  const catalogProducts = productsCtx?.products || [];
+  const { data: pricingProducts = [], isLoading, error } = useProductsPricing(); // ALL items
+  const { data: listedProducts = [] } = useProductsListed(); // fallback (optional)
 
-  const { data: apiProducts = [], isLoading, error } = useProducts();
+  const productsCtx = useProductsCatalog();
+
   const allProducts =
-    catalogProducts && catalogProducts.length ? catalogProducts : apiProducts;
+    pricingProducts && pricingProducts.length
+      ? pricingProducts
+      : listedProducts;
 
   // Keep a stable ref to the reload function for event listeners
   const reloadRef = useRef(null);
@@ -114,24 +118,8 @@ const Diagram = ({
     });
   }, [allProducts]);
 
-  /* useEffect(() => {
-    console.log("[Diagram] products counts", {
-      ctx: (productsCtx?.products || []).length,
-      api: (apiProducts || []).length,
-      all: (allProducts || []).length,
-      filtered: (filteredProducts || []).length,
-      sample: (allProducts || []).slice(0, 3),
-    });
-  }, [productsCtx, apiProducts, allProducts, filteredProducts]);
- */
   const queryClient = useQueryClient();
   const [, force] = useState(0);
-
-  // keep using your existing reloadRef wiring:
-  useEffect(() => {
-    reloadRef.current = productsCtx?.reload || productsCtx?.refetch || null;
-  }, [productsCtx]);
-
   useEffect(() => {
     const bump = async () => {
       // 1) Tell context to refetch if it exposes a loader

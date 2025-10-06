@@ -106,34 +106,29 @@ export function getProjects(token) {
     });
 }
 
-export function getProducts(token, scope) {
-  if (scope === "pricing") {
-    console.log("running pricing");
-    return fetch(BASE_URL + "dashboard/products?scope=pricing", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-    })
-      .then(processServerResponse)
-      .then((data) => {
-        return data;
-      });
-  } else {
-    console.log("running basic products");
-    return fetch(BASE_URL + "dashboard/products", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-    })
-      .then(processServerResponse)
-      .then((data) => {
-        return data;
-      });
+export async function getProducts(token, scope /* "pricing" | undefined */) {
+  const url =
+    scope === "pricing"
+      ? `${BASE_URL}dashboard/products?scope=pricing`
+      : `${BASE_URL}dashboard/products`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`GET ${url} failed: ${res.status} ${txt}`);
   }
+
+  // Your server returns an array already; normalize either way.
+  const data = await res.json();
+  return Array.isArray(data) ? data : data?.products ?? [];
 }
 
 export function createProduct(productData, token) {

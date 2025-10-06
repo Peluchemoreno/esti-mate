@@ -5,14 +5,18 @@ import { Box } from "@mui/material/";
 import { useEffect, useMemo, useState } from "react";
 import AddProductModal from "../AddProductModal/AddProductModal";
 import EditProductModal from "../EditProductModal/EditProductModal";
-import { getProducts, createProduct } from "../../utils/api";
+import { createProduct } from "../../utils/api";
 import { useProductsCatalog } from "../../contexts/ProductsContext";
+import { useProductsListed } from "../../hooks/useProducts";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Products({ activeModal, setActiveModal, closeModal }) {
   const { refresh } = useProductsCatalog();
+  const { data: products = [], isLoading, error } = useProductsListed();
   const [tableRows, setTableRows] = useState([]);
   const [currentItem, setCurrentItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const queryClient = useQueryClient();
 
   const isGutter = (p) => p?.type === "gutter";
 
@@ -143,20 +147,9 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
 
   // Fetch once (and when modal closes after create/edit)
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const token = localStorage.getItem("jwt");
-      const res = await getProducts(token, "");
-      const list = Array.isArray(res?.products) ? res.products : [];
-      if (!cancelled) {
-        setTableRows(list); // replace, don't append
-        console.log("Products fetched from API:", list.length);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeModal]);
+    const list = Array.isArray(products) ? products : [];
+    setTableRows(list);
+  }, [products, activeModal]);
 
   function handleAddItemClick() {
     setActiveModal("add-item");
@@ -182,6 +175,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
       if (res?.data) {
         // Prepend new row and let dedupe take care of repeats
         setTableRows((prev) => [res.data, ...prev]);
+        queryClient.invalidateQueries({ queryKey: ["products", "listed"] });
         closeModal();
       }
     });
