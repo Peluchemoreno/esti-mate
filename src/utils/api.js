@@ -107,8 +107,9 @@ export function getProjects(token) {
 }
 
 export function getProducts(token, scope) {
-  if (scope === "all") {
-    return fetch(BASE_URL + "dashboard/products?scope=all", {
+  if (scope === "pricing") {
+    console.log("running pricing");
+    return fetch(BASE_URL + "dashboard/products?scope=pricing", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -120,6 +121,7 @@ export function getProducts(token, scope) {
         return data;
       });
   } else {
+    console.log("running basic products");
     return fetch(BASE_URL + "dashboard/products", {
       method: "GET",
       headers: {

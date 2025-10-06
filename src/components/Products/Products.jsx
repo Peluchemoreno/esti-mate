@@ -146,7 +146,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
     let cancelled = false;
     (async () => {
       const token = localStorage.getItem("jwt");
-      const res = await getProducts(token, "all");
+      const res = await getProducts(token, "");
       const list = Array.isArray(res?.products) ? res.products : [];
       if (!cancelled) {
         setTableRows(list); // replace, don't append
