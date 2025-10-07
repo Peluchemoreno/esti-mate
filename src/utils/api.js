@@ -110,7 +110,7 @@ export async function getProducts(token, scope /* "pricing" | undefined */) {
   const url =
     scope === "pricing"
       ? `${BASE_URL}dashboard/products?scope=pricing`
-      : `${BASE_URL}dashboard/products`;
+      : `${BASE_URL}dashboard/products?scope=ui`;
 
   const res = await fetch(url, {
     method: "GET",

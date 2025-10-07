@@ -18,11 +18,11 @@ const API_BASE = import.meta.env.VITE_API_URL;
  */
 const plankey = {
   // NOTE: the basic plan below is the live plan
-  // basic: "price_1S9FSOLV1NkgtKMpFGrODp7C",
+  basic: "price_1S9FSOLV1NkgtKMpFGrODp7C",
 
   // NOTE: the plan below is the test plan
-  // basic: "price_1S84vkLogbJCypHWKzhe2KJ4", // testing mode
-
+  /* basic: "price_1S84vkLogbJCypHWKzhe2KJ4", // testing mode
+   */
   test: "price_1SAblmLV1NkgtKMp569jEsoF",
   pro: "price_PRO_PLACEHOLDER", // fill in if/when you have real ids
   enterprise: "price_ENT_PLACEHOLDER", // fill in if/when you have real ids

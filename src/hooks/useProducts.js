@@ -25,7 +25,7 @@ export function useProductsListed() {
     queryKey: ["products", "listed", version],
     queryFn: async () => {
       if (!token) return [];
-      return await getProducts(token); // default (listed-only)
+      return await getProducts(token, "ui"); // default (listed-only)
     },
     enabled: !!token,
     refetchOnMount: "always",
