@@ -159,6 +159,34 @@ function normalizeColor(c) {
   return NAMED[lower] || s;
 }
 
+// NEW: lightweight gutter name normalizer (uses size + a couple words)
+// No renames; local to this file.
+function prettyGutter(raw = "") {
+  const s = String(raw).trim();
+  if (!s) return "Gutter";
+  // Try to capture leading size like 5" or 6"
+  const m = s.match(/(\d+)\s*"/);
+  const size = m ? `${m[1]}"` : null;
+
+  // Extract a short descriptor after size (e.g., K-Style, Half Round)
+  const PROFILE_ALIASES = [
+    [/k[-\s]?style/i, "K-Style"],
+    [/half[-\s]?round/i, "Half Round"],
+    [/straight[-\s]?face|straightface/i, "Straight Face"],
+    [/box/i, "Box"],
+    [/round(?!.*half)/i, "Round"],
+    [/custom/i, "Custom"],
+  ];
+
+  if (size) {
+    for (const [rx, label] of PROFILE_ALIASES) {
+      if (rx.test(s)) return `${size} ${label}`;
+    }
+  }
+  // Fallback: keep the original product name (safe & accurate)
+  return s;
+}
+
 export default function EstimatePDF({
   estimate,
   selectedDiagram,
@@ -179,6 +207,9 @@ export default function EstimatePDF({
   let gutterColor = null;
   let downspoutColor = null;
 
+  let gutterLabel = null;
+  let downspoutLabel = null;
+
   lines.forEach((l) => {
     if (l.isDownspout) {
       baseRows.push({
@@ -188,6 +219,12 @@ export default function EstimatePDF({
         meta: { kind: "downspout" },
       });
       if (!downspoutColor) downspoutColor = normalizeColor(l.color || "#000");
+      if (!downspoutLabel) {
+        const label = l.downspoutSize
+          ? `${prettyDs(l.downspoutSize)} Downspout`
+          : "Downspout";
+        downspoutLabel = label;
+      }
     } else if (l.currentProduct) {
       baseRows.push({
         name: l.currentProduct.name,
@@ -203,6 +240,9 @@ export default function EstimatePDF({
             l.currentProduct?.color ||
             "#000"
         );
+      if (!gutterLabel) {
+        gutterLabel = prettyGutter(l.currentProduct.name || "Gutter");
+      }
     }
   });
 
@@ -380,29 +420,23 @@ export default function EstimatePDF({
 
         {/* Legend under the diagram with real draw colors */}
         {gutterColor || downspoutColor ? (
-          <View style={[styles.keySection, { marginTop: 8 }]}>
+          <View style={styles.keySection}>
             <Text style={styles.sectionTitle}>Key</Text>
             <View style={styles.keyRow}>
-              {gutterColor ? (
+              {gutterColor && gutterLabel ? (
                 <View style={styles.keyItem}>
                   <View
-                    style={[
-                      styles.swatch,
-                      { backgroundColor: normalizeColor(gutterColor) },
-                    ]}
+                    style={[styles.swatch, { backgroundColor: gutterColor }]}
                   />
-                  <Text>Gutter</Text>
+                  <Text>{gutterLabel}</Text>
                 </View>
               ) : null}
-              {downspoutColor ? (
+              {downspoutColor && downspoutLabel ? (
                 <View style={styles.keyItem}>
                   <View
-                    style={[
-                      styles.swatch,
-                      { backgroundColor: normalizeColor(downspoutColor) },
-                    ]}
+                    style={[styles.swatch, { backgroundColor: downspoutColor }]}
                   />
-                  <Text>Downspout</Text>
+                  <Text>{downspoutLabel}</Text>
                 </View>
               ) : null}
             </View>

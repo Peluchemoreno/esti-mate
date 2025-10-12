@@ -155,7 +155,6 @@ const EstimateModal = ({
         },
         items,
         estimateDate: estimateData.estimateDate,
-        estimateNumber: estimateData.estimateNumber,
         notes: estimateData.notes || "",
       };
 
@@ -252,19 +251,53 @@ const EstimateModal = ({
     };
   }, []);
 
-  // per-user estimate auto-number (local fallback)
+  // per-user estimate auto-number (DB source of truth)
   useEffect(() => {
-    const bumpLocal = () => {
-      const k = `estnum:${currentUser?._id || "anon"}`;
-      const cur = Number(localStorage.getItem(k) || 0) + 1;
-      localStorage.setItem(k, String(cur));
-      return cur.toString().padStart(3, "0");
+    if (!isOpen) return;
+
+    const token = localStorage.getItem("jwt");
+    if (!token || !currentUser?._id) {
+      // still update date so the PDF header isn't stale
+      setEstimateData((s) => ({
+        ...s,
+        estimateDate: new Date().toISOString().split("T")[0],
+      }));
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}api/estimates/next`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { next } = await res.json();
+
+        if (!cancelled) {
+          // ensure date is fresh too
+          setEstimateData((s) => ({
+            ...s,
+            estimateNumber: String(next).padStart(3, "0"),
+            estimateDate: new Date().toISOString().split("T")[0],
+          }));
+        }
+      } catch (e) {
+        alert(e.message || "Failed to fetch next estimate number.");
+        // Don’t fabricate a number here; keep it empty to avoid conflicts
+        if (!cancelled) {
+          setEstimateData((s) => ({
+            ...s,
+            estimateNumber: "",
+            estimateDate: new Date().toISOString().split("T")[0],
+          }));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
     };
-    setEstimateData((s) => ({
-      ...s,
-      estimateNumber: bumpLocal(),
-      estimateDate: new Date().toISOString().split("T")[0],
-    }));
   }, [isOpen, currentUser?._id]);
 
   // Choose catalog for pricing — prefer full pricing catalog if loaded

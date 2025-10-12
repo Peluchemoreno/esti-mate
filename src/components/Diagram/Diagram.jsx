@@ -238,7 +238,8 @@ const Diagram = ({
     }));
     withIds.forEach((line) => drawLine(ctx, line));
     setLines(withIds);
-  }, [selectedDiagram]);
+    baselineHashRef.current = hashLines(withIds);
+  }, [selectedDiagram?._id, selectedDiagram]);
 
   // clean up selection when modal changes
   useEffect(() => {
@@ -272,6 +273,116 @@ const Diagram = ({
     const ctx = canvas.getContext("2d");
     drawAllLines(ctx);
   }, [currentLine, lines, isDrawing]);
+
+  // --- stable diagram hashing (only fields that define "meaningful change") ---
+  const baselineHashRef = useRef(null);
+
+  function round2(n) {
+    return Math.round(Number(n || 0) * 100) / 100;
+  }
+
+  function normColor(c) {
+    return String(c || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  /**
+   * Build a normalized snapshot of what matters to the diagram:
+   * - Lines (coordinates rounded to 2 decimals, product id/name, kind, color, ds size)
+   * - If you later want notes/free marks included, fold them in here similarly.
+   */
+  function hashLines(lines = []) {
+    const norm = (l) => {
+      // Notes
+      if (l.isNote) {
+        return {
+          t: "note",
+          x: round2(l.startX),
+          y: round2(l.startY),
+          text: String(l.note || "").trim(),
+        };
+      }
+
+      // Downspouts (priced)
+      if (l.isDownspout) {
+        return {
+          t: "ds",
+          x: round2(l.startX),
+          y: round2(l.startY),
+          size: l.downspoutSize || null,
+          seq: String(l.elbowSequence || "").trim(),
+          c: normColor(l.color || "#000"),
+        };
+      }
+
+      // Free marks (non-priced)
+      if (l.isFreeMark) {
+        if (l.kind === "free-circle") {
+          return {
+            t: "fc",
+            cx: round2(l.centerX),
+            cy: round2(l.centerY),
+            r: round2(l.radius || 0),
+            fill: !!l.fill,
+            c: normColor(l.color || "#111"),
+            dashed: !!l.dashed,
+            w: Number(l.strokeWidth || 2),
+          };
+        }
+        if (l.kind === "free-square") {
+          const left = Math.min(l.startX, l.endX);
+          const top = Math.min(l.startY, l.endY);
+          const w = Math.abs(l.endX - l.startX);
+          const h = Math.abs(l.endY - l.startY);
+          return {
+            t: "fs",
+            x: round2(left),
+            y: round2(top),
+            w: round2(w),
+            h: round2(h),
+            fill: !!l.fill,
+            c: normColor(l.color || "#111"),
+            dashed: !!l.dashed,
+            sw: Number(l.strokeWidth || 2),
+          };
+        }
+        // free-line
+        return {
+          t: "fl",
+          x1: round2(l.startX),
+          y1: round2(l.startY),
+          x2: round2(l.endX),
+          y2: round2(l.endY),
+          c: normColor(l.color || "#111"),
+          dashed: !!l.dashed,
+          w: Number(l.strokeWidth || 2),
+        };
+      }
+
+      // Gutters (priced)
+      return {
+        t: "gut",
+        x1: round2(l.startX),
+        y1: round2(l.startY),
+        x2: round2(l.endX),
+        y2: round2(l.endY),
+        pid: l.currentProduct?._id || null,
+        pname: l.currentProduct?.name || null,
+        c: normColor(
+          l.color ||
+            l.currentProduct?.colorCode ||
+            l.currentProduct?.color ||
+            "#000"
+        ),
+      };
+    };
+
+    const core = (lines || []).map(norm);
+    // order-independent
+    core.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    return JSON.stringify(core);
+  }
 
   // ======= Geometry / draw helpers =======
   function drawGrid(ctx) {
@@ -1289,8 +1400,8 @@ const Diagram = ({
     }
 
     // If nothing changed, don't interrupt
-    const original = originalDiagram?.lines || [];
-    const hasChanged = JSON.stringify(lines) !== JSON.stringify(original);
+    const currentHash = hashLines(lines);
+    const hasChanged = currentHash !== baselineHashRef.current;
     if (!hasChanged) {
       closeModal();
       return;
@@ -1823,6 +1934,9 @@ const Diagram = ({
     } else {
       handleAddDiagramToProject();
     }
+
+    // after successful save/add/overwrite:
+    baselineHashRef.current = hashLines(lines);
   }
 
   function clearCanvas() {
@@ -1868,13 +1982,27 @@ const Diagram = ({
           alt="save diagram"
           className="diagram__icon diagram__save"
           onClick={() => {
-            const original = originalDiagram?.lines || [];
-            const hasChanged =
-              JSON.stringify(lines) !== JSON.stringify(original);
-            if (!hasChanged) return;
+            // Defensive: ensure baseline exists
+            if (baselineHashRef.current == null) {
+              baselineHashRef.current = hashLines(lines);
+            }
+
+            const currentHash = hashLines(lines);
+            const hasChanged = currentHash !== baselineHashRef.current;
+
+            if (!hasChanged) {
+              // Match saveDiagram() behavior: close when nothing changed
+              // testing the other branch
+              closeModal();
+              return;
+            }
+
             const isOverwrite = Boolean(selectedDiagram?._id);
-            if (isOverwrite) setActiveModal("confirmDiagramOverwrite");
-            else saveDiagram("add");
+            if (isOverwrite) {
+              setActiveModal("confirmDiagramOverwrite");
+            } else {
+              saveDiagram("add");
+            }
           }}
         />
 
