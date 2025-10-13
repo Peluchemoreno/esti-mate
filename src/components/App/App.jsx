@@ -200,7 +200,13 @@ function App() {
   }
 
   function closeModal() {
-    setCurrentDiagram({});
+    // Only nuke selection when the diagram modal is closing
+    if (activeModal === "confirmDiagramOverwrite") {
+      setSelectedDiagram({}); // <-- clear Project page selection
+      setCurrentDiagram({}); // <-- clear editor diagram
+      setOriginalDiagram({}); // optional: keeps your diff/overwrite logic clean
+      setMobileDiagramActive(false); // if you use the mobile editor
+    }
     setActiveModal("");
   }
 
@@ -259,6 +265,8 @@ function App() {
                       closeModal={closeModal}
                       currentDiagram={currentDiagram}
                       currentUser={currentUser}
+                      setSelectedDiagram={setSelectedDiagram}
+                      selectedDiagram={selectedDiagram}
                     />
                   }
                 />

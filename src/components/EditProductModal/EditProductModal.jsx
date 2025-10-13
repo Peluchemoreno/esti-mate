@@ -27,6 +27,7 @@ export default function EditProductModal({
   const [screenPrice, setScreenPrice] = useState("");
 
   useEffect(() => {
+    console.log(product);
     setItemName(product?.name || "defualt name");
 
     // Prefer whatever the server now stores (color), else fall back to legacy fields.
@@ -413,6 +414,7 @@ export default function EditProductModal({
                     setScreenInputName("");
                     setAddScreenInputsOpen(false);
                   } else {
+                    console.log(addScreenInputsOpen);
                     setAddScreenInputsOpen(true);
                   }
                 }}

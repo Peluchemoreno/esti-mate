@@ -26,6 +26,8 @@ export default function Project({
   closeModal,
   setDiagrams,
   currentUser,
+  selectedDiagram,
+  setSelectedDiagram,
 }) {
   const formatDateTime = (value, tz = "America/Chicago") => {
     const d = new Date(value);
@@ -56,7 +58,6 @@ export default function Project({
     totalCost: 500,
   });
   const [diagramData, setDiagramData] = useState([]);
-  const [selectedDiagram, setSelectedDiagram] = useState({});
 
   let project = projects.filter((item) => {
     return item._id === projectId;
@@ -234,6 +235,7 @@ export default function Project({
           billingPrimaryPhone: project?.billingPrimaryPhone || "",
         }}
         selectedDiagram={selectedDiagram}
+        setSelectedDiagram={setSelectedDiagram}
         activeModal={activeModal}
         currentUser={currentUser}
         products={allUnfilteredProducts}

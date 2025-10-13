@@ -2654,7 +2654,6 @@ const Diagram = ({
         })
         .catch((err) => {
           console.error("Failed to save diagram:", err);
-          closeModal();
         });
     }
 
@@ -2698,7 +2697,6 @@ const Diagram = ({
       >
         <img
           onClick={() => {
-            setSelectedDiagram({});
             closeModal();
           }}
           src={closeIcon}
@@ -3016,6 +3014,7 @@ const Diagram = ({
         activeModal={activeModal}
         setActiveModal={setActiveModal}
         saveDiagram={saveDiagram}
+        closeModal={closeModal}
       />
       <AnnotationModal
         activeModal={activeModal}

@@ -5,6 +5,7 @@ export function OverwriteDiagramModal({
   activeModal,
   setActiveModal,
   saveDiagram,
+  closeModal,
 }) {
   return (
     <div
@@ -32,6 +33,7 @@ export function OverwriteDiagramModal({
             className="button button_overwrite"
             onClick={() => {
               saveDiagram("overwrite");
+              closeModal();
             }}
           >
             Overwrite current diagram
@@ -40,6 +42,7 @@ export function OverwriteDiagramModal({
             className="button button_createNew"
             onClick={() => {
               saveDiagram("new");
+              closeModal();
             }}
           >
             Create new diagram

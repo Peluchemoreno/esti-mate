@@ -91,6 +91,7 @@ const EstimateModal = ({
   estimate,
   project,
   selectedDiagram,
+  setSelectedDiagram,
   activeModal,
   currentUser,
   products, // visible catalog (listed: true)
@@ -217,11 +218,17 @@ const EstimateModal = ({
       // notify the SavedEstimatesPanel to refresh
       window.dispatchEvent(new Event("estimate-created"));
 
-      onClose();
+      handleCloseModal();
     } catch (e) {
       alert(e.message || "Failed to save estimate.");
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedDiagram({});
+    }
+  }, [isOpen, setSelectedDiagram]);
 
   // company logo
   useEffect(() => {
@@ -341,6 +348,12 @@ const EstimateModal = ({
       cancelled = true;
     };
   }, [isOpen, currentUser?._id]);
+
+  const handleCloseModal = useCallback(() => {
+    // clear the diagram selection when the modal closes
+    setSelectedDiagram({});
+    if (onClose) onClose();
+  }, [onClose, setSelectedDiagram]);
 
   // Choose catalog for pricing — prefer full pricing catalog if loaded
   const catalogForPricing = pricingCatalog || products;
@@ -608,7 +621,7 @@ const EstimateModal = ({
   return (
     <Modal
       isOpen={isOpen}
-      onRequestClose={onClose}
+      onRequestClose={handleCloseModal}
       contentLabel="Estimate Preview"
       style={{
         overlay: { backgroundColor: "rgba(0,0,0,0.5)" },
