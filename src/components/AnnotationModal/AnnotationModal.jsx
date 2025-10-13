@@ -1,36 +1,53 @@
 import "./AnnotationModal.css";
 import closeButton from "../../assets/icons/close.svg";
-import { useScrollTrigger } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-export function AnnotationModal({ activeModal, setActiveModal, addNote }) {
+// Props:
+// - activeModal: string ("note" opens)
+// - setActiveModal: fn
+// - onSubmit: fn(text)  <-- handles add OR update (decided by parent)
+// - initialText: string <-- prefill when editing
+// - mode: "create" | "edit"
+export function AnnotationModal({
+  activeModal,
+  setActiveModal,
+  onSubmit,
+  initialText = "",
+  mode = "create",
+}) {
   const [textInput, setTextInput] = useState("");
+
+  // prefill when opening / when initialText changes
+  useEffect(() => {
+    if (activeModal === "note") {
+      setTextInput(initialText || "");
+    }
+  }, [activeModal, initialText]);
 
   function handleTextInputChange(e) {
     setTextInput(e.target.value);
   }
 
-  function resetInputs() {
+  function resetAndClose() {
     setTextInput("");
+    setActiveModal("diagram");
   }
 
-  function handleAddNote(note) {
-    addNote(note);
-  }
+  const isOpen = activeModal === "note";
+  const isEdit = mode === "edit";
+  const title = isEdit ? "Update note" : "Add a note here";
+  const actionLabel = isEdit ? "Update Note" : "Add Note";
 
   return (
-    <div className={activeModal === "note" ? "modal modal_visible" : "modal"}>
+    <div className={isOpen ? "modal modal_visible" : "modal"}>
       <div className="diagram-confirm__content">
         <img
           src={closeButton}
           alt=""
           className="close-btn"
-          onClick={() => {
-            setActiveModal("diagram");
-            resetInputs();
-          }}
+          onClick={resetAndClose}
         />
-        <h3 className="diagram-confirm__title">Add a note here</h3>
+        <h3 className="diagram-confirm__title">{title}</h3>
         <label htmlFor="note">
           <input
             className="input add-note__input"
@@ -42,24 +59,18 @@ export function AnnotationModal({ activeModal, setActiveModal, addNote }) {
           />
         </label>
         <div className="diagram-confirm__buttons">
-          <button
-            className="button button_overwrite"
-            onClick={() => {
-              setActiveModal("diagram");
-              resetInputs();
-            }}
-          >
+          <button className="button button_overwrite" onClick={resetAndClose}>
             Cancel
           </button>
           <button
             className="button button_createNew"
             onClick={() => {
-              handleAddNote(textInput);
-              setActiveModal("diagram");
-              resetInputs();
+              const v = String(textInput || "").trim();
+              if (v) onSubmit(v);
+              resetAndClose();
             }}
           >
-            Add Note
+            {actionLabel}
           </button>
         </div>
       </div>

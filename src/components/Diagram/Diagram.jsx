@@ -319,6 +319,11 @@ const Diagram = ({
   const { data: listedProducts = [] } = useProductsListed(); // fallback (optional)
 
   const productsCtx = useProductsCatalog();
+  // which annotation (note) is being edited; null means "creating"
+  const [editingNoteIndex, setEditingNoteIndex] = useState(null);
+
+  // click-vs-drag detection for notes (like you already do for downspout box)
+  const noteClickRef = useRef({ x: 0, y: 0, index: null });
 
   const allProducts =
     pricingProducts && pricingProducts.length
@@ -326,6 +331,37 @@ const Diagram = ({
       : listedProducts;
 
   const boxClickRef = useRef({ x: 0, y: 0, index: null });
+
+  useEffect(() => {
+    if (activeModal === "diagram") {
+      setCanvasSize();
+      drawScene();
+    }
+  }, [activeModal]);
+
+  // Observe container size + window zoom
+  useEffect(() => {
+    if (activeModal !== "diagram") return;
+    const el = canvasRef.current?.parentElement;
+    if (!el) return;
+
+    const ro = new ResizeObserver(() => {
+      setCanvasSize();
+      drawScene();
+    });
+    ro.observe(el);
+
+    const onWin = () => {
+      setCanvasSize();
+      drawScene();
+    };
+    window.addEventListener("resize", onWin);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", onWin);
+    };
+  }, [activeModal]);
 
   // Keep a stable ref to the reload function for event listeners
   const reloadRef = useRef(null);
@@ -384,6 +420,13 @@ const Diagram = ({
   const [tool, setTool] = useState(""); // dropdown selection
   const [isDrawing, setIsDrawing] = useState(false);
   const [gridSize, setGridSize] = useState(10);
+  const [feetPerSquare, setFeetPerSquare] = useState(1);
+
+  useEffect(() => {
+    if (activeModal === "diagram") {
+      drawScene();
+    }
+  }, [gridSize, feetPerSquare, activeModal]);
 
   const [currentLine, setCurrentLine] = useState({
     id: null,
@@ -405,6 +448,41 @@ const Diagram = ({
     lastX: 0,
     lastY: 0,
   });
+
+  function setCanvasSize() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement || canvas;
+    const dpr = window.devicePixelRatio || 1;
+
+    const cssW = Math.max(1, parent.clientWidth);
+    const cssH = Math.max(1, parent.clientHeight);
+
+    canvas.width = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+
+    const ctx = canvas.getContext("2d");
+    // draw in CSS pixels
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // one true render path
+  function drawScene() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // grid first
+    drawGrid(ctx);
+    // existing lines
+    (lines || []).forEach((L) => drawLine(ctx, L));
+    // in-progress line
+    if (isDrawing && currentLine) drawLine(ctx, currentLine);
+  }
 
   const [downspoutCoordinates, setDownspoutCoordinates] = useState([0, 0]);
   const [noteCoordinates, setNoteCoordinates] = useState([0, 0]);
@@ -439,6 +517,13 @@ const Diagram = ({
       window.removeEventListener("storage", onStorage);
     };
   }, []);
+
+  useEffect(() => {
+    if (activeModal === "diagram") {
+      // ctx may already be set; safe to call
+      drawScene();
+    }
+  }, [activeModal, lines]); // lines array is your source of truth
 
   // default tool -> first gutter
   useEffect(() => {
@@ -514,7 +599,6 @@ const Diagram = ({
     }));
 
     // draw the scaled content exactly as your code does now
-    withIds.forEach((line) => drawLine(ctx, line));
     setLines(withIds);
 
     // If you’re using the baseline-hash to decide overwrite prompts, reset it here
@@ -526,30 +610,9 @@ const Diagram = ({
     }
   }, [selectedDiagram]);
 
-  // scale canvas for DPR + redraw grid
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(window.innerWidth * dpr);
-    canvas.height = Math.floor(window.innerHeight * dpr);
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-    drawGrid(ctx);
-  }, [window.innerWidth, window.innerHeight]);
-
-  // redraw everything on state changes
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    drawAllLines(ctx);
-  }, [currentLine, lines, isDrawing]);
+    if (activeModal === "diagram") drawScene();
+  }, [activeModal, currentLine, lines, isDrawing]);
 
   // --- stable diagram hashing (only fields that define "meaningful change") ---
   const baselineHashRef = useRef(null);
@@ -664,7 +727,7 @@ const Diagram = ({
   // ======= Geometry / draw helpers =======
   function drawGrid(ctx) {
     const { width, height } = ctx.canvas;
-    const size = 10;
+    const size = gridSize;
     ctx.strokeStyle = "#ccc";
     ctx.lineWidth = 1;
     for (let x = 0; x < width; x += size) {
@@ -680,7 +743,15 @@ const Diagram = ({
       ctx.stroke();
     }
   }
-  const convertToFeet = (dist) => Math.round(dist / gridSize);
+  const convertToFeet = (dist) => {
+    // dist is in pixels
+    // each square is gridSize px and equals feetPerSquare feet
+    // => pixels per foot = gridSize / feetPerSquare
+    // => feet = pixels / (gridSize / feetPerSquare) = pixels * (feetPerSquare / gridSize)
+    const pxPerFoot = gridSize / Math.max(0.0001, feetPerSquare);
+    return Math.round(dist / pxPerFoot);
+  };
+
   const snap = (n) => Math.round(n / gridSize) * gridSize;
 
   function getCanvasCoords(e) {
@@ -844,9 +915,14 @@ const Diagram = ({
   function currentProductFromTool() {
     return filteredProducts.find((p) => p.name === tool);
   }
+
   function productColor(p) {
-    return p?.colorCode ?? p?.visual ?? p?.color ?? "#000000";
+    // prefer explicit color, then visual, then template defaultColor, then black
+    return (
+      p?.colorCode ?? p?.visual ?? p?.color ?? p?.defaultColor ?? "#000000"
+    );
   }
+
   function gutterProfileKeyFromProductName(name) {
     return normalizeGutterKey(name);
   }
@@ -1098,6 +1174,14 @@ const Diagram = ({
   }
 
   function handleAddDownspout(downspoutData) {
+    const currentDownspout = (allProducts || []).find((p) => {
+      return (
+        /ownspout/i.test(p.name) &&
+        p.name.toLowerCase().includes(downspoutData.profile.toLowerCase()) &&
+        p.name.includes(downspoutData.downspoutSize.split(" ")[0])
+      );
+    });
+
     // If we came from clicking an existing DS box: update instead of creating a new line
     if (editingDownspoutIndex !== null) {
       setLines((prev) => {
@@ -1150,14 +1234,6 @@ const Diagram = ({
       return;
     }
 
-    const currentDownspout = (allProducts || []).find((p) => {
-      return (
-        /ownspout/i.test(p.name) &&
-        p.name.toLowerCase().includes(downspoutData.profile.toLowerCase()) &&
-        p.name.includes(downspoutData.downspoutSize.split(" ")[0])
-      );
-    });
-
     const formatted = {
       id: newId(),
       startX: downspoutCoordinates[0],
@@ -1166,7 +1242,7 @@ const Diagram = ({
       endY: downspoutCoordinates[1],
       midpoint: null,
       measurement: parseInt(downspoutData.totalFootage, 10),
-      color: currentDownspout?.visual || "#000",
+      color: currentDownspout?.color || "#000",
       isSelected: false,
       isDownspout: true,
       profile: downspoutData.profile,
@@ -1187,6 +1263,7 @@ const Diagram = ({
       elbowBoxAngle: Math.PI / 4, // 45°, keeps your current “bottom-right-ish” vibe
       elbowBoxRadius: gridSize * 5, // tweak as you like
     };
+    console.log(currentDownspout);
     setLines((prev) => [...prev, formatted]);
   }
 
@@ -1260,9 +1337,12 @@ const Diagram = ({
 
         if (el.isNote) {
           if (hitTestAnnotation(el, x, y)) {
-            hitIndex = i;
-            dragMode = "move";
-            break;
+            // bring note to front
+            bringToFront(i);
+            // start as a move, but decide click-vs-drag on mouseup
+            setDragging({ mode: "move", end: null, lastX: x, lastY: y });
+            noteClickRef.current = { x, y, index: lines.length - 1 }; // after bringToFront
+            return;
           }
         } else if (el.isDownspout) {
           const hit = hitTestDownspout(el, x, y);
@@ -1602,6 +1682,25 @@ const Diagram = ({
 
     if (isDownspoutModalOpen) return;
 
+    // open AnnotationModal if we "clicked" a note (not dragged it)
+    if (tool === "select" && noteClickRef.current.index !== null) {
+      const { x: downX, y: downY, index } = noteClickRef.current;
+      const upXY = getCanvasCoords({
+        nativeEvent: { clientX: dragging.lastX, clientY: dragging.lastY },
+      });
+      const moved = Math.hypot(upXY.x - downX, upXY.y - downY);
+      // small threshold => treat as click
+      if (moved < 4) {
+        const noteLine = lines[index];
+        if (noteLine?.isNote) {
+          setEditingNoteIndex(index);
+          setActiveModal("note"); // reuse your existing modal slot
+        }
+      }
+      // reset the click ref
+      noteClickRef.current = { x: 0, y: 0, index: null };
+    }
+
     if (tool === "select") {
       setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
       setIsDrawing(false);
@@ -1845,27 +1944,24 @@ const Diagram = ({
   function saveDiagram(saveType) {
     setSelectedIndex(null);
 
+    // ---------- fold accessories (front-end only, once) ----------
     function foldAccessoryItems(items) {
       const map = new Map();
-
       (items || []).forEach((it) => {
         const isAccessory =
           it?.meta &&
           ["miter", "endcap", "elbow", "offset"].includes(it.meta.kind);
 
-        // For accessories: do NOT rely on product._id. Use meta to preserve intent.
-        // For base rows (gutters/downspouts), product id/name is fine.
         const key = isAccessory
           ? [
               it.meta?.kind || "", // miter | endcap | elbow | offset
               it.meta?.miterType || "", // strip | bay | custom
               it.meta?.degrees ?? "", // number for custom miters
-              it.meta?.code || "", // A | B for elbows
+              it.meta?.code || "", // A | B for elbows (explicit!)
               it.meta?.inches || "", // 2 | 4 | 6 for offsets
               it.meta?.size || it.meta?.sizeLabel || "",
               it.meta?.profileKey || it.meta?.profile || "",
-              // include name as a final tie-breaker so renamed customs ("Custom Miter (9°)") stay separate
-              it.name || "",
+              it.name || "", // tie-breaker so renamed customs stay separate
             ].join("|")
           : it.product?._id || it.name || "base";
 
@@ -1876,7 +1972,6 @@ const Diagram = ({
           map.set(key, { ...it, quantity: Number(it.quantity || 0) });
         }
       });
-
       return Array.from(map.values());
     }
 
@@ -1885,7 +1980,7 @@ const Diagram = ({
       return;
     }
 
-    // If nothing changed, don't interrupt
+    // Skip save if the diagram hasn’t changed
     const currentHash = hashLines(lines);
     const hasChanged = currentHash !== baselineHashRef.current;
     if (!hasChanged) {
@@ -1893,7 +1988,7 @@ const Diagram = ({
       return;
     }
 
-    // Require a project id
+    // Require project id
     const resolvedProjectId =
       currentProjectId ||
       selectedDiagram?.projectId ||
@@ -1904,7 +1999,7 @@ const Diagram = ({
       return;
     }
 
-    // --- thumb bounds for ALL elements (lines, notes, free marks, downspouts) ---
+    // ---------- bounding box utilities for thumbnail ----------
     function boundsUnion(a, b) {
       return {
         minX: Math.min(a.minX, b.minX),
@@ -1914,13 +2009,7 @@ const Diagram = ({
       };
     }
     function elementBounds(el, ctx) {
-      let box = {
-        minX: Infinity,
-        minY: Infinity,
-        maxX: -Infinity,
-        maxY: -Infinity,
-      };
-
+      // priced gutter line
       if (!el.isFreeMark && !el.isNote && !el.isDownspout) {
         return {
           minX: Math.min(el.startX, el.endX),
@@ -1930,6 +2019,7 @@ const Diagram = ({
         };
       }
 
+      // note
       if (el.isNote) {
         const text = String(el.note || "");
         ctx.save();
@@ -1949,6 +2039,7 @@ const Diagram = ({
         };
       }
 
+      // downspout (X + elbow box)
       if (el.isDownspout) {
         const r = gridSize;
         const cross = {
@@ -1958,7 +2049,7 @@ const Diagram = ({
           maxY: el.startY + r,
         };
         const w = 60;
-        const h = 28; // keep in sync with draw & hitTest
+        const h = 28;
         const angle =
           typeof el.elbowBoxAngle === "number" ? el.elbowBoxAngle : Math.PI / 4;
         const radius =
@@ -1976,6 +2067,7 @@ const Diagram = ({
         return boundsUnion(cross, box);
       }
 
+      // free marks
       if (el.isFreeMark) {
         if (el.kind === "free-line") {
           return {
@@ -1995,14 +2087,15 @@ const Diagram = ({
         if (el.kind === "free-circle") {
           const r = Math.max(0, el.radius || 0);
           return {
-            minX: el.centerX - r,
-            minY: el.centerY - r,
-            maxX: el.centerX + r,
-            maxY: el.centerY + r,
+            minX: (el.centerX ?? el.startX) - r,
+            minY: (el.centerY ?? el.startY) - r,
+            maxX: (el.centerX ?? el.startX) + r,
+            maxY: (el.centerY ?? el.startY) + r,
           };
         }
       }
 
+      // fallback: point
       const x = el.startX ?? el.centerX ?? 0;
       const y = el.startY ?? el.centerY ?? 0;
       return { minX: x, minY: y, maxX: x, maxY: y };
@@ -2029,64 +2122,53 @@ const Diagram = ({
     }
 
     const token = localStorage.getItem("jwt");
-    const canvas = canvasRef.current;
+    const canvas = canvasRef.current; // ⬅️ use the top-level ref; do NOT redeclare hooks here
     const ctx = canvas.getContext("2d");
     drawAllLines(ctx);
+
+    // ---------- DPR-safe thumbnail crop ----------
     const dpr = window.devicePixelRatio || 1;
+    const bbox = getBoundingBoxForAll(lines, ctx, 40);
 
-    // 1) Compute bounds in CSS units (your helper returns CSS units)
-    const boundingBox = getBoundingBoxForAll(lines, ctx, 40); // a little more padding
-
-    // 2) Convert CSS -> backing store pixels
-    const srcX = Math.max(0, Math.floor(boundingBox.minX * dpr));
-    const srcY = Math.max(0, Math.floor(boundingBox.minY * dpr));
+    const srcX = Math.max(0, Math.floor(bbox.minX * dpr));
+    const srcY = Math.max(0, Math.floor(bbox.minY * dpr));
     const srcW = Math.min(
-      Math.floor((boundingBox.maxX - boundingBox.minX) * dpr),
+      Math.floor((bbox.maxX - bbox.minX) * dpr),
       canvas.width - srcX
     );
     const srcH = Math.min(
-      Math.floor((boundingBox.maxY - boundingBox.minY) * dpr),
+      Math.floor((bbox.maxY - bbox.minY) * dpr),
       canvas.height - srcY
     );
 
-    // ... setup tempCanvas (unchanged) ...
+    const temp = document.createElement("canvas");
+    const tctx = temp.getContext("2d");
+    const display = 200;
+    const internal = 3 * display;
 
-    const tempCanvas = document.createElement("canvas");
-    const tempCtx = tempCanvas.getContext("2d");
+    temp.width = internal;
+    temp.height = internal;
+    tctx.clearRect(0, 0, temp.width, temp.height);
 
-    // fixed, crisp thumb regardless of device
-    const thumbnailDisplaySize = 200;
-    const thumbnailInternalSize = 3 * thumbnailDisplaySize;
+    const pad = 0.05 * internal;
+    const availW = internal - pad * 2;
+    const availH = internal - pad * 2;
 
-    tempCanvas.width = thumbnailInternalSize;
-    tempCanvas.height = thumbnailInternalSize;
-    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+    const cropWcss = bbox.maxX - bbox.minX;
+    const cropHcss = bbox.maxY - bbox.minY;
+    const scale = Math.min(availW / cropWcss, availH / cropHcss);
+    const destW = cropWcss * scale;
+    const destH = cropHcss * scale;
+    const dx = (internal - destW) / 2;
+    const dy = (internal - destH) / 2;
 
-    // leave some border inside thumb so labels/joins never touch edges
-    const pad = 0.05 * thumbnailInternalSize;
-    const availW = thumbnailInternalSize - pad * 2;
-    const availH = thumbnailInternalSize - pad * 2;
+    tctx.fillStyle = "#ffffff";
+    tctx.fillRect(0, 0, temp.width, temp.height);
+    tctx.drawImage(canvas, srcX, srcY, srcW, srcH, dx, dy, destW, destH);
 
-    // destination size computed in CSS pixels first, then mapped 1:1 to thumb
-    const cropWidthCss = boundingBox.maxX - boundingBox.minX;
-    const cropHeightCss = boundingBox.maxY - boundingBox.minY;
-    const scale = Math.min(availW / cropWidthCss, availH / cropHeightCss);
-    const destW = cropWidthCss * scale;
-    const destH = cropHeightCss * scale;
+    const thumbnailDataUrl = temp.toDataURL("image/png");
 
-    const dx = (thumbnailInternalSize - destW) / 2;
-    const dy = (thumbnailInternalSize - destH) / 2;
-
-    // white background
-    tempCtx.fillStyle = "#ffffff";
-    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-    // draw from the hi-DPI source rect
-    tempCtx.drawImage(canvas, srcX, srcY, srcW, srcH, dx, dy, destW, destH);
-
-    const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
-
-    // --- PRICE + ACCESSORIES ---
+    // ---------- base price (gutters + downspout footage) ----------
     let price = 0;
     let totalFootage = 0;
 
@@ -2095,13 +2177,14 @@ const Diagram = ({
         const p = Number(line.price || 0);
         price += p * Number(line.measurement || 0);
       } else if (line.isNote || line.isFreeMark) {
-        // no price
+        // not priced
       } else {
         const p = Number(line?.currentProduct?.price || 0);
         price += p * Number(line.measurement || 0);
       }
     });
 
+    // ---------- analyze joints (end caps & miters) ----------
     const analysis = analyzeJoints(lines);
     const endcapMiterData = {
       endCapsByProduct: analysis.endCapsByProduct,
@@ -2109,10 +2192,7 @@ const Diagram = ({
       mixedMiters: analysis.mixedMiters,
     };
 
-    const caseIncludes = (hay, needle) =>
-      String(hay).toLowerCase().includes(String(needle).toLowerCase());
-
-    // --- local helpers (robust to your seedTemplate.js) ---
+    // helpers used below
     const ci = (s) => String(s || "").toLowerCase();
     const nameHasAny = (n, tokens = []) => {
       const S = ci(n);
@@ -2135,7 +2215,7 @@ const Diagram = ({
       return m ? `${m[1]}"` : s;
     };
 
-    // kind: "end cap" | "strip miter" | "bay miter"
+    // precise end/strip/bay lookup using your catalog names
     const findGutterAccessoryTemplate = (
       allProducts,
       { profileKey, sizeInches, kind }
@@ -2162,13 +2242,24 @@ const Diagram = ({
       return pass(true) || pass(false) || null;
     };
 
+    // explicit Custom Miter resolver (your catalog has a single “Custom Miter”)
+    function findCustomMiterProduct(allProducts, profileKey) {
+      const profTokens = nameTokensForProfile(profileKey);
+      return (allProducts || []).find((p) => {
+        const n = p?.name || "";
+        if (!/accessory/i.test(p?.type || "accessory")) return false;
+        if (!/custom\s*miter/i.test(n)) return false;
+        // if you want per-profile custom SKUs, keep this; otherwise, drop the check:
+        return nameHasAny(n, profTokens) || true;
+      });
+    }
+
     function calculateEndCapsAndMiters(analysisData) {
       const endCaps = {};
       const miters = {};
       const customMiters = {};
       const accessoryLineItems = [];
 
-      // wrapper so we never forget to include price
       const pushCatalogItem = (product, quantity, meta = {}, nameOverride) => {
         if (!product || !quantity) return;
         accessoryLineItems.push({
@@ -2179,19 +2270,17 @@ const Diagram = ({
           meta,
         });
       };
-      // ---------------- End Caps ----------------
+
+      // End Caps
       Object.keys(analysisData.endCapsByProduct || {}).forEach((profileKey) => {
         const endCapCount = Number(
           analysisData.endCapsByProduct[profileKey] || 0
         );
         if (!endCapCount) return;
 
-        // If you can infer 5"/6"/7" per profile, pass it; otherwise null is fine.
-        const sizeInches = null;
-
         const endCapTpl = findGutterAccessoryTemplate(allProducts, {
           profileKey,
-          sizeInches,
+          sizeInches: null, // pass null if size isn’t encoded in your accessory names
           kind: "end cap",
         });
         if (endCapTpl) {
@@ -2201,27 +2290,23 @@ const Diagram = ({
             quantity: endCapCount,
             product: endCapTpl,
           });
-
           pushCatalogItem(endCapTpl, endCapCount, {
             kind: "endcap",
             profileKey,
-            inches: sizeInches || undefined,
           });
         }
       });
 
-      // ---------------- Miters ----------------
+      // Miters
       Object.keys(analysisData.mitersByProduct || {}).forEach((profileKey) => {
         const m = analysisData.mitersByProduct[profileKey] || {};
         const stripQty = Number(m.inside90 || 0) + Number(m.outside90 || 0);
         const bayQty = Number(m.bay135 || 0);
 
-        const sizeInches = null;
-
         if (stripQty > 0) {
           const strip = findGutterAccessoryTemplate(allProducts, {
             profileKey,
-            sizeInches,
+            sizeInches: null,
             kind: "strip miter",
           });
           if (strip) {
@@ -2242,7 +2327,7 @@ const Diagram = ({
         if (bayQty > 0) {
           const bay = findGutterAccessoryTemplate(allProducts, {
             profileKey,
-            sizeInches,
+            sizeInches: null,
             kind: "bay miter",
           });
           if (bay) {
@@ -2266,19 +2351,7 @@ const Diagram = ({
             const qty = Number(count || 0);
             if (!qty) return;
 
-            const custom =
-              findGutterAccessoryTemplate(allProducts, {
-                profileKey,
-                sizeInches,
-                kind: "custom miter",
-              }) ||
-              findGutterAccessoryTemplate(allProducts, {
-                // fallback: if your catalog doesn't encode size on customs
-                profileKey,
-                sizeInches: null,
-                kind: "custom miter",
-              });
-
+            const custom = findCustomMiterProduct(allProducts, profileKey);
             if (custom) {
               (customMiters[profileKey] ||= []).push({
                 type: `Custom Miter (${angle}°)`,
@@ -2287,8 +2360,7 @@ const Diagram = ({
                 product: custom,
                 angle,
               });
-              // Optional: override the display name so the PDF line shows the angle,
-              // while the price still comes from the Custom Miter SKU.
+              // keep the angle in the name for the line item, price from SKU
               pushCatalogItem(
                 custom,
                 qty,
@@ -2308,15 +2380,12 @@ const Diagram = ({
       return { endCaps, miters, customMiters, accessoryLineItems };
     }
 
-    // --- elbows + offsets (priced) ---
-    // Replace your existing collectElbowsAndOffsets() with this version
+    // ---------- Downspout elbows & offsets ----------
     function collectElbowsAndOffsets(lines, allProducts) {
-      // helpers
       const caseIncludes = (hay, needle) =>
         String(hay).toLowerCase().includes(String(needle).toLowerCase());
 
       function getSizeKeyFromDownspoutLine(line) {
-        // Prefer explicit property (e.g., "2x3 Corrugated") but we just need "2x3"
         const fromProp = String(line.downspoutSize || "").trim();
         const rxSize = /(\d+)\s*[xX]\s*(\d+)/;
         const rxQuoted = /(\d+)\s*"?\s*[xX]\s*(\d+)\s*"?/;
@@ -2326,108 +2395,81 @@ const Diagram = ({
           m = n.match(rxSize) || n.match(rxQuoted);
         }
         if (!m) return "unknown";
-        return `${m[1]}x${m[2]}`; // "2x3" / "3x4"
+        return `${m[1]}x${m[2]}`;
       }
 
       function inferProfileFromLine(line) {
-        // 1) explicit field if you set it in DownspoutModal
         const p = String(line.profile || "").toLowerCase();
         if (p) return p;
-
-        // 2) infer from currentProduct.name fallback
         const n = String(line.currentProduct?.name || "").toLowerCase();
         if (n.includes("round")) return "round";
         if (n.includes("smooth")) return "smooth";
         if (n.includes("box")) return "box";
-        // default to corrugated when ambiguous
         return "corrugated";
       }
 
-      // Tokenize sequence into elbows (A/B/…) and offsets (2,4,6,…)
-      // REPLACE your existing parseElbowsAndOffsets with this one
       function parseElbowsAndOffsets(seq) {
         const out = { elbows: {}, offsets: {} };
         if (!seq) return out;
-
-        // Normalize once
         const s = String(seq).trim();
 
-        // 1) Count elbow letters anywhere (A-D)
+        // Elbows A-D
         (s.match(/[A-D]/gi) || []).forEach((ch) => {
           const up = ch.toUpperCase();
           out.elbows[up] = (out.elbows[up] || 0) + 1;
         });
 
-        // 2) First, extract all quoted/united offsets like 2", 4 in, 6 inch, 10", etc.
-        //    Treat these as whole numbers.
-        const consumed = []; // [ [start,end) ] ranges we consumed so we don't double count bare digits inside them
+        // Quoted/units offsets first
+        const consumed = [];
         const unitRe = /(\d+)\s*(?:"|in\b|inch\b|”)/gi;
         let m;
         while ((m = unitRe.exec(s))) {
-          const inches = m[1]; // e.g., "2", "4", "10"
+          const inches = m[1];
           out.offsets[inches] = (out.offsets[inches] || 0) + 1;
           consumed.push([m.index, unitRe.lastIndex]);
         }
-
-        // Helper to check if an index falls within any consumed range
         const isConsumed = (idx) =>
           consumed.some(([a, b]) => idx >= a && idx < b);
 
-        // 3) Now handle bare digit runs (no quotes/units).
-        //    Example: "AAB246" => we want 2, 4, 6 (split into single digits).
-        //    We *skip* digits inside already-consumed ranges.
+        // Bare digits: split 246 => 2,4,6
         for (let i = 0; i < s.length; i++) {
           if (isConsumed(i)) continue;
           const ch = s[i];
           if (/\d/.test(ch)) {
-            // Collect the contiguous digit run
             let j = i;
             let run = "";
             while (j < s.length && /\d/.test(s[j]) && !isConsumed(j)) {
               run += s[j++];
             }
-
             if (run.length === 1) {
-              // single digit like "2" => 2"
               out.offsets[run] = (out.offsets[run] || 0) + 1;
             } else {
-              // multiple bare digits like "246" => split into 2,4,6
-              for (const d of run) {
-                out.offsets[d] = (out.offsets[d] || 0) + 1;
-              }
+              for (const d of run) out.offsets[d] = (out.offsets[d] || 0) + 1;
             }
-            i = j - 1; // advance cursor
+            i = j - 1;
           }
         }
-
         return out;
       }
 
-      // ---- NEW: count by size **and** profile
-      // e.g. { "2x3|corrugated": { A: 3, B: 1 }, "3x4|smooth": { A: 2 } }
       const elbowCounts = {};
-      // e.g. { "2x3|corrugated": { "2": 2, "4": 1 } }
       const offsetCounts = {};
 
       lines.forEach((line) => {
         if (!line?.isDownspout) return;
-
-        const sizeKey = getSizeKeyFromDownspoutLine(line); // "2x3" / "3x4" / "unknown"
-        const profileKey = inferProfileFromLine(line); // "corrugated" | "smooth" | "box" | "round"
+        const sizeKey = getSizeKeyFromDownspoutLine(line);
+        const profileKey = inferProfileFromLine(line);
         const mapKey = `${sizeKey}|${profileKey}`;
-
         const { elbows, offsets } = parseElbowsAndOffsets(
           line.elbowSequence || ""
         );
 
-        // elbows
         if (!elbowCounts[mapKey]) elbowCounts[mapKey] = {};
         Object.entries(elbows).forEach(([code, qty]) => {
           elbowCounts[mapKey][code] =
             (elbowCounts[mapKey][code] || 0) + Number(qty || 0);
         });
 
-        // offsets
         if (!offsetCounts[mapKey]) offsetCounts[mapKey] = {};
         Object.entries(offsets).forEach(([inches, qty]) => {
           offsetCounts[mapKey][inches] =
@@ -2437,17 +2479,16 @@ const Diagram = ({
 
       const items = [];
 
-      // build elbow line items (now we know the profile for each group)
+      // elbows
       Object.entries(elbowCounts).forEach(([key, byCode]) => {
         const [sizeKey, profileKey] = key.split("|");
         Object.entries(byCode).forEach(([code, qty]) => {
           if (!qty) return;
 
-          // robust catalog match with profile+size+code
           const prod = findDownspoutFitting(allProducts, {
-            profileKey, // corrugated/smooth/box/round
-            dsSize: sizeKey, // "2x3" / "3x4" / '3"' ...
-            code, // "A" | "B" (ignored for round)
+            profileKey,
+            dsSize: sizeKey,
+            code, // <-- A or B
             kind: "elbow",
           });
           if (!prod) return;
@@ -2468,20 +2509,20 @@ const Diagram = ({
             meta: {
               kind: "elbow",
               size: sizeKey,
-              letter: code,
+              letter: code, // keep old field
+              code, // add canonical field used by backend folding
               profileKey,
             },
           });
         });
       });
 
-      // build offset line items (profile affects SKU resolution too)
+      // offsets
       Object.entries(offsetCounts).forEach(([key, byInches]) => {
         const [sizeKey, profileKey] = key.split("|");
         Object.entries(byInches).forEach(([inches, qty]) => {
           if (!qty) return;
 
-          // offsets don’t have A/B, but profile+size still matters
           const prod =
             findDownspoutFitting(allProducts, {
               profileKey,
@@ -2495,7 +2536,6 @@ const Diagram = ({
                 (caseIncludes(p.name, `${inches}"`) ||
                   caseIncludes(p.name, ` ${inches} `))
             );
-
           if (!prod) return;
 
           items.push({
@@ -2526,26 +2566,24 @@ const Diagram = ({
 
     const { endCaps, miters, customMiters, accessoryLineItems } =
       calculateEndCapsAndMiters(endcapMiterData);
-
     const elbowOffsetItems = collectElbowsAndOffsets(lines, allProducts);
 
-    // de-duplicate ALL accessories before pricing/rendering
     const allAccessoriesUnfolded = [...accessoryLineItems, ...elbowOffsetItems];
-
     const allAccessories = foldAccessoryItems(allAccessoriesUnfolded);
 
-    // price from folded list ONLY
+    // add accessory price
     allAccessories.forEach((it) => {
       price += Number(it.price || 0) * Number(it.quantity || 0);
     });
 
-    // right above `const data = { ... }`
+    // persist the canvas size used for this save (for future scaling)
     const rect = canvasRef.current.getBoundingClientRect();
     const metaViewport = {
       canvasW: Math.round(rect.width),
       canvasH: Math.round(rect.height),
     };
 
+    // normalize for API (canonicalize keys; keep names stable)
     function normalizeAccessoriesForAPI(items) {
       return (items || []).map((it) => {
         const out = {
@@ -2555,16 +2593,17 @@ const Diagram = ({
         };
         const m = { ...(out.meta || {}) };
 
-        // Canonicalize server-side keys
+        // server canonical: kind casing
         if (m.kind === "endcap") m.kind = "endCap";
+
         if (m.kind === "miter") {
-          // server canonical: meta.type
           if (!m.type && m.miterType) {
             const t = String(m.miterType);
             m.type = t.charAt(0).toUpperCase() + t.slice(1); // Strip/Bay/Custom
           }
           if (m.degrees != null) m.degrees = Number(m.degrees);
         }
+
         if (!m.size && m.sizeLabel) m.size = m.sizeLabel;
         if (!m.profileKey && m.profile) m.profileKey = m.profile;
         if (m.code) m.code = String(m.code).toUpperCase();
@@ -2572,7 +2611,7 @@ const Diagram = ({
 
         out.meta = m;
 
-        // Defensive: embed discriminators in name so nothing merges even if some meta is lost downstream.
+        // keep discriminators visible in names without duplicating
         if (
           m.kind === "miter" &&
           m.type === "Custom" &&
@@ -2596,7 +2635,6 @@ const Diagram = ({
         ) {
           out.name = out.name.replace(/\bOffset\b/i, `${m.inches}" Offset`);
         }
-
         return out;
       });
     }
@@ -2606,18 +2644,15 @@ const Diagram = ({
       imageData: thumbnailDataUrl,
       totalFootage,
       price: parseFloat(price).toFixed(2),
-      // legacy fields (ok to keep; not used by new pdf)
+      // legacy for old PDF (fine to keep)
       miterSummary: analysis.miters,
       endCaps: analysis.endCaps,
       endCapsByProduct: analysis.endCapsByProduct,
       mitersByProduct: analysis.mitersByProduct,
       mixedMiters: analysis.mixedMiters,
       accessoryData: [endCaps, miters, customMiters],
-      // new
-      accessories: {
-        items: normalizeAccessoriesForAPI(allAccessories), // folded accessories list
-      },
-      // 🔹 NEW: persist the canvas size this drawing was made on
+      // new normalized list used by Estimate PDF
+      accessories: { items: normalizeAccessoriesForAPI(allAccessories) },
       meta: {
         ...(selectedDiagram?.meta || {}),
         ...metaViewport,
@@ -2663,7 +2698,7 @@ const Diagram = ({
       handleAddDiagramToProject();
     }
 
-    // after successful save/add/overwrite:
+    // update baseline after a successful save
     baselineHashRef.current = hashLines(lines);
   }
 
@@ -2985,6 +3020,47 @@ const Diagram = ({
           </div>
         )}
 
+        {(lines?.length ?? 0) === 0 && (
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              padding: "8px 0",
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span>Grid square size (px):</span>
+              <input
+                type="number"
+                min={4}
+                step={1}
+                value={gridSize}
+                onChange={(e) => {
+                  const v = Math.max(2, Number(e.target.value) || 10);
+                  setGridSize(v);
+                }}
+                style={{ width: 90, padding: "4px 6px", color: "white" }}
+              />
+            </label>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span>Feet per square:</span>
+              <input
+                type="number"
+                min={0.01}
+                step={0.25}
+                value={feetPerSquare}
+                onChange={(e) => {
+                  const v = Math.max(0.01, Number(e.target.value) || 1);
+                  setFeetPerSquare(v);
+                }}
+                style={{ width: 90, padding: "4px 6px", color: "white" }}
+              />
+            </label>
+          </div>
+        )}
+
         <canvas
           ref={canvasRef}
           className="diagram__canvas"
@@ -3018,8 +3094,36 @@ const Diagram = ({
       />
       <AnnotationModal
         activeModal={activeModal}
-        setActiveModal={setActiveModal}
-        addNote={addNote}
+        setActiveModal={(v) => {
+          // if closing the modal, clear edit state
+          if (v !== "note") setEditingNoteIndex(null);
+          setActiveModal(v);
+        }}
+        mode={editingNoteIndex !== null ? "edit" : "create"}
+        initialText={
+          editingNoteIndex !== null ? lines[editingNoteIndex]?.note || "" : ""
+        }
+        onSubmit={(text) => {
+          if (editingNoteIndex !== null) {
+            // update existing note text
+            setLines((prev) => {
+              const next = [...prev];
+              if (next[editingNoteIndex]) {
+                next[editingNoteIndex] = {
+                  ...next[editingNoteIndex],
+                  note: text,
+                };
+              }
+              return next;
+            });
+            setEditingNoteIndex(null);
+            setActiveModal("diagram");
+          } else {
+            // existing create flow
+            addNote(text);
+            setActiveModal("diagram");
+          }
+        }}
       />
     </>
   );

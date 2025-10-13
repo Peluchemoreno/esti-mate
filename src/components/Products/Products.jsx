@@ -69,29 +69,34 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
         width: 150,
         headerClassName: "products__column-header",
         renderCell: (params) => {
-          const isGutter = params.row?.type === "gutter";
-          const gutterColor =
-            params.row?.color ||
-            params.row?.colorCode ||
-            params.row?.defaultColor ||
-            params.row?.visual ||
+          const type = String(params.row?.type || "").toLowerCase();
+          const isGutter = type === "gutter";
+          const isDownspout = type === "downspout";
+          // prefer saved color, then template/defaults
+          const color =
+            params.row?.color ??
+            params.row?.colorCode ??
+            params.row?.visual ??
+            params.row?.defaultColor ??
             null;
+
+          const showSwatch = (isGutter || isDownspout) && !!color;
 
           return (
             <Box
               sx={{
                 width: "100%",
                 height: "100%",
-                backgroundColor:
-                  isGutter && gutterColor ? gutterColor : "transparent",
+                backgroundColor: showSwatch ? color : "transparent",
                 color: "white",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "flex-start",
                 paddingLeft: 1,
               }}
+              title={showSwatch ? color : ""}
             >
-              <div>{isGutter && gutterColor ? gutterColor : "-"}</div>
+              <div>{showSwatch ? color : "-"}</div>
             </Box>
           );
         },
