@@ -11,10 +11,6 @@ export default function SignupContinued({
   setTempLogo,
   isLoading,
 }) {
-  useEffect(() => {
-    console.log(userData);
-  }, []);
-
   const [companyName, setCompanyName] = useState("");
   const [logo, setLogo] = useState(null);
   const [companyAddress, setCompanyAddress] = useState("");
@@ -34,7 +30,6 @@ export default function SignupContinued({
 
     e.preventDefault();
     userData = { ...userData, companyName, companyAddress, companyPhone };
-    console.log("runing handle submit");
     handleSignUp(userData, logo);
   }
 
@@ -46,9 +41,6 @@ export default function SignupContinued({
     setCompanyPhone(e.target.value);
   }
 
-  useEffect(() => {
-    console.log(userData);
-  }, [userData]);
   return (
     <>
       <Link to="/">

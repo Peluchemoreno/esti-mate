@@ -344,7 +344,6 @@ function App() {
                     currentProjectId={currentProjectId}
                     updateDiagram={updateDiagram}
                     addDiagramToProject={addDiagramToProject}
-                    setDiagrams={setDiagrams}
                     handlePassDiagramData={handlePassDiagramData}
                     selectedDiagram={currentDiagram}
                     originalDiagram={originalDiagram}
@@ -361,7 +360,6 @@ function App() {
                   currentProjectId={currentProjectId}
                   updateDiagram={updateDiagram}
                   addDiagramToProject={addDiagramToProject}
-                  setDiagrams={setDiagrams}
                   handlePassDiagramData={handlePassDiagramData}
                   selectedDiagram={currentDiagram}
                   setSelectedDiagram={setCurrentDiagram}

@@ -8,6 +8,9 @@ export default function DownspoutModal({
   setTool,
   setIsDownspoutModalOpen,
   addDownspout,
+  mode = "create", // "create" | "edit"
+  initialData = null, // downspout line object when editing
+  onClose, // optional callback
 }) {
   const [elbowSequence, setElbowSequence] = useState("");
   const [totalFootage, setTotalFootage] = useState("");
@@ -21,13 +24,25 @@ export default function DownspoutModal({
   const [profile, setProfile] = useState("");
 
   useEffect(() => {
-    clearInputs();
-  }, [activeModal]);
+    if (activeModal !== "downspout") return;
+    if (mode === "edit" && initialData) {
+      setElbowSequence(String(initialData.elbowSequence || "").toUpperCase());
+      setTotalFootage(String(initialData.measurement ?? ""));
+      setSplashBlock(!!initialData.splashBlock);
+      setRainBarrel(!!initialData.rainBarrel);
+      setUndergroundDrainage(!!initialData.undergroundDrainage);
+      // Try to reconstruct size label from stored ds
+      setDownspoutSize(initialData.downspoutSize || "2x3 corrugated");
+      setDownspoutMaterial("aluminum"); // your UI hides this anyway
+      setFootageIsValid(true);
+      setElbowSequenceIsValid(true);
+    } else {
+      clearInputs();
+    }
+  }, [activeModal, mode, initialData]);
 
   function handleDownspoutSubmit(e) {
     e.preventDefault();
-    console.log(downspoutSize);
-    console.log(downspoutSize.split(" "));
     const downspoutData = {
       elbowSequence,
       totalFootage,
@@ -41,16 +56,22 @@ export default function DownspoutModal({
           ? downspoutSize.split(" ")[1]
           : downspoutSize.split(" ")[0],
     };
-    console.log(downspoutData);
     addDownspout(downspoutData);
-
     setActiveModal("diagram");
     setIsDownspoutModalOpen(false);
+    if (mode === "create") {
+      // leave as-is for your current flow
+    } else {
+      // stay in Select when editing
+      setTool?.((prev) => prev);
+    }
+    onClose?.();
   }
 
   function handleChangeElbowSequence(e) {
-    validateElbowSequence(e.target.value);
-    setElbowSequence(e.target.value);
+    const v = (e.target.value || "").toUpperCase();
+    validateElbowSequence(v);
+    setElbowSequence(v);
   }
 
   function handleChangeTotalFootage(e) {
@@ -59,7 +80,6 @@ export default function DownspoutModal({
   }
 
   function handleChangeDownspoutSize(e) {
-    console.log(e.target.value);
     setDownspoutSize(e.target.value);
   }
 
@@ -102,7 +122,6 @@ export default function DownspoutModal({
   function validateElbowSequence(input) {
     const pattern = /^[A, a, B, b, C, c, 2, 4, 6]*$/;
     setElbowSequenceIsValid(pattern.test(input));
-    console.log(pattern.test(input));
   }
 
   return (
@@ -115,7 +134,7 @@ export default function DownspoutModal({
     >
       <form className="downspout-modal__form" onSubmit={handleDownspoutSubmit}>
         <header>
-          <h2>Downspout Details</h2>
+          <h2>{mode === "edit" ? "Update Downspout" : "Downspout Details"}</h2>
         </header>
         <div className="downspout-modal__body">
           <label className="add-item__label">
@@ -225,20 +244,27 @@ export default function DownspoutModal({
           <button
             onClick={() => {
               setIsDownspoutModalOpen(false);
-              setTool("downspout"); // Or whatever tool you want to reset to
+              if (mode === "create") {
+                setTool("downspout");
+              } else {
+                // stay in Select on edit
+                setTool?.((prev) => prev); // no-op if provided
+              }
               setActiveModal("diagram");
+              onClose?.();
             }}
             type="button"
             className="add-item-form__button_cancel"
           >
             Cancel
           </button>
+
           <button
             type="submit"
             className="add-item-form__button_create"
             disabled={disableCreateButton()}
           >
-            Create
+            {mode === "edit" ? "Update" : "Create"}
           </button>
         </div>
       </form>

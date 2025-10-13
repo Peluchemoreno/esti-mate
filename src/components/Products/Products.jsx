@@ -79,7 +79,6 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
 
           return (
             <Box
-              onClick={() => console.log(params.row)}
               sx={{
                 width: "100%",
                 height: "100%",
@@ -157,7 +156,6 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
 
   function handleEditItemClick(item) {
     setCurrentItem(item);
-    console.log(item);
     setActiveModal("edit item");
   }
 
@@ -170,7 +168,6 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
       quantity: itemData.quantityUnit,
       price: Number(itemData.itemPrice), // no "$"
     };
-    console.log("createProduct payload:", payload);
     createProduct(payload, token).then((res) => {
       if (res?.data) {
         // Prepend new row and let dedupe take care of repeats

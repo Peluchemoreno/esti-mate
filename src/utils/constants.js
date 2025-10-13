@@ -80,9 +80,6 @@ export function isLineNearPoint(x1, y1, x2, y2, px, py, radius) {
     return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
   }
 
-  // console.log("Checking line from:", x1, y1, "to", x2, y2);
-  // console.log("Click at:", px, py, "with radius:", radius);
-
   // Find the projection of (px, py) onto the line segment
   let A = px - x1;
   let B = py - y1;

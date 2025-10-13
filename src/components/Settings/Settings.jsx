@@ -39,17 +39,14 @@ export default function Settings({ currentUser, setCurrentUser }) {
 
   function handleCompanyNameChange(e) {
     setCompanyName(e.target.value);
-    console.log(companyName);
   }
 
   function handleCompanyAddressChange(e) {
     setCompanyAddress(e.target.value);
-    console.log(companyAddress);
   }
 
   function handleCompanyPhoneNumberChange(e) {
     setCompanyPhoneNumber(e.target.value);
-    console.log(companyPhoneNumber);
   }
 
   function handleChangeLogoFile(e) {
@@ -60,8 +57,6 @@ export default function Settings({ currentUser, setCurrentUser }) {
     const token = localStorage.getItem("jwt");
     e.preventDefault();
     const businessData = { companyName, companyAddress, companyPhoneNumber };
-    console.log(businessData);
-    console.log(currentUser.logo);
 
     updateUserInfo(businessData, token).then((data) => {
       setCurrentUser(data);
@@ -80,12 +75,11 @@ export default function Settings({ currentUser, setCurrentUser }) {
     const token = localStorage.getItem("jwt");
     setToken(token);
 
-    console.log("this is the logo call");
     if (currentUser?._id && token) {
       getCompanyLogo(currentUser._id, token)
         .then((url) => {
           setLogoUrl(url);
-          console.log("Fetched logo:", url);
+          "Fetched logo:", url;
         })
         .catch((err) => {
           console.error("Failed to load logo:", err.message);
@@ -93,9 +87,6 @@ export default function Settings({ currentUser, setCurrentUser }) {
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    console.log(currentUser);
-  }, []);
   return (
     <div className="settings">
       <h3 className="settings__header-title">Settings</h3>

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Image,
 } from "@react-pdf/renderer";
+import { useEffect } from "react";
 
 // ---- styles ----
 const styles = StyleSheet.create({
@@ -94,39 +95,88 @@ const fmt = (n) =>
 // fold duplicates (prefer product identity)
 function fold(items) {
   const map = new Map();
+
   (items || []).forEach((it) => {
-    const key =
-      it.product?._id ||
-      [
-        it.name,
-        it.meta?.kind || "",
-        it.meta?.miterType || "",
-        it.meta?.code || "",
-        it.meta?.inches || "",
-        it.meta?.side || "",
-        it.meta?.size || it.meta?.sizeKey || "",
-        it.meta?.profile || "",
-      ].join("|");
+    const m = it?.meta || {};
+    const kind = (m.kind === "endcap" ? "endCap" : m.kind) || "";
+
+    const isAccessory =
+      kind === "miter" ||
+      kind === "endCap" ||
+      kind === "elbow" ||
+      kind === "offset";
+
+    const miterType = m.type || m.miterType || ""; // Strip | Bay | Custom
+    const degrees = m.degrees ?? m.angle ?? "";
+    const code = m.code || m.letter || "";
+    const inches = m.inches || "";
+    const side = m.side || "";
+    const size = m.size || m.sizeLabel || "";
+    const profile = m.profileKey || m.profile || "";
+
+    const key = isAccessory
+      ? [
+          kind,
+          String(miterType).toLowerCase(),
+          String(degrees),
+          String(code).toUpperCase(),
+          String(inches),
+          String(side),
+          String(size),
+          String(profile),
+          String(it.name || ""),
+        ].join("|")
+      : it.product?._id ||
+        [
+          String(it.name || ""),
+          kind,
+          String(miterType).toLowerCase(),
+          String(code).toUpperCase(),
+          String(inches),
+          String(side),
+          String(size),
+          String(degrees),
+          String(profile),
+        ].join("|");
 
     const prev = map.get(key);
     if (prev) {
-      prev.quantity += Number(it.quantity || 0);
+      prev.quantity = Number(prev.quantity || 0) + Number(it.quantity || 0);
     } else {
       map.set(key, { ...it, quantity: Number(it.quantity || 0) });
     }
   });
+
   return Array.from(map.values());
 }
 
 // normalize DS label
-const prettyDs = (raw = "") =>
-  String(raw)
-    .replace(
-      /(\d+\s*x\s*\d+)\s*corrugated/i,
-      (_m, size) => `${size.replace(/\s*/g, "")} Corrugated`
-    )
+// Normalize DS label to "3\" Round" or "3x4 Corrugated"
+const prettyDs = (raw = "") => {
+  const s = String(raw || "").trim();
+
+  // Try to extract size:
+  const mCorr = s.match(/(\d+\s*x\s*\d+)\s*(corrugated)?/i); // 2x3 / 3x4
+  const mRound = s.match(/(\d+)\s*"?\s*(?:inch|")\s*(round)?/i); // 3" Round, 3 inch Round
+
+  if (mCorr) {
+    const size = mCorr[1].replace(/\s*/g, "").toLowerCase(); // "3x4"
+    return `${size} Corrugated`.replace(
+      /^(\d+)x(\d+) Corrugated$/i,
+      (_, a, b) => `${a}x${b} Corrugated`
+    );
+  }
+  if (mRound) {
+    const inches = mRound[1]; // "3"
+    return `${inches}" Round`;
+  }
+
+  // Fallbacks/cleanup: collapse repeated tokens and odd quoting
+  return s
+    .replace(/"\s*round\s*"?\s*round/i, `" Round`) // ... "Round" Round -> " Round
     .replace(/\s+/g, " ")
     .trim();
+};
 
 // normalize CSS color -> hex for @react-pdf
 function normalizeColor(c) {
@@ -207,8 +257,8 @@ export default function EstimatePDF({
   let gutterColor = null;
   let downspoutColor = null;
 
-  let gutterLabel = null;
-  let downspoutLabel = null;
+  const gutterLabels = new Set(); // e.g., 5" K-Style, 6" Half Round
+  const dsLabels = new Set(); // e.g., 3" Round, 3x4 Corrugated
 
   lines.forEach((l) => {
     if (l.isDownspout) {
@@ -219,12 +269,10 @@ export default function EstimatePDF({
         meta: { kind: "downspout" },
       });
       if (!downspoutColor) downspoutColor = normalizeColor(l.color || "#000");
-      if (!downspoutLabel) {
-        const label = l.downspoutSize
-          ? `${prettyDs(l.downspoutSize)} Downspout`
-          : "Downspout";
-        downspoutLabel = label;
-      }
+      // collect every DS type we see
+      dsLabels.add(
+        l.downspoutSize ? `${prettyDs(l.downspoutSize)} Downspout` : "Downspout"
+      );
     } else if (l.currentProduct) {
       baseRows.push({
         name: l.currentProduct.name,
@@ -240,9 +288,8 @@ export default function EstimatePDF({
             l.currentProduct?.color ||
             "#000"
         );
-      if (!gutterLabel) {
-        gutterLabel = prettyGutter(l.currentProduct.name || "Gutter");
-      }
+      // collect every gutter profile we see
+      gutterLabels.add(prettyGutter(l.currentProduct.name || "Gutter"));
     }
   });
 
@@ -252,9 +299,9 @@ export default function EstimatePDF({
     selectedDiagram?.accessoryItems ||
     [];
 
-  // prefer saved items (viewer/download) else build from diagram+accessories
+  const hasDiagram = !!selectedDiagram;
   const presetRows =
-    Array.isArray(items) && items.length
+    !hasDiagram && Array.isArray(items) && items.length
       ? items.map((it) => ({
           name: it.name,
           quantity: Number(it.quantity || 0),
@@ -262,15 +309,15 @@ export default function EstimatePDF({
         }))
       : null;
 
-  const rows = presetRows
-    ? presetRows
-    : fold(
+  const rows = hasDiagram
+    ? fold(
         [...baseRows, ...accessoryItems, ...extraItems].map((r) => ({
           ...r,
           price: Number(r.unitPrice ?? r.price ?? 0),
           quantity: Number(r.quantity || 0),
         }))
-      );
+      )
+    : presetRows || [];
 
   const total = rows.reduce(
     (sum, r) => sum + Number(r.price || 0) * Number(r.quantity || 0),
@@ -423,22 +470,39 @@ export default function EstimatePDF({
           <View style={styles.keySection}>
             <Text style={styles.sectionTitle}>Key</Text>
             <View style={styles.keyRow}>
-              {gutterColor && gutterLabel ? (
-                <View style={styles.keyItem}>
+              {/* Gutter legend rows */}
+              {Array.from(gutterLabels).map((label) => (
+                <View
+                  key={`g-${label}`}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                >
                   <View
-                    style={[styles.swatch, { backgroundColor: gutterColor }]}
+                    style={{
+                      width: 10,
+                      height: 10,
+                      backgroundColor: gutterColor || "#000",
+                    }}
                   />
-                  <Text>{gutterLabel}</Text>
+                  <Text>{label}</Text>
                 </View>
-              ) : null}
-              {downspoutColor && downspoutLabel ? (
-                <View style={styles.keyItem}>
+              ))}
+
+              {/* Downspout legend rows */}
+              {Array.from(dsLabels).map((label) => (
+                <View
+                  key={`ds-${label}`}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                >
                   <View
-                    style={[styles.swatch, { backgroundColor: downspoutColor }]}
+                    style={{
+                      width: 10,
+                      height: 10,
+                      backgroundColor: downspoutColor || "#000",
+                    }}
                   />
-                  <Text>{downspoutLabel}</Text>
+                  <Text>{label}</Text>
                 </View>
-              ) : null}
+              ))}
             </View>
           </View>
         ) : null}

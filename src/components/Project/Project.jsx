@@ -27,8 +27,6 @@ export default function Project({
   setDiagrams,
   currentUser,
 }) {
-  // console.log(setMobileDiagramActive)
-
   const formatDateTime = (value, tz = "America/Chicago") => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return String(value);
@@ -65,31 +63,18 @@ export default function Project({
   })[0];
 
   useEffect(() => {
-    console.log("Project data:", project);
-  }, []);
-
-  useEffect(() => {
     const token = localStorage.getItem("jwt");
 
-    retrieveProjectDiagrams(projectId, token)
-      .then((diagrams) => {
-        setDiagramData(diagrams);
-      })
-      .then((data) => {
-        // console.log("heres the data ", data);
-      });
+    retrieveProjectDiagrams(projectId, token).then((diagrams) => {
+      setDiagramData(diagrams);
+    });
   }, [diagrams]);
 
   useEffect(() => {
     setCurrentProjectId(projectId);
   }, [activeModal]);
 
-  // console.log(project)
   const navigator = useNavigate();
-
-  useEffect(() => {
-    console.log("activeModal changed", activeModal);
-  }, [activeModal]);
 
   function openDiagramModal() {
     if (isMobile) {

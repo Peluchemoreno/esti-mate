@@ -47,6 +47,227 @@ const PROFILE_ALIASES = [
   [/custom/i, "Custom"],
 ];
 
+function formatDownspoutName(sizeRaw, profileRaw) {
+  const s = String(sizeRaw || "").trim();
+  const p = String(profileRaw || "").trim();
+  const corr = /corr/i.test(p);
+  const round = /round/i.test(p);
+  // normalize to: 3x4 Corrugated Downspout  OR  3" Round Downspout
+  if (/^\d+\s*x\s*\d+$/i.test(s)) {
+    return `${s.replace(/\s*/g, "")} ${
+      corr
+        ? "Corrugated"
+        : /smooth/i.test(p)
+        ? "Smooth"
+        : /box/i.test(p)
+        ? "Box"
+        : p
+    } Downspout`;
+  }
+  const m = s.match(/^(\d+)/);
+  if (m && round) return `${m[1]}" Round Downspout`;
+  // fallback
+  return `${s} ${p} Downspout`.replace(/\s+/g, " ").trim();
+}
+
+// ---- Catalog matching helpers (robust to your seedTemplate) ----
+
+// normalize
+const ci = (s) => String(s || "").toLowerCase();
+
+// Map gutter drawing profile -> tokens we can match in template *names*
+function nameTokensForProfile(profileKey) {
+  const p = ci(profileKey);
+  if (p.includes("k")) return ["k-style"];
+  if (p.includes("straight")) return ["straight face", "straight-face"];
+  if (p.includes("half")) return ["half round", "half-round"];
+  if (p.includes("box")) return ["box"];
+  if (p.includes("custom")) return ["custom"];
+  // fallback
+  return [p];
+}
+
+// “size” for gutters is like 5", 6", 7"
+function inchesToken(sizeInches) {
+  const s = String(sizeInches || "").replace(/\s+/g, "");
+  return /(\d+)"/.test(s) ? s : `${s.replace(/[^0-9]/g, "")}"`;
+}
+
+// For downspouts: 2x3 / 3x4 / 4x5 / 3" / 4"
+function dsSizeToken(dsSizeRaw) {
+  const s = ci(dsSizeRaw).replace(/\s+/g, "");
+  if (/^\d+x\d+$/.test(s)) return s; // 3x4
+  const m = s.match(/^(\d+)("?|inch|in)$/); // 3"
+  return m ? `${m[1]}"` : s;
+}
+
+// does a product *name* contain one of tokens?
+function nameHasAny(n, tokens = []) {
+  const S = ci(n);
+  return tokens.some((t) => S.includes(ci(t)));
+}
+
+// Find an accessory template by *name* patterns more than by profile field.
+// kind: "end cap" | "strip miter" | "bay miter"
+function findGutterAccessoryTemplate(
+  allProducts,
+  { profileKey, sizeInches, kind }
+) {
+  const sizeTok = inchesToken(sizeInches); // e.g., 5"
+  const profNameTokens = nameTokensForProfile(profileKey); // e.g., ["k-style"] or ["half round", "half-round"]
+
+  const kindTokens = ci(kind); // "end cap" / "strip miter" / "bay miter"
+  const isEndCap = kindTokens.includes("end");
+  const isStrip = kindTokens.includes("strip");
+  const isBay = kindTokens.includes("bay");
+
+  // pass 1: strict -> name must include profile token + size + kind words
+  let hit = allProducts.find((p) => {
+    const n = p.name || "";
+    if (!/accessory/i.test(p.type || "accessory")) return false;
+    if (!nameHasAny(n, profNameTokens)) return false;
+    if (!n.includes(sizeTok)) return false;
+    if (isEndCap && !/end\s*cap|endcap/i.test(n)) return false;
+    if (isStrip && !/strip\s*miter/i.test(n)) return false;
+    if (isBay && !/bay\s*miter/i.test(n)) return false;
+    return true;
+  });
+  if (hit) return hit;
+
+  // pass 2: relaxed -> ignore size (some entries are size-less for custom/box)
+  hit = allProducts.find((p) => {
+    const n = p.name || "";
+    if (!/accessory/i.test(p.type || "accessory")) return false;
+    if (!nameHasAny(n, profNameTokens)) return false;
+    if (isEndCap && !/end\s*cap|endcap/i.test(n)) return false;
+    if (isStrip && !/strip\s*miter/i.test(n)) return false;
+    if (isBay && !/bay\s*miter/i.test(n)) return false;
+    return true;
+  });
+  return hit || null;
+}
+
+// Downspout elbows/offsets: match by profile family + size + code A/B (when present)
+// Requires helpers already in your file:
+//   - ci: (s) => String(s || "").toLowerCase()
+//   - nameHasAny: (name, tokens[]) => tokens.some(t => String(name).toLowerCase().includes(String(t).toLowerCase()))
+//   - dsSizeToken: (dsSize) => '2x3' | '3x4' | '3"' | '4"' (normalized)
+function findDownspoutFitting(allProducts, { profileKey, dsSize, code, kind }) {
+  const catalog = Array.isArray(allProducts) ? allProducts : [];
+  const K = ci(kind || ""); // e.g., "elbow", '2" offset'
+  const prof = ci(profileKey || ""); // corrugated | smooth | box | round
+  const sizeTok = dsSizeToken(dsSize || ""); // "3x4", "2x3", '3"', '4"'
+
+  // Profile tokens used in product NAME matching
+  let profTokens = [];
+  if (prof.includes("corr")) profTokens = ["corrugated"];
+  else if (prof.includes("smooth")) profTokens = ["smooth"];
+  else if (prof.includes("box")) profTokens = ["box"];
+  else if (prof.includes("round")) profTokens = ["round"];
+
+  const wantElbow = /elbow/i.test(K);
+  const wantOffset = /offset/i.test(K);
+
+  // ---- elbow code handling (A/B) ----
+  // Non-round elbow SKUs have explicit A/B; round elbows don't.
+  const needCode = wantElbow && !prof.includes("round") && !!code;
+  const codeSafe = code
+    ? String(code).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    : "";
+  const codeRe = needCode ? new RegExp(`\\b${codeSafe}\\b`, "i") : null;
+
+  // ---- size matching helpers ----
+  const sizeNeedle = String(sizeTok || "").toLowerCase(); // '2x3' | '3"' etc.
+  function nameHasSize(n) {
+    const s = String(n || "").toLowerCase();
+    if (!sizeNeedle) return true;
+    // '2x3', '2 x 3', '2X3'
+    if (/^\d+x\d+$/.test(sizeNeedle)) {
+      const [w, h] = sizeNeedle.split("x");
+      const re = new RegExp(`\\b${w}\\s*[xX]\\s*${h}\\b`);
+      return re.test(s);
+    }
+    // round inches, e.g. 3" or 4"
+    if (/^\d+"\s*$/.test(sizeNeedle)) {
+      const w = sizeNeedle.replace(/"/g, "");
+      return s.includes(`${w}"`) || new RegExp(`\\b${w}\\b`).test(s);
+    }
+    return s.includes(sizeNeedle);
+  }
+
+  // ---- offset inches (parsed from kind) ----
+  // Supports '2" offset', '4 in offset', '6 inch offset'
+  let inchesRe = null;
+  if (wantOffset) {
+    const m = K.match(/(\d+)\s*(?:"|in\b|inch\b|”)?/i);
+    if (m) {
+      const inchesSafe = m[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Match 2" or bare 2
+      inchesRe = new RegExp(
+        `(?:\\b${inchesSafe}"\\b|\\b${inchesSafe}\\b)`,
+        "i"
+      );
+    }
+  }
+
+  // ---- base type checks ----
+  function isDesiredKind(n) {
+    const s = String(n || "");
+    if (wantElbow && !/elbow/i.test(s)) return false;
+    if (wantOffset && !/offset/i.test(s)) return false;
+    return wantElbow || wantOffset; // must be one of them
+  }
+
+  // ---------- PASS 1: strict (profile + size + kind + code if needed + inches for offset) ----------
+  let hit = catalog.find((p) => {
+    const n = p?.name || "";
+    if (!/accessory/i.test(p?.type || "accessory")) return false;
+    if (!nameHasAny(n, profTokens)) return false;
+    if (!isDesiredKind(n)) return false;
+    if (!nameHasSize(n)) return false;
+    if (needCode && !(codeRe && codeRe.test(n))) return false;
+    if (wantOffset && inchesRe && !inchesRe.test(n)) return false;
+    return true;
+  });
+  if (hit) return hit;
+
+  // ---------- PASS 2: allow size-less catalog entries (e.g., "Box A Elbow") ----------
+  hit = catalog.find((p) => {
+    const n = p?.name || "";
+    if (!/accessory/i.test(p?.type || "accessory")) return false;
+    if (!nameHasAny(n, profTokens)) return false;
+    if (!isDesiredKind(n)) return false;
+    if (needCode && !(codeRe && codeRe.test(n))) return false;
+    if (wantOffset && inchesRe && !inchesRe.test(n)) return false;
+    return true;
+  });
+  if (hit) return hit;
+
+  // ---------- PASS 3: round elbows with no A/B (ignore code entirely) ----------
+  if (wantElbow && prof.includes("round")) {
+    hit = catalog.find((p) => {
+      const n = p?.name || "";
+      if (!/accessory/i.test(p?.type || "accessory")) return false;
+      if (!nameHasAny(n, ["round"])) return false;
+      if (!/elbow/i.test(n)) return false;
+      if (sizeNeedle && !nameHasSize(n)) return false;
+      return true;
+    });
+    if (hit) return hit;
+  }
+
+  // ---------- PASS 4: last resort (profile + kind only) ----------
+  hit = catalog.find((p) => {
+    const n = p?.name || "";
+    if (!/accessory/i.test(p?.type || "accessory")) return false;
+    if (!nameHasAny(n, profTokens)) return false;
+    if (!isDesiredKind(n)) return false;
+    return true;
+  });
+
+  return hit || null;
+}
+
 function normalizeGutterKey(name = "") {
   const trimmed = name.trim();
   const sizeMatch = trimmed.match(/(\d+)\s*"/);
@@ -92,6 +313,9 @@ const Diagram = ({
   // Products (context first, then API)
   // ✅ Call hooks once at top-level, never conditionally
   const { data: pricingProducts = [], isLoading, error } = useProductsPricing(); // ALL items
+  // which downspout we are editing via the modal (null = adding a new one)
+  const [editingDownspoutIndex, setEditingDownspoutIndex] = useState(null);
+
   const { data: listedProducts = [] } = useProductsListed(); // fallback (optional)
 
   const productsCtx = useProductsCatalog();
@@ -100,6 +324,8 @@ const Diagram = ({
     pricingProducts && pricingProducts.length
       ? pricingProducts
       : listedProducts;
+
+  const boxClickRef = useRef({ x: 0, y: 0, index: null });
 
   // Keep a stable ref to the reload function for event listeners
   const reloadRef = useRef(null);
@@ -151,9 +377,7 @@ const Diagram = ({
       window.removeEventListener("storage", onStorage);
     };
   }, [queryClient]);
-  useEffect(() => {
-    // console.log("diagram loading refreshing products");
-  }, []);
+  useEffect(() => {}, []);
   // canvas + state
   const canvasRef = useRef(null);
 
@@ -186,10 +410,6 @@ const Diagram = ({
   const [noteCoordinates, setNoteCoordinates] = useState([0, 0]);
   const [lineLength, setLineLength] = useState(0);
   const [isDownspoutModalOpen, setIsDownspoutModalOpen] = useState(false);
-
-  useEffect(() => {
-    console.log(tool);
-  }, [tool]);
 
   // listen for catalog bumps and ask the context to reload when possible
   // listen for catalog bumps and ask the context to reload when possible
@@ -234,22 +454,77 @@ const Diagram = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const rect = canvas.getBoundingClientRect();
+    const curW = Math.max(1, Math.round(rect.width));
+    const curH = Math.max(1, Math.round(rect.height));
+
+    const savedW = Number(selectedDiagram?.meta?.canvasW) || curW;
+    const savedH = Number(selectedDiagram?.meta?.canvasH) || curH;
+
+    // If this diagram was saved on a different canvas size, scale coordinates
+    const sx = curW / savedW;
+    const sy = curH / savedH;
+
+    const scaleLine = (l) => {
+      const copy = { ...l };
+
+      // Priced gutter/downspout lines
+      if (!copy.isFreeMark && !copy.isNote) {
+        if (copy.startX != null) copy.startX = copy.startX * sx;
+        if (copy.startY != null) copy.startY = copy.startY * sy;
+        if (copy.endX != null) copy.endX = copy.endX * sx;
+        if (copy.endY != null) copy.endY = copy.endY * sy;
+      }
+
+      // Free-line
+      if (copy.isFreeMark && copy.kind === "free-line") {
+        if (copy.startX != null) copy.startX = copy.startX * sx;
+        if (copy.startY != null) copy.startY = copy.startY * sy;
+        if (copy.endX != null) copy.endX = copy.endX * sx;
+        if (copy.endY != null) copy.endY = copy.endY * sy;
+      }
+
+      // Free-square
+      if (copy.isFreeMark && copy.kind === "free-square") {
+        if (copy.startX != null) copy.startX = copy.startX * sx;
+        if (copy.startY != null) copy.startY = copy.startY * sy;
+        if (copy.endX != null) copy.endX = copy.endX * sx;
+        if (copy.endY != null) copy.endY = copy.endY * sy;
+      }
+
+      // Free-circle
+      if (copy.isFreeMark && copy.kind === "free-circle") {
+        if (copy.centerX != null) copy.centerX = copy.centerX * sx;
+        if (copy.centerY != null) copy.centerY = copy.centerY * sy;
+        if (copy.radius != null) copy.radius = copy.radius * ((sx + sy) / 2);
+      }
+
+      // Notes
+      if (copy.isNote) {
+        if (copy.startX != null) copy.startX = copy.startX * sx;
+        if (copy.startY != null) copy.startY = copy.startY * sy;
+      }
+
+      return copy;
+    };
+
     const withIds = (selectedDiagram?.lines || []).map((l) => ({
       id: l.id || newId(),
-      ...l,
+      ...scaleLine(l),
     }));
+
+    // draw the scaled content exactly as your code does now
     withIds.forEach((line) => drawLine(ctx, line));
     setLines(withIds);
-    baselineHashRef.current = hashLines(withIds);
-  }, [selectedDiagram?._id, selectedDiagram]);
 
-  // clean up selection when modal changes
-  useEffect(() => {
-    if (activeModal !== "selectedLine") {
-      setLines((prev) => prev.map((l) => ({ ...l, isSelected: false })));
-      setSelectedIndex(null);
+    // If you’re using the baseline-hash to decide overwrite prompts, reset it here
+    if (
+      typeof baselineHashRef !== "undefined" &&
+      baselineHashRef?.current !== undefined
+    ) {
+      baselineHashRef.current = hashLines(withIds);
     }
-  }, [activeModal]);
+  }, [selectedDiagram]);
 
   // scale canvas for DPR + redraw grid
   useEffect(() => {
@@ -456,15 +731,77 @@ const Diagram = ({
       return { hit: "body" };
     return null;
   }
+
+  function hitTestFreeSquare(sq, x, y) {
+    const left = Math.min(sq.startX, sq.endX);
+    const top = Math.min(sq.startY, sq.endY);
+    const w = Math.abs(sq.endX - sq.startX);
+    const h = Math.abs(sq.endY - sq.startY);
+
+    if (w <= 0 || h <= 0) return false;
+
+    if (sq.fill) {
+      // Click inside filled rect selects
+      return x >= left && x <= left + w && y >= top && y <= top + h;
+    }
+
+    // For stroked (not filled): near any edge within tolerance
+    const EP = 8;
+    const onLeft = Math.abs(x - left) <= EP && y >= top && y <= top + h;
+    const onRight = Math.abs(x - (left + w)) <= EP && y >= top && y <= top + h;
+    const onTop = Math.abs(y - top) <= EP && x >= left && x <= left + w;
+    const onBottom =
+      Math.abs(y - (top + h)) <= EP && x >= left && x <= left + w;
+    return onLeft || onRight || onTop || onBottom;
+  }
+
+  function hitTestFreeCircle(circ, x, y) {
+    const cx = circ.centerX ?? circ.startX ?? 0;
+    const cy = circ.centerY ?? circ.startY ?? 0;
+    const R = Number(circ.radius || 0);
+    if (R <= 0) return false;
+
+    const dx = x - cx;
+    const dy = y - cy;
+    const dist = Math.hypot(dx, dy);
+
+    if (circ.fill) {
+      // Click anywhere inside the filled circle
+      return dist <= R;
+    }
+
+    // For stroked only: near the ring
+    const EP = 8;
+    return Math.abs(dist - R) <= EP;
+  }
+
   function hitTestDownspout(ds, x, y) {
     const r = gridSize;
-    if (calculateDistance([x, y], [ds.startX, ds.startY]) <= r) return true;
-    const boxX = ds.startX + 5;
-    const boxY = ds.startY + 5;
-    const boxW = 60;
-    const boxH = 20;
-    return x >= boxX && x <= boxX + boxW && y >= boxY && y <= boxY + boxH;
+    // center/X
+    if (calculateDistance([x, y], [ds.startX, ds.startY]) <= r) {
+      return { part: "center" };
+    }
+
+    // compute the dynamic box rect exactly as in draw
+    const w = 60;
+    const h = 28;
+    const angle =
+      typeof ds.elbowBoxAngle === "number" ? ds.elbowBoxAngle : Math.PI / 4;
+    const radius =
+      typeof ds.elbowBoxRadius === "number" ? ds.elbowBoxRadius : gridSize * 5;
+
+    const cx = ds.startX + radius * Math.cos(angle);
+    const cy = ds.startY + radius * Math.sin(angle);
+    const boxX = cx - w / 2;
+    const boxY = cy - h / 2;
+
+    if (x >= boxX && x <= boxX + w && y >= boxY && y <= boxY + h) {
+      return { part: "box" };
+    }
+
+    return null;
   }
+
   function hitTestAnnotation(note, x, y) {
     const ctx = canvasRef.current.getContext("2d");
     ctx.font = "1000 12px Arial";
@@ -546,7 +883,6 @@ const Diagram = ({
   }
 
   function drawLine(ctx, line) {
-    // console.log(line);
     const x1 = snap(line.startX);
     const y1 = snap(line.startY);
     const x2 = snap(line.endX);
@@ -592,18 +928,47 @@ const Diagram = ({
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      const boxX = x1 + 5;
-      const boxY = y1 + 5;
       const w = 60;
-      const h = 20;
+      const h = 28;
+
+      // defaults if missing (for old diagrams)
+      const angle =
+        typeof line.elbowBoxAngle === "number"
+          ? line.elbowBoxAngle
+          : Math.PI / 4;
+      const radius =
+        typeof line.elbowBoxRadius === "number"
+          ? line.elbowBoxRadius
+          : gridSize * 5;
+
+      // center of the label box relative to the X
+      const cx = x1 + radius * Math.cos(angle);
+      const cy = y1 + radius * Math.sin(angle);
+
+      // top-left corner for drawing the rect
+      const boxX = cx - w / 2;
+      const boxY = cy - h / 2;
+
       ctx.fillStyle = "grey";
       ctx.fillRect(boxX, boxY, w, h);
       ctx.strokeStyle = line.color || "#000";
       ctx.strokeRect(boxX, boxY, w, h);
+
+      // label: UPPERCASE sequence and footage
+      const seq = String(line.elbowSequence || "").toUpperCase();
+      const ft = Number.isFinite(Number(line.measurement))
+        ? `${Number(line.measurement)}'`
+        : ""; // or "0'" if you prefer always showing
       ctx.fillStyle = "white";
-      ctx.font = "10px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(line.elbowSequence || "", boxX + w / 2, boxY + 15);
+
+      // top line: sequence
+      ctx.font = "10px Arial";
+      ctx.fillText(seq, boxX + w / 2, boxY + 11);
+
+      // bottom line: footage
+      ctx.font = "10px Arial";
+      ctx.fillText(ft, boxX + w / 2, boxY + 22);
 
       if (line.isSelected) {
         ctx.save();
@@ -612,6 +977,7 @@ const Diagram = ({
         ctx.strokeRect(boxX - 4, boxY - 4, w + 8, h + 8);
         ctx.restore();
       }
+
       return;
     }
 
@@ -633,39 +999,63 @@ const Diagram = ({
     }
 
     // Free marks (line/square/hollow circle) — not priced
+    // --- Free marks (free-line, free-square, free-circle) ---
     if (line.isFreeMark) {
       ctx.save();
-      ctx.lineWidth = line.strokeWidth || 2;
-      ctx.strokeStyle = line.color || "#111";
-      if (line.dashed) ctx.setLineDash([6, 4]);
-      ctx.setLineDash(line.dashed ? [6, 4] : []); // ← force style every time
+
+      // stroke style
+      ctx.lineWidth = line.strokeWidth ?? 2;
+      ctx.strokeStyle = line.color ?? "#111";
+      ctx.setLineDash(line.dashed ? [6, 4] : []);
 
       if (line.kind === "free-line") {
+        // draw the line itself
         ctx.beginPath();
         ctx.moveTo(line.startX, line.startY);
         ctx.lineTo(line.endX, line.endY);
         ctx.stroke();
+
+        // show edit handles when selected (same UX as gutters)
+        if (line.isSelected) {
+          const handleR = Math.max(
+            3,
+            (typeof gridSize === "number" ? gridSize : 8) / 2
+          );
+          ctx.setLineDash([]); // handles are solid
+          ctx.fillStyle = "orange";
+
+          // start handle
+          ctx.beginPath();
+          ctx.arc(line.startX, line.startY, handleR, 0, Math.PI * 2);
+          ctx.fill();
+
+          // end handle
+          ctx.beginPath();
+          ctx.arc(line.endX, line.endY, handleR, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else if (line.kind === "free-square") {
         const left = Math.min(line.startX, line.endX);
         const top = Math.min(line.startY, line.endY);
         const w = Math.abs(line.endX - line.startX);
         const h = Math.abs(line.endY - line.startY);
         if (line.fill) {
-          ctx.fillStyle = line.color || "#111";
+          ctx.fillStyle = line.color ?? "#111";
           ctx.fillRect(left, top, w, h);
         } else {
           ctx.strokeRect(left, top, w, h);
         }
       } else if (line.kind === "free-circle") {
         ctx.beginPath();
-        ctx.arc(line.centerX, line.centerY, line.radius || 0, 0, Math.PI * 2);
+        ctx.arc(line.centerX, line.centerY, line.radius ?? 0, 0, Math.PI * 2);
         if (line.fill) {
-          ctx.fillStyle = line.color || "#111";
+          ctx.fillStyle = line.color ?? "#111";
           ctx.fill();
         } else {
           ctx.stroke();
         }
       }
+
       ctx.restore();
       return;
     }
@@ -708,6 +1098,58 @@ const Diagram = ({
   }
 
   function handleAddDownspout(downspoutData) {
+    // If we came from clicking an existing DS box: update instead of creating a new line
+    if (editingDownspoutIndex !== null) {
+      setLines((prev) => {
+        const next = [...prev];
+        const ds = next[editingDownspoutIndex];
+        if (!ds || !ds.isDownspout) return prev;
+
+        // Keep product mapping logic consistent with add flow
+        const currentDownspout = (allProducts || []).find((p) => {
+          return (
+            /ownspout/i.test(p.name) &&
+            p.name
+              .toLowerCase()
+              .includes(downspoutData.profile.toLowerCase()) &&
+            (p.name.includes(downspoutData.downspoutSize) ||
+              p.size === downspoutData.downspoutSize)
+          );
+        });
+
+        // Force uppercase sequence and update footage (measurement)
+        ds.elbowSequence = String(
+          downspoutData.elbowSequence || ""
+        ).toUpperCase();
+        ds.profile = downspoutData.profile; // persist the profile family ("corrugated" | "smooth" | "box" | "round")
+        ds.measurement = parseInt(downspoutData.totalFootage, 10) || 0;
+
+        // If size/profile changed in modal, reflect that too
+        ds.downspoutSize = downspoutData.downspoutSize;
+        ds.currentProduct = {
+          price: currentDownspout?.price || ds.currentProduct?.price || 0,
+          name: formatDownspoutName(
+            downspoutData.downspoutSize,
+            downspoutData.profile
+          ),
+          description:
+            currentDownspout?.description ||
+            ds.currentProduct?.description ||
+            "",
+        };
+        ds.price = currentDownspout?.price || ds.price || 0;
+        ds.color = currentDownspout?.visual || ds.color || "#000";
+
+        return next;
+      });
+
+      // Close modal and clear edit state
+      setIsDownspoutModalOpen(false);
+      setActiveModal(null);
+      setEditingDownspoutIndex(null);
+      return;
+    }
+
     const currentDownspout = (allProducts || []).find((p) => {
       return (
         /ownspout/i.test(p.name) &&
@@ -727,21 +1169,23 @@ const Diagram = ({
       color: currentDownspout?.visual || "#000",
       isSelected: false,
       isDownspout: true,
+      profile: downspoutData.profile,
       price: currentDownspout?.price || 0,
       elbowSequence: downspoutData.elbowSequence,
       downspoutSize: downspoutData.downspoutSize,
       currentProduct: {
         price: currentDownspout?.price || 0,
-        name:
-          downspoutData.downspoutSize.split(" ")[0] +
-          " " +
-          downspoutData.downspoutSize.split(" ")[1] +
-          " Downspout",
+        name: formatDownspoutName(
+          downspoutData.downspoutSize,
+          downspoutData.profile
+        ),
         description: currentDownspout?.description || "",
       },
       rainBarrel: downspoutData.rainBarrel,
       splashBlock: downspoutData.splashBlock,
       undergroundDrainage: downspoutData.undergroundDrainage,
+      elbowBoxAngle: Math.PI / 4, // 45°, keeps your current “bottom-right-ish” vibe
+      elbowBoxRadius: gridSize * 5, // tweak as you like
     };
     setLines((prev) => [...prev, formatted]);
   }
@@ -771,7 +1215,6 @@ const Diagram = ({
 
     // Downspout
     if (tool === "downspout") {
-      console.log("opening downspout");
       setDownspoutCoordinates([snappedX, snappedY]);
       setIsDownspoutModalOpen(true);
       setActiveModal("downspout");
@@ -822,16 +1265,27 @@ const Diagram = ({
             break;
           }
         } else if (el.isDownspout) {
-          if (hitTestDownspout(el, x, y)) {
-            hitIndex = i;
-            dragMode = "move";
-            break;
+          const hit = hitTestDownspout(el, x, y);
+          if (hit) {
+            if (hit.part === "box") {
+              // start a box-drag, but decide "open modal vs drag" on mouseup
+              bringToFront(i);
+              setDragging({ mode: "move-box", end: null, lastX: x, lastY: y });
+              boxClickRef.current = { x, y, index: lines.length - 1 }; // top after bringToFront
+              return;
+            } else {
+              // click on the X moves the whole DS
+              hitIndex = i;
+              dragMode = "move";
+              break;
+            }
           }
         } else if (el.isFreeMark) {
-          // refined hit-testing for free shapes
-          let hit = false;
+          // Unified free-shape hit-testing: line endpoints/body OR square/circle
+          let h = null;
+
           if (el.kind === "free-line") {
-            const h = hitTestLine(
+            h = hitTestLine(
               {
                 startX: el.startX,
                 startY: el.startY,
@@ -841,47 +1295,20 @@ const Diagram = ({
               x,
               y
             );
-            if (h) {
-              hitIndex = i;
-              dragMode =
-                h.hit === "start" || h.hit === "end" ? "drag-end" : "move";
-              end =
-                h.hit === "start" ? "start" : h.hit === "end" ? "end" : null;
-              break;
-            }
-          } else if (base.kind === "free-square") {
-            // CLICK-TO-PLACE: 1 grid cell square
-            const size = gridSize;
-            const half = Math.floor(size / 2);
-            const sq = {
-              ...base,
-              startX: snappedX - half,
-              startY: snappedY - half,
-              endX: snappedX + half,
-              endY: snappedY + half,
-              fill: !!base.fill,
-            };
-            setLines((prev) => [...prev, sq]);
-            return; // no drawing session
-          } else if (base.kind === "free-circle") {
-            // CLICK-TO-PLACE: diameter = 1 grid cell
-            const R = Math.max(1, Math.floor(gridSize / 2));
-            const circ = {
-              ...base,
-              centerX: snappedX,
-              centerY: snappedY,
-              radius: R,
-              startX: snappedX, // keep these for any code that reads startX/Y
-              startY: snappedY,
-              fill: !!base.fill,
-            };
-            setLines((prev) => [...prev, circ]);
-            return; // no drawing session
+          } else if (el.kind === "free-square") {
+            h = hitTestFreeSquare(el, x, y) ? { hit: "body" } : null;
+          } else if (el.kind === "free-circle") {
+            h = hitTestFreeCircle(el, x, y) ? { hit: "body" } : null;
           }
 
-          if (hit) {
+          if (h) {
             hitIndex = i;
-            dragMode = "move";
+            if (h.hit === "start" || h.hit === "end") {
+              dragMode = "drag-end";
+              end = h.hit === "start" ? "start" : "end";
+            } else {
+              dragMode = "move";
+            }
             break;
           }
         } else {
@@ -949,7 +1376,7 @@ const Diagram = ({
 
       if (base.kind === "free-square") {
         // CLICK-TO-PLACE: static square
-        const size = Math.max(16, gridSize * 4);
+        const size = Math.max(16, gridSize);
         const half = Math.floor(size / 2);
         const sq = {
           ...base,
@@ -965,12 +1392,12 @@ const Diagram = ({
 
       if (base.kind === "free-circle") {
         // CLICK-TO-PLACE: static circle
-        const R = base.radius ?? Math.max(4, Math.floor(gridSize * 2));
+        const R = base.radius ?? Math.max(4, Math.floor(gridSize));
         const circ = {
           ...base,
           centerX: snappedX,
           centerY: snappedY,
-          radius: R,
+          radius: R / 2,
           startX: snappedX, // harmless for other code
           startY: snappedY,
           fill: !!base.fill,
@@ -1026,11 +1453,30 @@ const Diagram = ({
         const el = next[selectedIndex];
         if (!el) return prev;
 
-        if (el.isNote || el.isDownspout) {
+        if (el.isNote) {
+          // unchanged
           el.startX += dx;
           el.startY += dy;
           el.endX = el.startX;
           el.endY = el.startY;
+        } else if (el.isDownspout) {
+          if (dragging.mode === "move-box") {
+            // Reposition the box by angle around the X
+            const angle = Math.atan2(y - el.startY, x - el.startX);
+            // optional: snap angle slightly if you want discrete stops
+            el.elbowBoxAngle = angle;
+            // keep radius stable; or allow CTRL+drag to adjust radius later
+            el.elbowBoxRadius =
+              typeof el.elbowBoxRadius === "number"
+                ? el.elbowBoxRadius
+                : gridSize * 4;
+          } else {
+            // moving the entire downspout (X)
+            el.startX += dx;
+            el.startY += dy;
+            el.endX = el.startX;
+            el.endY = el.startY;
+          }
         } else if (el.isFreeMark) {
           if (el.kind === "free-line") {
             if (dragging.mode === "move") {
@@ -1130,6 +1576,30 @@ const Diagram = ({
   }
 
   function handleMouseUp() {
+    // open modal if we "clicked" the DS box (not dragged it)
+    if (tool === "select" && dragging.mode === "move-box") {
+      const { x, y } = boxClickRef.current;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const up = getCanvasCoords({
+        nativeEvent: { clientX: dragging.lastX, clientY: dragging.lastY },
+      });
+      const moved = Math.hypot(up.x - x, up.y - y);
+      // threshold ~4px
+      if (moved < 4 && selectedIndex !== null) {
+        const ds = lines[selectedIndex];
+        if (ds?.isDownspout) {
+          setEditingDownspoutIndex(selectedIndex);
+          setDownspoutCoordinates([ds.startX, ds.startY]);
+          setIsDownspoutModalOpen(true);
+          setActiveModal("downspout");
+        }
+      }
+      // reset drag state
+      setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
+      setIsDrawing(false);
+      return;
+    }
+
     if (isDownspoutModalOpen) return;
 
     if (tool === "select") {
@@ -1377,15 +1847,28 @@ const Diagram = ({
 
     function foldAccessoryItems(items) {
       const map = new Map();
-      items.forEach((it) => {
-        const keyParts = [
-          it.product?._id || it.name || it.meta?.profileKey || "unknown",
-          it.meta?.kind || "generic",
-          it.meta?.type || "",
-          it.meta?.angle ?? "",
-          it.meta?.inches ?? "",
-        ];
-        const key = keyParts.join("|");
+
+      (items || []).forEach((it) => {
+        const isAccessory =
+          it?.meta &&
+          ["miter", "endcap", "elbow", "offset"].includes(it.meta.kind);
+
+        // For accessories: do NOT rely on product._id. Use meta to preserve intent.
+        // For base rows (gutters/downspouts), product id/name is fine.
+        const key = isAccessory
+          ? [
+              it.meta?.kind || "", // miter | endcap | elbow | offset
+              it.meta?.miterType || "", // strip | bay | custom
+              it.meta?.degrees ?? "", // number for custom miters
+              it.meta?.code || "", // A | B for elbows
+              it.meta?.inches || "", // 2 | 4 | 6 for offsets
+              it.meta?.size || it.meta?.sizeLabel || "",
+              it.meta?.profileKey || it.meta?.profile || "",
+              // include name as a final tie-breaker so renamed customs ("Custom Miter (9°)") stay separate
+              it.name || "",
+            ].join("|")
+          : it.product?._id || it.name || "base";
+
         const prev = map.get(key);
         if (prev) {
           prev.quantity = Number(prev.quantity || 0) + Number(it.quantity || 0);
@@ -1393,6 +1876,7 @@ const Diagram = ({
           map.set(key, { ...it, quantity: Number(it.quantity || 0) });
         }
       });
+
       return Array.from(map.values());
     }
 
@@ -1467,27 +1951,29 @@ const Diagram = ({
 
       if (el.isDownspout) {
         const r = gridSize;
-        const cx = el.startX;
-        const cy = el.startY;
         const cross = {
-          minX: cx - r,
-          minY: cy - r,
-          maxX: cx + r,
-          maxY: cy + r,
+          minX: el.startX - r,
+          minY: el.startY - r,
+          maxX: el.startX + r,
+          maxY: el.startY + r,
         };
-
-        const boxX = el.startX + 5;
-        const boxY = el.startY + 5;
-        const boxWidth = 60;
-        const boxHeight = 20;
-        const seq = {
-          minX: boxX,
-          minY: boxY,
-          maxX: boxX + boxWidth,
-          maxY: boxY + boxHeight,
+        const w = 60;
+        const h = 28; // keep in sync with draw & hitTest
+        const angle =
+          typeof el.elbowBoxAngle === "number" ? el.elbowBoxAngle : Math.PI / 4;
+        const radius =
+          typeof el.elbowBoxRadius === "number"
+            ? el.elbowBoxRadius
+            : gridSize * 5;
+        const cx = el.startX + radius * Math.cos(angle);
+        const cy = el.startY + radius * Math.sin(angle);
+        const box = {
+          minX: cx - w / 2,
+          minY: cy - h / 2,
+          maxX: cx + w / 2,
+          maxY: cy + h / 2,
         };
-
-        return boundsUnion(cross, seq);
+        return boundsUnion(cross, box);
       }
 
       if (el.isFreeMark) {
@@ -1546,50 +2032,57 @@ const Diagram = ({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     drawAllLines(ctx);
+    const dpr = window.devicePixelRatio || 1;
 
-    const boundingBox = getBoundingBoxForAll(lines, ctx, 30);
-    const cropWidth = boundingBox.maxX - boundingBox.minX;
-    const cropHeight = boundingBox.maxY - boundingBox.minY;
+    // 1) Compute bounds in CSS units (your helper returns CSS units)
+    const boundingBox = getBoundingBoxForAll(lines, ctx, 40); // a little more padding
+
+    // 2) Convert CSS -> backing store pixels
+    const srcX = Math.max(0, Math.floor(boundingBox.minX * dpr));
+    const srcY = Math.max(0, Math.floor(boundingBox.minY * dpr));
+    const srcW = Math.min(
+      Math.floor((boundingBox.maxX - boundingBox.minX) * dpr),
+      canvas.width - srcX
+    );
+    const srcH = Math.min(
+      Math.floor((boundingBox.maxY - boundingBox.minY) * dpr),
+      canvas.height - srcY
+    );
+
+    // ... setup tempCanvas (unchanged) ...
 
     const tempCanvas = document.createElement("canvas");
     const tempCtx = tempCanvas.getContext("2d");
 
+    // fixed, crisp thumb regardless of device
     const thumbnailDisplaySize = 200;
     const thumbnailInternalSize = 3 * thumbnailDisplaySize;
 
     tempCanvas.width = thumbnailInternalSize;
     tempCanvas.height = thumbnailInternalSize;
     tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // leave some border inside thumb so labels/joins never touch edges
     const pad = 0.05 * thumbnailInternalSize;
+    const availW = thumbnailInternalSize - pad * 2;
+    const availH = thumbnailInternalSize - pad * 2;
 
-    const availableWidth = thumbnailInternalSize - pad * 2;
-    const availableHeight = thumbnailInternalSize - pad * 2;
+    // destination size computed in CSS pixels first, then mapped 1:1 to thumb
+    const cropWidthCss = boundingBox.maxX - boundingBox.minX;
+    const cropHeightCss = boundingBox.maxY - boundingBox.minY;
+    const scale = Math.min(availW / cropWidthCss, availH / cropHeightCss);
+    const destW = cropWidthCss * scale;
+    const destH = cropHeightCss * scale;
 
-    const scale = Math.min(
-      availableWidth / cropWidth,
-      availableHeight / cropHeight
-    );
+    const dx = (thumbnailInternalSize - destW) / 2;
+    const dy = (thumbnailInternalSize - destH) / 2;
 
-    const destWidth = cropWidth * scale;
-    const destHeight = cropHeight * scale;
-
-    const dx = (thumbnailInternalSize - destWidth) / 2;
-    const dy = (thumbnailInternalSize - destHeight) / 2;
-
+    // white background
     tempCtx.fillStyle = "#ffffff";
     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-    tempCtx.drawImage(
-      canvas,
-      boundingBox.minX,
-      boundingBox.minY,
-      cropWidth,
-      cropHeight,
-      dx,
-      dy,
-      destWidth,
-      destHeight
-    );
+    // draw from the hi-DPI source rect
+    tempCtx.drawImage(canvas, srcX, srcY, srcW, srcH, dx, dy, destW, destH);
 
     const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
 
@@ -1619,51 +2112,118 @@ const Diagram = ({
     const caseIncludes = (hay, needle) =>
       String(hay).toLowerCase().includes(String(needle).toLowerCase());
 
+    // --- local helpers (robust to your seedTemplate.js) ---
+    const ci = (s) => String(s || "").toLowerCase();
+    const nameHasAny = (n, tokens = []) => {
+      const S = ci(n);
+      return tokens.some((t) => S.includes(ci(t)));
+    };
+    const nameTokensForProfile = (profileKey) => {
+      const p = ci(profileKey || "");
+      if (p.includes("k")) return ["k-style"];
+      if (p.includes("straight")) return ["straight face", "straight-face"];
+      if (p.includes("half")) return ["half round", "half-round"];
+      if (p.includes("box")) return ["box"];
+      if (p.includes("round")) return ["round"];
+      return [p];
+    };
+    const inchesToken = (sizeInches) => {
+      if (!sizeInches) return null;
+      const s = String(sizeInches).replace(/\s+/g, "");
+      if (/^\d+"$/.test(s)) return s;
+      const m = s.match(/^(\d+)$/);
+      return m ? `${m[1]}"` : s;
+    };
+
+    // kind: "end cap" | "strip miter" | "bay miter"
+    const findGutterAccessoryTemplate = (
+      allProducts,
+      { profileKey, sizeInches, kind }
+    ) => {
+      const sizeTok = inchesToken(sizeInches);
+      const profTokens = nameTokensForProfile(profileKey);
+      const K = ci(kind);
+      const wantEnd = /end/.test(K);
+      const wantStrip = /strip/.test(K);
+      const wantBay = /bay/.test(K);
+
+      const pass = (requireSize) =>
+        (allProducts || []).find((p) => {
+          const n = p?.name || "";
+          if (!/accessory/i.test(p?.type || "accessory")) return false;
+          if (!nameHasAny(n, profTokens)) return false;
+          if (requireSize && sizeTok && !n.includes(sizeTok)) return false;
+          if (wantEnd && !/end\s*cap|endcap/i.test(n)) return false;
+          if (wantStrip && !/strip\s*miter/i.test(n)) return false;
+          if (wantBay && !/bay\s*miter/i.test(n)) return false;
+          return true;
+        });
+
+      return pass(true) || pass(false) || null;
+    };
+
     function calculateEndCapsAndMiters(analysisData) {
       const endCaps = {};
       const miters = {};
       const customMiters = {};
       const accessoryLineItems = [];
 
-      const pushItem = (o) => accessoryLineItems.push(o);
-
-      // End Caps
+      // wrapper so we never forget to include price
+      const pushCatalogItem = (product, quantity, meta = {}, nameOverride) => {
+        if (!product || !quantity) return;
+        accessoryLineItems.push({
+          name: nameOverride || product.name,
+          quantity: Number(quantity || 0),
+          price: Number(product.price || 0),
+          product,
+          meta,
+        });
+      };
+      // ---------------- End Caps ----------------
       Object.keys(analysisData.endCapsByProduct || {}).forEach((profileKey) => {
-        const qty = analysisData.endCapsByProduct[profileKey] || 0;
-        if (!qty) return;
-        const match = allProducts.find(
-          (p) =>
-            caseIncludes(p.name, profileKey) && caseIncludes(p.name, "end cap")
+        const endCapCount = Number(
+          analysisData.endCapsByProduct[profileKey] || 0
         );
-        if (match) {
-          endCaps[profileKey] = {
-            price: match.price,
-            quantity: qty,
-            product: match,
-          };
-          pushItem({
-            name: match.name,
-            quantity: qty,
-            price: match.price,
-            product: match,
-            meta: { kind: "endCap", profileKey },
+        if (!endCapCount) return;
+
+        // If you can infer 5"/6"/7" per profile, pass it; otherwise null is fine.
+        const sizeInches = null;
+
+        const endCapTpl = findGutterAccessoryTemplate(allProducts, {
+          profileKey,
+          sizeInches,
+          kind: "end cap",
+        });
+        if (endCapTpl) {
+          (endCaps[profileKey] ||= []).push({
+            type: "End Cap",
+            price: endCapTpl.price,
+            quantity: endCapCount,
+            product: endCapTpl,
+          });
+
+          pushCatalogItem(endCapTpl, endCapCount, {
+            kind: "endcap",
+            profileKey,
+            inches: sizeInches || undefined,
           });
         }
       });
 
-      // Miters
+      // ---------------- Miters ----------------
       Object.keys(analysisData.mitersByProduct || {}).forEach((profileKey) => {
         const m = analysisData.mitersByProduct[profileKey] || {};
-        const stripQty = (m.inside90 || 0) + (m.outside90 || 0);
-        const bayQty = m.bay135 || 0;
+        const stripQty = Number(m.inside90 || 0) + Number(m.outside90 || 0);
+        const bayQty = Number(m.bay135 || 0);
+
+        const sizeInches = null;
 
         if (stripQty > 0) {
-          const strip = allProducts.find(
-            (p) =>
-              caseIncludes(p.name, profileKey) &&
-              caseIncludes(p.name, "strip") &&
-              caseIncludes(p.name, "miter")
-          );
+          const strip = findGutterAccessoryTemplate(allProducts, {
+            profileKey,
+            sizeInches,
+            kind: "strip miter",
+          });
           if (strip) {
             (miters[profileKey] ||= []).push({
               type: "Strip Miter",
@@ -1671,23 +2231,20 @@ const Diagram = ({
               quantity: stripQty,
               product: strip,
             });
-            pushItem({
-              name: strip.name,
-              quantity: stripQty,
-              price: strip.price,
-              product: strip,
-              meta: { kind: "miter", profileKey, type: "Strip Miter" },
+            pushCatalogItem(strip, stripQty, {
+              kind: "miter",
+              profileKey,
+              miterType: "strip",
             });
           }
         }
 
         if (bayQty > 0) {
-          const bay = allProducts.find(
-            (p) =>
-              caseIncludes(p.name, profileKey) &&
-              caseIncludes(p.name, "bay") &&
-              caseIncludes(p.name, "miter")
-          );
+          const bay = findGutterAccessoryTemplate(allProducts, {
+            profileKey,
+            sizeInches,
+            kind: "bay miter",
+          });
           if (bay) {
             (miters[profileKey] ||= []).push({
               type: "Bay 135 Miter",
@@ -1695,41 +2252,57 @@ const Diagram = ({
               quantity: bayQty,
               product: bay,
             });
-            pushItem({
-              name: bay.name,
-              quantity: bayQty,
-              price: bay.price,
-              product: bay,
-              meta: { kind: "miter", profileKey, type: "Bay 135 Miter" },
+            pushCatalogItem(bay, bayQty, {
+              kind: "miter",
+              profileKey,
+              miterType: "bay",
+              degrees: 135,
             });
           }
         }
 
-        (m.custom || []).forEach(({ angle, count }) => {
-          if (!count) return;
-          const custom = allProducts.find(
-            (p) =>
-              caseIncludes(p.name, profileKey) &&
-              caseIncludes(p.name, "custom") &&
-              caseIncludes(p.name, "miter")
-          );
-          if (custom) {
-            (customMiters[profileKey] ||= []).push({
-              type: `Custom Miter (${angle}°)`,
-              price: custom.price,
-              quantity: count,
-              product: custom,
-              angle,
-            });
-            pushItem({
-              name: custom.name,
-              quantity: count,
-              price: custom.price,
-              product: custom,
-              meta: { kind: "miter", profileKey, type: "Custom", angle },
-            });
+        (Array.isArray(m.custom) ? m.custom : []).forEach(
+          ({ angle, count }) => {
+            const qty = Number(count || 0);
+            if (!qty) return;
+
+            const custom =
+              findGutterAccessoryTemplate(allProducts, {
+                profileKey,
+                sizeInches,
+                kind: "custom miter",
+              }) ||
+              findGutterAccessoryTemplate(allProducts, {
+                // fallback: if your catalog doesn't encode size on customs
+                profileKey,
+                sizeInches: null,
+                kind: "custom miter",
+              });
+
+            if (custom) {
+              (customMiters[profileKey] ||= []).push({
+                type: `Custom Miter (${angle}°)`,
+                price: custom.price,
+                quantity: qty,
+                product: custom,
+                angle,
+              });
+              // Optional: override the display name so the PDF line shows the angle,
+              // while the price still comes from the Custom Miter SKU.
+              pushCatalogItem(
+                custom,
+                qty,
+                {
+                  kind: "miter",
+                  profileKey,
+                  miterType: "custom",
+                  degrees: angle,
+                },
+                `Custom Miter (${angle}°)`
+              );
+            }
           }
-        });
+        );
       });
 
       return { endCaps, miters, customMiters, accessoryLineItems };
@@ -1738,14 +2311,13 @@ const Diagram = ({
     // --- elbows + offsets (priced) ---
     // Replace your existing collectElbowsAndOffsets() with this version
     function collectElbowsAndOffsets(lines, allProducts) {
-      // --- helpers ---
+      // helpers
       const caseIncludes = (hay, needle) =>
         String(hay).toLowerCase().includes(String(needle).toLowerCase());
 
       function getSizeKeyFromDownspoutLine(line) {
         // Prefer explicit property (e.g., "2x3 Corrugated") but we just need "2x3"
         const fromProp = String(line.downspoutSize || "").trim();
-        // Try "2x3" with or without quotes/spaces
         const rxSize = /(\d+)\s*[xX]\s*(\d+)/;
         const rxQuoted = /(\d+)\s*"?\s*[xX]\s*(\d+)\s*"?/;
         let m = fromProp.match(rxSize) || fromProp.match(rxQuoted);
@@ -1754,111 +2326,198 @@ const Diagram = ({
           m = n.match(rxSize) || n.match(rxQuoted);
         }
         if (!m) return "unknown";
-        return `${m[1]}x${m[2]}`; // e.g., "2x3" or "3x4"
+        return `${m[1]}x${m[2]}`; // "2x3" / "3x4"
       }
 
-      // Tokenize the elbow sequence into elbow codes (A/B/C/D) and numeric offsets (2, 4, 6, etc.)
-      // Examples that will parse correctly:
-      // "AAB2\"C4\"B"  => elbows: A:2, B:2, C:1 ; offsets: 2:1, 4:1
-      // "a b c 2\" 6\"" => elbows: A:1,B:1,C:1 ; offsets: 2:1, 6:1
+      function inferProfileFromLine(line) {
+        // 1) explicit field if you set it in DownspoutModal
+        const p = String(line.profile || "").toLowerCase();
+        if (p) return p;
+
+        // 2) infer from currentProduct.name fallback
+        const n = String(line.currentProduct?.name || "").toLowerCase();
+        if (n.includes("round")) return "round";
+        if (n.includes("smooth")) return "smooth";
+        if (n.includes("box")) return "box";
+        // default to corrugated when ambiguous
+        return "corrugated";
+      }
+
+      // Tokenize sequence into elbows (A/B/…) and offsets (2,4,6,…)
+      // REPLACE your existing parseElbowsAndOffsets with this one
       function parseElbowsAndOffsets(seq) {
         const out = { elbows: {}, offsets: {} };
         if (!seq) return out;
 
-        // This regex captures either a letter A-D (case-insensitive) *or* a number (offset) optionally followed by a double-quote
-        const tokenRe = /([A-Da-d])|(\d+)\s*"?/g;
+        // Normalize once
+        const s = String(seq).trim();
+
+        // 1) Count elbow letters anywhere (A-D)
+        (s.match(/[A-D]/gi) || []).forEach((ch) => {
+          const up = ch.toUpperCase();
+          out.elbows[up] = (out.elbows[up] || 0) + 1;
+        });
+
+        // 2) First, extract all quoted/united offsets like 2", 4 in, 6 inch, 10", etc.
+        //    Treat these as whole numbers.
+        const consumed = []; // [ [start,end) ] ranges we consumed so we don't double count bare digits inside them
+        const unitRe = /(\d+)\s*(?:"|in\b|inch\b|”)/gi;
         let m;
-        while ((m = tokenRe.exec(String(seq)))) {
-          if (m[1]) {
-            // Elbow letter
-            const code = m[1].toUpperCase();
-            out.elbows[code] = (out.elbows[code] || 0) + 1;
-          } else if (m[2]) {
-            // Numeric offset (inches)
-            const inches = String(m[2]);
-            out.offsets[inches] = (out.offsets[inches] || 0) + 1;
+        while ((m = unitRe.exec(s))) {
+          const inches = m[1]; // e.g., "2", "4", "10"
+          out.offsets[inches] = (out.offsets[inches] || 0) + 1;
+          consumed.push([m.index, unitRe.lastIndex]);
+        }
+
+        // Helper to check if an index falls within any consumed range
+        const isConsumed = (idx) =>
+          consumed.some(([a, b]) => idx >= a && idx < b);
+
+        // 3) Now handle bare digit runs (no quotes/units).
+        //    Example: "AAB246" => we want 2, 4, 6 (split into single digits).
+        //    We *skip* digits inside already-consumed ranges.
+        for (let i = 0; i < s.length; i++) {
+          if (isConsumed(i)) continue;
+          const ch = s[i];
+          if (/\d/.test(ch)) {
+            // Collect the contiguous digit run
+            let j = i;
+            let run = "";
+            while (j < s.length && /\d/.test(s[j]) && !isConsumed(j)) {
+              run += s[j++];
+            }
+
+            if (run.length === 1) {
+              // single digit like "2" => 2"
+              out.offsets[run] = (out.offsets[run] || 0) + 1;
+            } else {
+              // multiple bare digits like "246" => split into 2,4,6
+              for (const d of run) {
+                out.offsets[d] = (out.offsets[d] || 0) + 1;
+              }
+            }
+            i = j - 1; // advance cursor
           }
         }
+
         return out;
       }
 
-      const items = [];
-
-      // Walk all downspout lines and accumulate elbows/offsets by size
-      const elbowCountsBySize = {}; // { "2x3": { A: 3, B: 1, ... }, ... }
-      const offsetCountsBySize = {}; // { "2x3": { "2": 2, "4": 1, ... }, ... }
+      // ---- NEW: count by size **and** profile
+      // e.g. { "2x3|corrugated": { A: 3, B: 1 }, "3x4|smooth": { A: 2 } }
+      const elbowCounts = {};
+      // e.g. { "2x3|corrugated": { "2": 2, "4": 1 } }
+      const offsetCounts = {};
 
       lines.forEach((line) => {
         if (!line?.isDownspout) return;
 
         const sizeKey = getSizeKeyFromDownspoutLine(line); // "2x3" / "3x4" / "unknown"
+        const profileKey = inferProfileFromLine(line); // "corrugated" | "smooth" | "box" | "round"
+        const mapKey = `${sizeKey}|${profileKey}`;
+
         const { elbows, offsets } = parseElbowsAndOffsets(
           line.elbowSequence || ""
         );
 
-        // Accumulate elbows
-        if (!elbowCountsBySize[sizeKey]) elbowCountsBySize[sizeKey] = {};
+        // elbows
+        if (!elbowCounts[mapKey]) elbowCounts[mapKey] = {};
         Object.entries(elbows).forEach(([code, qty]) => {
-          elbowCountsBySize[sizeKey][code] =
-            (elbowCountsBySize[sizeKey][code] || 0) + Number(qty || 0);
+          elbowCounts[mapKey][code] =
+            (elbowCounts[mapKey][code] || 0) + Number(qty || 0);
         });
 
-        // Accumulate offsets
-        if (!offsetCountsBySize[sizeKey]) offsetCountsBySize[sizeKey] = {};
+        // offsets
+        if (!offsetCounts[mapKey]) offsetCounts[mapKey] = {};
         Object.entries(offsets).forEach(([inches, qty]) => {
-          offsetCountsBySize[sizeKey][inches] =
-            (offsetCountsBySize[sizeKey][inches] || 0) + Number(qty || 0);
+          offsetCounts[mapKey][inches] =
+            (offsetCounts[mapKey][inches] || 0) + Number(qty || 0);
         });
       });
 
-      // Turn elbow counts into priced line items via product lookup
-      Object.entries(elbowCountsBySize).forEach(([sizeKey, byCode]) => {
+      const items = [];
+
+      // build elbow line items (now we know the profile for each group)
+      Object.entries(elbowCounts).forEach(([key, byCode]) => {
+        const [sizeKey, profileKey] = key.split("|");
         Object.entries(byCode).forEach(([code, qty]) => {
           if (!qty) return;
-          const prod = (allProducts || []).find(
-            (p) =>
-              caseIncludes(p.name, sizeKey) &&
-              caseIncludes(p.name, "elbow") &&
-              // look for " A " or "-A " etc.; safer to just includes code
-              caseIncludes(p.name, ` ${String(code).toUpperCase()} `)
-          );
-          if (prod) {
-            items.push({
-              name: prod.name,
-              quantity: Number(qty),
-              price: prod.price,
-              product: prod,
-              meta: {
-                kind: "elbow",
-                sizeKey,
-                code: String(code).toUpperCase(),
-              },
-            });
-          }
+
+          // robust catalog match with profile+size+code
+          const prod = findDownspoutFitting(allProducts, {
+            profileKey, // corrugated/smooth/box/round
+            dsSize: sizeKey, // "2x3" / "3x4" / '3"' ...
+            code, // "A" | "B" (ignored for round)
+            kind: "elbow",
+          });
+          if (!prod) return;
+
+          items.push({
+            name: `${sizeKey} ${
+              /round/i.test(prod.name)
+                ? "Round"
+                : /smooth/i.test(prod.name)
+                ? "Smooth"
+                : /box/i.test(prod.name)
+                ? "Box"
+                : "Corrugated"
+            }${/round|box/i.test(prod.name) ? "" : ` ${code}`} Elbow`,
+            quantity: Number(qty || 0),
+            price: Number(prod.price || 0),
+            product: prod,
+            meta: {
+              kind: "elbow",
+              size: sizeKey,
+              letter: code,
+              profileKey,
+            },
+          });
         });
       });
 
-      // Turn offset counts into priced line items via product lookup
-      Object.entries(offsetCountsBySize).forEach(([sizeKey, byInches]) => {
+      // build offset line items (profile affects SKU resolution too)
+      Object.entries(offsetCounts).forEach(([key, byInches]) => {
+        const [sizeKey, profileKey] = key.split("|");
         Object.entries(byInches).forEach(([inches, qty]) => {
           if (!qty) return;
-          const prod = (allProducts || []).find(
-            (p) =>
-              caseIncludes(p.name, sizeKey) &&
-              caseIncludes(p.name, "offset") &&
-              // match 2", 4", etc. (allow both with or without the quote in DB naming)
-              (caseIncludes(p.name, `${inches}"`) ||
-                caseIncludes(p.name, ` ${inches} `))
-          );
-          if (prod) {
-            items.push({
-              name: prod.name,
-              quantity: Number(qty),
-              price: prod.price,
-              product: prod,
-              meta: { kind: "offset", sizeKey, inches: String(inches) },
-            });
-          }
+
+          // offsets don’t have A/B, but profile+size still matters
+          const prod =
+            findDownspoutFitting(allProducts, {
+              profileKey,
+              dsSize: sizeKey,
+              kind: `${inches}" offset`,
+            }) ||
+            (allProducts || []).find(
+              (p) =>
+                caseIncludes(p.name, sizeKey) &&
+                caseIncludes(p.name, "offset") &&
+                (caseIncludes(p.name, `${inches}"`) ||
+                  caseIncludes(p.name, ` ${inches} `))
+            );
+
+          if (!prod) return;
+
+          items.push({
+            name: `${sizeKey} ${
+              /round/i.test(prod.name)
+                ? "Round"
+                : /smooth/i.test(prod.name)
+                ? "Smooth"
+                : /box/i.test(prod.name)
+                ? "Box"
+                : "Corrugated"
+            } ${inches}" Offset`,
+            quantity: Number(qty || 0),
+            price: Number(prod.price || 0),
+            product: prod,
+            meta: {
+              kind: "offset",
+              size: sizeKey,
+              inches: String(inches),
+              profileKey,
+            },
+          });
         });
       });
 
@@ -1872,12 +2531,75 @@ const Diagram = ({
 
     // de-duplicate ALL accessories before pricing/rendering
     const allAccessoriesUnfolded = [...accessoryLineItems, ...elbowOffsetItems];
+
     const allAccessories = foldAccessoryItems(allAccessoriesUnfolded);
 
     // price from folded list ONLY
     allAccessories.forEach((it) => {
       price += Number(it.price || 0) * Number(it.quantity || 0);
     });
+
+    // right above `const data = { ... }`
+    const rect = canvasRef.current.getBoundingClientRect();
+    const metaViewport = {
+      canvasW: Math.round(rect.width),
+      canvasH: Math.round(rect.height),
+    };
+
+    function normalizeAccessoriesForAPI(items) {
+      return (items || []).map((it) => {
+        const out = {
+          ...it,
+          quantity: Number(it.quantity || 0),
+          price: Number(it.price || 0),
+        };
+        const m = { ...(out.meta || {}) };
+
+        // Canonicalize server-side keys
+        if (m.kind === "endcap") m.kind = "endCap";
+        if (m.kind === "miter") {
+          // server canonical: meta.type
+          if (!m.type && m.miterType) {
+            const t = String(m.miterType);
+            m.type = t.charAt(0).toUpperCase() + t.slice(1); // Strip/Bay/Custom
+          }
+          if (m.degrees != null) m.degrees = Number(m.degrees);
+        }
+        if (!m.size && m.sizeLabel) m.size = m.sizeLabel;
+        if (!m.profileKey && m.profile) m.profileKey = m.profile;
+        if (m.code) m.code = String(m.code).toUpperCase();
+        if (m.inches != null) m.inches = String(m.inches);
+
+        out.meta = m;
+
+        // Defensive: embed discriminators in name so nothing merges even if some meta is lost downstream.
+        if (
+          m.kind === "miter" &&
+          m.type === "Custom" &&
+          m.degrees != null &&
+          !/Custom Miter\s*\(\d+°\)/i.test(out.name)
+        ) {
+          out.name = `Custom Miter (${m.degrees}°)`;
+        }
+        if (
+          m.kind === "elbow" &&
+          m.code &&
+          !/round/i.test(out.name) &&
+          !new RegExp(`\\b${m.code}\\b`, "i").test(out.name)
+        ) {
+          out.name = out.name.replace(/\bElbow\b/i, `${m.code} Elbow`);
+        }
+        if (
+          m.kind === "offset" &&
+          m.inches &&
+          !new RegExp(`\\b${m.inches}"\\b`).test(out.name)
+        ) {
+          out.name = out.name.replace(/\bOffset\b/i, `${m.inches}" Offset`);
+        }
+
+        return out;
+      });
+    }
 
     const data = {
       lines: [...lines],
@@ -1893,7 +2615,12 @@ const Diagram = ({
       accessoryData: [endCaps, miters, customMiters],
       // new
       accessories: {
-        items: allAccessories, // folded accessories list
+        items: normalizeAccessoriesForAPI(allAccessories), // folded accessories list
+      },
+      // 🔹 NEW: persist the canvas size this drawing was made on
+      meta: {
+        ...(selectedDiagram?.meta || {}),
+        ...metaViewport,
       },
     };
 
@@ -2280,6 +3007,10 @@ const Diagram = ({
         setTool={setTool}
         setIsDownspoutModalOpen={setIsDownspoutModalOpen}
         addDownspout={handleAddDownspout}
+        mode={editingDownspoutIndex !== null ? "edit" : "create"}
+        initialData={
+          editingDownspoutIndex !== null ? lines[editingDownspoutIndex] : null
+        }
       />
       <OverwriteDiagramModal
         activeModal={activeModal}

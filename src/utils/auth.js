@@ -1,6 +1,5 @@
 import { processServerResponse } from "./constants";
 const BASE_URL = import.meta.env.VITE_API_URL;
-console.log("BASE_URL: ", BASE_URL);
 
 export function signin(email, password) {
   return fetch(BASE_URL + "signin", {
@@ -27,7 +26,6 @@ export function signUp(userData) {
   })
     .then(processServerResponse)
     .then((data) => {
-      console.log("data from signup: ", data);
       return data;
     });
 }

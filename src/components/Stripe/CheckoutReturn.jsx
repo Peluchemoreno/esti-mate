@@ -14,7 +14,7 @@ export default function CheckoutReturn() {
     (async () => {
       try {
         if (!sessionId) throw new Error("Missing session_id");
-        console.log(`${BASE_URL}api/stripe/session/${sessionId}`);
+
         const res = await fetch(`${BASE_URL}api/stripe/session/${sessionId}`, {
           credentials: "include",
           headers: { "Content-Type": "application/json" },

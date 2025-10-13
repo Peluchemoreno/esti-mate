@@ -28,17 +28,59 @@ const commitNotes = () => {
 
 function foldItems(items) {
   const map = new Map();
+
   (items || []).forEach((it) => {
-    const key = [
-      it.product?._id || it.name,
-      it.meta?.kind || "",
-      it.meta?.code || "",
-      it.meta?.inches || "",
-    ].join("|");
+    const m = it?.meta || {};
+    const kind = (m.kind === "endcap" ? "endCap" : m.kind) || "";
+
+    const isAccessory =
+      kind === "miter" ||
+      kind === "endCap" ||
+      kind === "elbow" ||
+      kind === "offset";
+
+    // back-compat tolerances
+    const miterType = m.type || m.miterType || ""; // 'Strip' | 'Bay' | 'Custom'
+    const degrees = m.degrees ?? m.angle ?? ""; // keep angle for custom
+    const code = m.code || m.letter || ""; // 'A' | 'B' for elbows
+    const inches = m.inches || ""; // '2' | '4' | '6' for offsets
+    const side = m.side || "";
+    const size = m.size || m.sizeLabel || ""; // '2x3' | '3x4' | '3"' | '4"'
+    const profile = m.profileKey || m.profile || "";
+
+    const key = isAccessory
+      ? [
+          kind,
+          String(miterType).toLowerCase(),
+          String(degrees),
+          String(code).toUpperCase(),
+          String(inches),
+          String(side),
+          String(size),
+          String(profile),
+          String(it.name || ""), // tie-breaker so renamed customs don't merge
+        ].join("|")
+      : it.product?._id ||
+        [
+          String(it.name || ""),
+          kind,
+          String(miterType).toLowerCase(),
+          String(code).toUpperCase(),
+          String(inches),
+          String(side),
+          String(size),
+          String(degrees),
+          String(profile),
+        ].join("|");
+
     const prev = map.get(key);
-    if (prev) prev.quantity += Number(it.quantity || 0);
-    else map.set(key, { ...it, quantity: Number(it.quantity || 0) });
+    if (prev) {
+      prev.quantity = Number(prev.quantity || 0) + Number(it.quantity || 0);
+    } else {
+      map.set(key, { ...it, quantity: Number(it.quantity || 0) });
+    }
   });
+
   return Array.from(map.values());
 }
 
@@ -303,25 +345,113 @@ const EstimateModal = ({
   // Choose catalog for pricing — prefer full pricing catalog if loaded
   const catalogForPricing = pricingCatalog || products;
 
+  // Convert selectedDiagram.accessoryData (the tallies you saved earlier)
+  // into the same "items" shape we fold for the PDF.
+  //
+  // accessoryData looks like:
+  // [ { '5" K-Style': [ { type:'End Cap', price, quantity, product }, ... ] }, ... ]
+  function itemsFromAccessoryData(accessoryData = []) {
+    const out = [];
+    const norm = (s) => String(s || "").toLowerCase();
+
+    accessoryData.forEach((bucket) => {
+      if (!bucket || typeof bucket !== "object") return;
+      Object.entries(bucket).forEach(([profileKey, arr]) => {
+        (arr || []).forEach((entry) => {
+          const type = String(entry?.type || "");
+          const product = entry?.product || null;
+          const qty = Number(entry?.quantity || 0);
+          const price = Number(entry?.price || product?.price || 0);
+          if (!product || !qty) return;
+
+          // End caps
+          if (/end\s*cap/i.test(type)) {
+            out.push({
+              name: product.name, // e.g., 5" K-Style End Cap
+              quantity: qty,
+              price,
+              product,
+              meta: {
+                kind: "endCap",
+                profileKey, // e.g., 5" K-Style
+              },
+            });
+            return;
+          }
+
+          // Strip/Bay/Custom miters
+          if (/miter/i.test(type)) {
+            // Derive miterType + degrees from the "type" OR from entry.angle
+            let miterType = "";
+            let degrees = null;
+
+            if (/strip/i.test(type)) miterType = "Strip";
+            else if (/bay/i.test(type)) miterType = "Bay";
+            else if (/custom/i.test(type)) miterType = "Custom";
+
+            // Try to extract angle if present in "Custom Miter (9°)" OR entry.angle
+            const m = type.match(/(\d+)\s*°/);
+            if (m) degrees = Number(m[1]);
+            if (degrees == null && entry?.angle != null) {
+              const d = Number(entry.angle);
+              if (!Number.isNaN(d)) degrees = d;
+            }
+
+            // Optional: override visible name for customs to show angle explicitly
+            const nameOverride =
+              miterType === "Custom" && degrees != null
+                ? `Custom Miter (${degrees}°)`
+                : product.name;
+
+            out.push({
+              name: nameOverride,
+              quantity: qty,
+              price,
+              product,
+              meta: {
+                kind: "miter",
+                type: miterType, // server-canonical field
+                // keep extra fields to avoid any merging later
+                miterType, // tolerate client shape elsewhere
+                degrees: degrees ?? undefined,
+                profileKey,
+              },
+            });
+            return;
+          }
+        });
+      });
+    });
+
+    return out;
+  }
+
   // Accessories (elbows/offsets/miters/end caps) computed live
   const computedAccessories = useMemo(() => {
-    const items = computeAccessoriesFromLines(
+    // elbows/offsets computed from live lines
+    const eo = computeAccessoriesFromLines(
       selectedDiagram?.lines || [],
       catalogForPricing || [],
-      {
-        // If you later pass miter/end cap tallies, they’ll be included here
-        // miters: [],
-        // endCaps: [],
-      }
+      {}
     );
-    return foldItems(items);
-  }, [selectedDiagram?.lines, catalogForPricing]);
+    // miters + end caps from the diagram’s saved tallies
+    const me = itemsFromAccessoryData(selectedDiagram?.accessoryData || []);
+
+    // Combine; no fold here — we fold once at the end of buildSavableItems()
+    return [...eo, ...me];
+  }, [
+    selectedDiagram?.lines,
+    selectedDiagram?.accessoryData,
+    catalogForPricing,
+  ]);
+
   // Merge any saved accessories with the freshly computed ones (prevents stale diagrams from hiding offsets)
-  const mergedAccessories = useMemo(() => {
-    const saved = selectedDiagram?.accessories?.items || [];
-    // foldItems already exists in this file and merges by product id/name+meta
-    return foldItems([...(saved || []), ...(computedAccessories || [])]);
-  }, [selectedDiagram?.accessories?.items, computedAccessories]);
+
+  // Preview should reflect the diagram *right now*, not previously saved accessories
+  const mergedAccessories = useMemo(
+    () => computedAccessories,
+    [computedAccessories]
+  );
 
   // ad-hoc handlers
   const addAdHoc = useCallback(() => {
@@ -405,7 +535,6 @@ const EstimateModal = ({
         price: Number(it.price || 0),
       });
     });
-
     return foldItems(rows);
   }, [selectedDiagram?.lines, mergedAccessories, adHocItems]);
 
@@ -674,6 +803,7 @@ const EstimateModal = ({
               ),
               accessories: { items: mergedAccessories },
             }}
+            items={buildSavableItems()}
             currentUser={currentUser}
             logoUrl={logoUrl}
             estimateData={estimateData}
