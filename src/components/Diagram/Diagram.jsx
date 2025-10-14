@@ -1955,23 +1955,33 @@ const Diagram = ({
   }
 
   // ======= Save diagram =======
-  function saveDiagram(saveType) {
+  // ⬇️ drop in place of your current saveDiagram
+  async function saveDiagram(saveType) {
     setSelectedIndex(null);
 
-    // ---------- fold accessories (front-end only, once) ----------
+    // --- mobile/iOS safety: draw then yield a frame before reading canvas ---
+    const raf = () => new Promise((res) => requestAnimationFrame(res));
+    async function ensureCanvasPainted(ctx, drawFn) {
+      drawFn(ctx);
+      await raf(); // let the GPU present before we read pixels / toDataURL
+    }
+
     function foldAccessoryItems(items) {
       const map = new Map();
+
       (items || []).forEach((it) => {
         const isAccessory =
           it?.meta &&
           ["miter", "endcap", "elbow", "offset"].includes(it.meta.kind);
 
+        // For accessories: do NOT rely on product._id. Use meta to preserve intent.
+        // For base rows (gutters/downspouts), product id/name is fine.
         const key = isAccessory
           ? [
               it.meta?.kind || "", // miter | endcap | elbow | offset
               it.meta?.miterType || "", // strip | bay | custom
               it.meta?.degrees ?? "", // number for custom miters
-              it.meta?.code || "", // A | B for elbows (explicit!)
+              it.meta?.code || "", // A | B for elbows
               it.meta?.inches || "", // 2 | 4 | 6 for offsets
               it.meta?.size || it.meta?.sizeLabel || "",
               it.meta?.profileKey || it.meta?.profile || "",
@@ -1986,23 +1996,28 @@ const Diagram = ({
           map.set(key, { ...it, quantity: Number(it.quantity || 0) });
         }
       });
+
       return Array.from(map.values());
     }
 
+    // Require content to save
     if (lines.length === 0) {
-      closeModal();
+      alert("Add at least one line before saving.");
       return;
     }
 
-    // Skip save if the diagram hasn’t changed
+    // Only enforce "no changes" for existing diagrams
+    const isExisting = Boolean(selectedDiagram?._id);
     const currentHash = hashLines(lines);
-    const hasChanged = currentHash !== baselineHashRef.current;
-    if (!hasChanged) {
-      closeModal();
-      return;
+    if (isExisting) {
+      const hasChanged = currentHash !== baselineHashRef.current;
+      if (!hasChanged) {
+        alert("No changes to save.");
+        return;
+      }
     }
 
-    // Require project id
+    // Require a project id
     const resolvedProjectId =
       currentProjectId ||
       selectedDiagram?.projectId ||
@@ -2013,7 +2028,7 @@ const Diagram = ({
       return;
     }
 
-    // ---------- bounding box utilities for thumbnail ----------
+    // --- thumb bounds for ALL elements (lines, notes, free marks, downspouts) ---
     function boundsUnion(a, b) {
       return {
         minX: Math.min(a.minX, b.minX),
@@ -2023,7 +2038,13 @@ const Diagram = ({
       };
     }
     function elementBounds(el, ctx) {
-      // priced gutter line
+      let box = {
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+      };
+
       if (!el.isFreeMark && !el.isNote && !el.isDownspout) {
         return {
           minX: Math.min(el.startX, el.endX),
@@ -2033,7 +2054,6 @@ const Diagram = ({
         };
       }
 
-      // note
       if (el.isNote) {
         const text = String(el.note || "");
         ctx.save();
@@ -2053,7 +2073,6 @@ const Diagram = ({
         };
       }
 
-      // downspout (X + elbow box)
       if (el.isDownspout) {
         const r = gridSize;
         const cross = {
@@ -2063,7 +2082,7 @@ const Diagram = ({
           maxY: el.startY + r,
         };
         const w = 60;
-        const h = 28;
+        const h = 28; // keep in sync with draw & hitTest
         const angle =
           typeof el.elbowBoxAngle === "number" ? el.elbowBoxAngle : Math.PI / 4;
         const radius =
@@ -2081,7 +2100,6 @@ const Diagram = ({
         return boundsUnion(cross, box);
       }
 
-      // free marks
       if (el.isFreeMark) {
         if (el.kind === "free-line") {
           return {
@@ -2101,15 +2119,14 @@ const Diagram = ({
         if (el.kind === "free-circle") {
           const r = Math.max(0, el.radius || 0);
           return {
-            minX: (el.centerX ?? el.startX) - r,
-            minY: (el.centerY ?? el.startY) - r,
-            maxX: (el.centerX ?? el.startX) + r,
-            maxY: (el.centerY ?? el.startY) + r,
+            minX: el.centerX - r,
+            minY: el.centerY - r,
+            maxX: el.centerX + r,
+            maxY: el.centerY + r,
           };
         }
       }
 
-      // fallback: point
       const x = el.startX ?? el.centerX ?? 0;
       const y = el.startY ?? el.centerY ?? 0;
       return { minX: x, minY: y, maxX: x, maxY: y };
@@ -2136,53 +2153,66 @@ const Diagram = ({
     }
 
     const token = localStorage.getItem("jwt");
-    const canvas = canvasRef.current; // ⬅️ use the top-level ref; do NOT redeclare hooks here
+    const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    drawAllLines(ctx);
 
-    // ---------- DPR-safe thumbnail crop ----------
+    // ⬇️ draw + yield one frame before reading back pixels (mobile fix)
+    await ensureCanvasPainted(ctx, drawAllLines);
+
     const dpr = window.devicePixelRatio || 1;
-    const bbox = getBoundingBoxForAll(lines, ctx, 40);
 
-    const srcX = Math.max(0, Math.floor(bbox.minX * dpr));
-    const srcY = Math.max(0, Math.floor(bbox.minY * dpr));
+    // 1) Compute bounds in CSS units (helper returns CSS units)
+    const boundingBox = getBoundingBoxForAll(lines, ctx, 40); // a little more padding
+
+    // 2) Convert CSS -> backing store pixels
+    const srcX = Math.max(0, Math.floor(boundingBox.minX * dpr));
+    const srcY = Math.max(0, Math.floor(boundingBox.minY * dpr));
     const srcW = Math.min(
-      Math.floor((bbox.maxX - bbox.minX) * dpr),
+      Math.floor((boundingBox.maxX - boundingBox.minX) * dpr),
       canvas.width - srcX
     );
     const srcH = Math.min(
-      Math.floor((bbox.maxY - bbox.minY) * dpr),
+      Math.floor((boundingBox.maxY - boundingBox.minY) * dpr),
       canvas.height - srcY
     );
 
-    const temp = document.createElement("canvas");
-    const tctx = temp.getContext("2d");
-    const display = 200;
-    const internal = 3 * display;
+    // ... setup tempCanvas ...
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
 
-    temp.width = internal;
-    temp.height = internal;
-    tctx.clearRect(0, 0, temp.width, temp.height);
+    // fixed, crisp thumb regardless of device
+    const thumbnailDisplaySize = 200;
+    const thumbnailInternalSize = 3 * thumbnailDisplaySize;
 
-    const pad = 0.05 * internal;
-    const availW = internal - pad * 2;
-    const availH = internal - pad * 2;
+    tempCanvas.width = thumbnailInternalSize;
+    tempCanvas.height = thumbnailInternalSize;
+    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-    const cropWcss = bbox.maxX - bbox.minX;
-    const cropHcss = bbox.maxY - bbox.minY;
-    const scale = Math.min(availW / cropWcss, availH / cropHcss);
-    const destW = cropWcss * scale;
-    const destH = cropHcss * scale;
-    const dx = (internal - destW) / 2;
-    const dy = (internal - destH) / 2;
+    // leave some border inside thumb so labels/joins never touch edges
+    const pad = 0.05 * thumbnailInternalSize;
+    const availW = thumbnailInternalSize - pad * 2;
+    const availH = thumbnailInternalSize - pad * 2;
 
-    tctx.fillStyle = "#ffffff";
-    tctx.fillRect(0, 0, temp.width, temp.height);
-    tctx.drawImage(canvas, srcX, srcY, srcW, srcH, dx, dy, destW, destH);
+    // destination size computed in CSS pixels first, then mapped 1:1 to thumb
+    const cropWidthCss = boundingBox.maxX - boundingBox.minX;
+    const cropHeightCss = boundingBox.maxY - boundingBox.minY;
+    const scale = Math.min(availW / cropWidthCss, availH / cropHeightCss);
+    const destW = cropWidthCss * scale;
+    const destH = cropHeightCss * scale;
 
-    const thumbnailDataUrl = temp.toDataURL("image/png");
+    const dx = (thumbnailInternalSize - destW) / 2;
+    const dy = (thumbnailInternalSize - destH) / 2;
 
-    // ---------- base price (gutters + downspout footage) ----------
+    // white background
+    tempCtx.fillStyle = "#ffffff";
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // draw from the hi-DPI source rect
+    tempCtx.drawImage(canvas, srcX, srcY, srcW, srcH, dx, dy, destW, destH);
+
+    const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
+
+    // --- PRICE + ACCESSORIES ---
     let price = 0;
     let totalFootage = 0;
 
@@ -2191,14 +2221,13 @@ const Diagram = ({
         const p = Number(line.price || 0);
         price += p * Number(line.measurement || 0);
       } else if (line.isNote || line.isFreeMark) {
-        // not priced
+        // no price
       } else {
         const p = Number(line?.currentProduct?.price || 0);
         price += p * Number(line.measurement || 0);
       }
     });
 
-    // ---------- analyze joints (end caps & miters) ----------
     const analysis = analyzeJoints(lines);
     const endcapMiterData = {
       endCapsByProduct: analysis.endCapsByProduct,
@@ -2206,7 +2235,10 @@ const Diagram = ({
       mixedMiters: analysis.mixedMiters,
     };
 
-    // helpers used below
+    const caseIncludes = (hay, needle) =>
+      String(hay).toLowerCase().includes(String(needle).toLowerCase());
+
+    // --- local helpers (robust to your seedTemplate.js) ---
     const ci = (s) => String(s || "").toLowerCase();
     const nameHasAny = (n, tokens = []) => {
       const S = ci(n);
@@ -2229,7 +2261,7 @@ const Diagram = ({
       return m ? `${m[1]}"` : s;
     };
 
-    // precise end/strip/bay lookup using your catalog names
+    // kind: "end cap" | "strip miter" | "bay miter" | "custom miter"
     const findGutterAccessoryTemplate = (
       allProducts,
       { profileKey, sizeInches, kind }
@@ -2240,6 +2272,7 @@ const Diagram = ({
       const wantEnd = /end/.test(K);
       const wantStrip = /strip/.test(K);
       const wantBay = /bay/.test(K);
+      const wantCustom = /custom/.test(K);
 
       const pass = (requireSize) =>
         (allProducts || []).find((p) => {
@@ -2250,23 +2283,12 @@ const Diagram = ({
           if (wantEnd && !/end\s*cap|endcap/i.test(n)) return false;
           if (wantStrip && !/strip\s*miter/i.test(n)) return false;
           if (wantBay && !/bay\s*miter/i.test(n)) return false;
+          if (wantCustom && !/custom\s*miter/i.test(n)) return false;
           return true;
         });
 
       return pass(true) || pass(false) || null;
     };
-
-    // explicit Custom Miter resolver (your catalog has a single “Custom Miter”)
-    function findCustomMiterProduct(allProducts, profileKey) {
-      const profTokens = nameTokensForProfile(profileKey);
-      return (allProducts || []).find((p) => {
-        const n = p?.name || "";
-        if (!/accessory/i.test(p?.type || "accessory")) return false;
-        if (!/custom\s*miter/i.test(n)) return false;
-        // if you want per-profile custom SKUs, keep this; otherwise, drop the check:
-        return nameHasAny(n, profTokens) || true;
-      });
-    }
 
     function calculateEndCapsAndMiters(analysisData) {
       const endCaps = {};
@@ -2274,6 +2296,7 @@ const Diagram = ({
       const customMiters = {};
       const accessoryLineItems = [];
 
+      // wrapper so we never forget to include price
       const pushCatalogItem = (product, quantity, meta = {}, nameOverride) => {
         if (!product || !quantity) return;
         accessoryLineItems.push({
@@ -2285,16 +2308,18 @@ const Diagram = ({
         });
       };
 
-      // End Caps
+      // ---------------- End Caps ----------------
       Object.keys(analysisData.endCapsByProduct || {}).forEach((profileKey) => {
         const endCapCount = Number(
           analysisData.endCapsByProduct[profileKey] || 0
         );
         if (!endCapCount) return;
 
+        const sizeInches = null; // pass actual if you can infer
+
         const endCapTpl = findGutterAccessoryTemplate(allProducts, {
           profileKey,
-          sizeInches: null, // pass null if size isn’t encoded in your accessory names
+          sizeInches,
           kind: "end cap",
         });
         if (endCapTpl) {
@@ -2304,23 +2329,27 @@ const Diagram = ({
             quantity: endCapCount,
             product: endCapTpl,
           });
+
           pushCatalogItem(endCapTpl, endCapCount, {
             kind: "endcap",
             profileKey,
+            inches: sizeInches || undefined,
           });
         }
       });
 
-      // Miters
+      // ---------------- Miters ----------------
       Object.keys(analysisData.mitersByProduct || {}).forEach((profileKey) => {
         const m = analysisData.mitersByProduct[profileKey] || {};
         const stripQty = Number(m.inside90 || 0) + Number(m.outside90 || 0);
         const bayQty = Number(m.bay135 || 0);
 
+        const sizeInches = null;
+
         if (stripQty > 0) {
           const strip = findGutterAccessoryTemplate(allProducts, {
             profileKey,
-            sizeInches: null,
+            sizeInches,
             kind: "strip miter",
           });
           if (strip) {
@@ -2341,7 +2370,7 @@ const Diagram = ({
         if (bayQty > 0) {
           const bay = findGutterAccessoryTemplate(allProducts, {
             profileKey,
-            sizeInches: null,
+            sizeInches,
             kind: "bay miter",
           });
           if (bay) {
@@ -2365,7 +2394,18 @@ const Diagram = ({
             const qty = Number(count || 0);
             if (!qty) return;
 
-            const custom = findCustomMiterProduct(allProducts, profileKey);
+            const custom =
+              findGutterAccessoryTemplate(allProducts, {
+                profileKey,
+                sizeInches,
+                kind: "custom miter",
+              }) ||
+              findGutterAccessoryTemplate(allProducts, {
+                profileKey,
+                sizeInches: null,
+                kind: "custom miter",
+              });
+
             if (custom) {
               (customMiters[profileKey] ||= []).push({
                 type: `Custom Miter (${angle}°)`,
@@ -2374,7 +2414,6 @@ const Diagram = ({
                 product: custom,
                 angle,
               });
-              // keep the angle in the name for the line item, price from SKU
               pushCatalogItem(
                 custom,
                 qty,
@@ -2394,8 +2433,9 @@ const Diagram = ({
       return { endCaps, miters, customMiters, accessoryLineItems };
     }
 
-    // ---------- Downspout elbows & offsets ----------
+    // --- elbows + offsets (priced) ---
     function collectElbowsAndOffsets(lines, allProducts) {
+      // helpers
       const caseIncludes = (hay, needle) =>
         String(hay).toLowerCase().includes(String(needle).toLowerCase());
 
@@ -2409,7 +2449,7 @@ const Diagram = ({
           m = n.match(rxSize) || n.match(rxQuoted);
         }
         if (!m) return "unknown";
-        return `${m[1]}x${m[2]}`;
+        return `${m[1]}x${m[2]}`; // "2x3" / "3x4"
       }
 
       function inferProfileFromLine(line) {
@@ -2427,13 +2467,11 @@ const Diagram = ({
         if (!seq) return out;
         const s = String(seq).trim();
 
-        // Elbows A-D
         (s.match(/[A-D]/gi) || []).forEach((ch) => {
           const up = ch.toUpperCase();
           out.elbows[up] = (out.elbows[up] || 0) + 1;
         });
 
-        // Quoted/units offsets first
         const consumed = [];
         const unitRe = /(\d+)\s*(?:"|in\b|inch\b|”)/gi;
         let m;
@@ -2445,7 +2483,6 @@ const Diagram = ({
         const isConsumed = (idx) =>
           consumed.some(([a, b]) => idx >= a && idx < b);
 
-        // Bare digits: split 246 => 2,4,6
         for (let i = 0; i < s.length; i++) {
           if (isConsumed(i)) continue;
           const ch = s[i];
@@ -2458,7 +2495,9 @@ const Diagram = ({
             if (run.length === 1) {
               out.offsets[run] = (out.offsets[run] || 0) + 1;
             } else {
-              for (const d of run) out.offsets[d] = (out.offsets[d] || 0) + 1;
+              for (const d of run) {
+                out.offsets[d] = (out.offsets[d] || 0) + 1;
+              }
             }
             i = j - 1;
           }
@@ -2471,9 +2510,11 @@ const Diagram = ({
 
       lines.forEach((line) => {
         if (!line?.isDownspout) return;
+
         const sizeKey = getSizeKeyFromDownspoutLine(line);
         const profileKey = inferProfileFromLine(line);
         const mapKey = `${sizeKey}|${profileKey}`;
+
         const { elbows, offsets } = parseElbowsAndOffsets(
           line.elbowSequence || ""
         );
@@ -2500,9 +2541,9 @@ const Diagram = ({
           if (!qty) return;
 
           const prod = findDownspoutFitting(allProducts, {
-            profileKey,
-            dsSize: sizeKey,
-            code, // <-- A or B
+            profileKey, // corrugated/smooth/box/round
+            dsSize: sizeKey, // "2x3" / "3x4" / '3"' ...
+            code, // "A" | "B" (ignored for round)
             kind: "elbow",
           });
           if (!prod) return;
@@ -2523,8 +2564,8 @@ const Diagram = ({
             meta: {
               kind: "elbow",
               size: sizeKey,
-              letter: code, // keep old field
-              code, // add canonical field used by backend folding
+              code, // keep canonical 'code'
+              letter: code, // (back-compat if anything still reads 'letter')
               profileKey,
             },
           });
@@ -2550,6 +2591,7 @@ const Diagram = ({
                 (caseIncludes(p.name, `${inches}"`) ||
                   caseIncludes(p.name, ` ${inches} `))
             );
+
           if (!prod) return;
 
           items.push({
@@ -2580,24 +2622,25 @@ const Diagram = ({
 
     const { endCaps, miters, customMiters, accessoryLineItems } =
       calculateEndCapsAndMiters(endcapMiterData);
+
     const elbowOffsetItems = collectElbowsAndOffsets(lines, allProducts);
 
+    // de-duplicate ALL accessories before pricing/rendering
     const allAccessoriesUnfolded = [...accessoryLineItems, ...elbowOffsetItems];
     const allAccessories = foldAccessoryItems(allAccessoriesUnfolded);
 
-    // add accessory price
+    // price from folded list ONLY
     allAccessories.forEach((it) => {
       price += Number(it.price || 0) * Number(it.quantity || 0);
     });
 
-    // persist the canvas size used for this save (for future scaling)
+    // right above `const data = { ... }`
     const rect = canvasRef.current.getBoundingClientRect();
     const metaViewport = {
       canvasW: Math.round(rect.width),
       canvasH: Math.round(rect.height),
     };
 
-    // normalize for API (canonicalize keys; keep names stable)
     function normalizeAccessoriesForAPI(items) {
       return (items || []).map((it) => {
         const out = {
@@ -2607,9 +2650,8 @@ const Diagram = ({
         };
         const m = { ...(out.meta || {}) };
 
-        // server canonical: kind casing
+        // Canonicalize server-side keys
         if (m.kind === "endcap") m.kind = "endCap";
-
         if (m.kind === "miter") {
           if (!m.type && m.miterType) {
             const t = String(m.miterType);
@@ -2617,7 +2659,6 @@ const Diagram = ({
           }
           if (m.degrees != null) m.degrees = Number(m.degrees);
         }
-
         if (!m.size && m.sizeLabel) m.size = m.sizeLabel;
         if (!m.profileKey && m.profile) m.profileKey = m.profile;
         if (m.code) m.code = String(m.code).toUpperCase();
@@ -2625,7 +2666,7 @@ const Diagram = ({
 
         out.meta = m;
 
-        // keep discriminators visible in names without duplicating
+        // Defensive: embed discriminators in name so nothing merges even if some meta is lost downstream.
         if (
           m.kind === "miter" &&
           m.type === "Custom" &&
@@ -2649,6 +2690,7 @@ const Diagram = ({
         ) {
           out.name = out.name.replace(/\bOffset\b/i, `${m.inches}" Offset`);
         }
+
         return out;
       });
     }
@@ -2658,15 +2700,18 @@ const Diagram = ({
       imageData: thumbnailDataUrl,
       totalFootage,
       price: parseFloat(price).toFixed(2),
-      // legacy for old PDF (fine to keep)
+      // legacy fields
       miterSummary: analysis.miters,
       endCaps: analysis.endCaps,
       endCapsByProduct: analysis.endCapsByProduct,
       mitersByProduct: analysis.mitersByProduct,
       mixedMiters: analysis.mixedMiters,
       accessoryData: [endCaps, miters, customMiters],
-      // new normalized list used by Estimate PDF
-      accessories: { items: normalizeAccessoriesForAPI(allAccessories) },
+      // new
+      accessories: {
+        items: normalizeAccessoriesForAPI(allAccessories), // folded accessories list
+      },
+      // persist the canvas size this drawing was made on
       meta: {
         ...(selectedDiagram?.meta || {}),
         ...metaViewport,
@@ -2712,7 +2757,7 @@ const Diagram = ({
       handleAddDiagramToProject();
     }
 
-    // update baseline after a successful save
+    // after successful save/add/overwrite:
     baselineHashRef.current = hashLines(lines);
   }
 
