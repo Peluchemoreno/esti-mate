@@ -103,3 +103,9 @@
     height: 100%;
   }
 }
+
+.diagram-canvas {
+  touch-action: none;       /* critical: lets preventDefault() actually take effect */
+  -webkit-user-select: none;
+  user-select: none;
+}

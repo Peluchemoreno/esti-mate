@@ -1940,6 +1940,20 @@ const Diagram = ({
     };
   }
 
+  // --- Touch → Mouse delegators so mobile can draw & commit ---
+  function handleTouchStart(e) {
+    e.preventDefault(); // keep the page from scrolling
+    handleMouseDown(e); // your getCanvasCoords already reads touches
+  }
+  function handleTouchMove(e) {
+    e.preventDefault();
+    handleMouseMove(e);
+  }
+  function handleTouchEnd(e) {
+    e.preventDefault();
+    handleMouseUp(e);
+  }
+
   // ======= Save diagram =======
   function saveDiagram(saveType) {
     setSelectedIndex(null);
@@ -3066,12 +3080,12 @@ const Diagram = ({
           className="diagram__canvas"
           width={window.innerWidth}
           height={window.innerHeight}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           onPointerDown={handleMouseDown}
           onPointerMove={handleMouseMove}
           onPointerUp={handleMouseUp}
-          onTouchStart={handleMouseDown}
-          onTouchMove={handleMouseMove}
-          onTouchEnd={handleMouseUp}
         />
       </div>
 
