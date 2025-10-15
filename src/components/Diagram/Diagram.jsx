@@ -676,7 +676,7 @@ const Diagram = ({
       setTool(filteredProducts[0].name);
     }
   }, [filteredProducts, tool]);
-
+  const metaIn = selectedDiagram?.meta || {};
   const savedGrid = Number(metaIn.gridSize) || gridSize;
   const savedFeet = Number(metaIn.feetPerSquare) || feetPerSquare;
   // Do not push raw savedGrid directly; we must match the geometric scale below.
