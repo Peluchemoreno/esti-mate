@@ -368,28 +368,37 @@ const Diagram = ({
     }
   }, [activeModal]);
 
-  // When opening the modal to create a NEW diagram, make sure canvas is blank
+  // When opening the modal to create a NEW diagram, make sure canvas is blank,
+  // but only once per open and only if there is no content yet.
   useEffect(() => {
     if (activeModal !== "diagram") return;
+
+    if (didInitDiagram.current) return; // already initialized this open
 
     const hasId =
       selectedDiagram &&
       typeof selectedDiagram === "object" &&
       selectedDiagram._id;
 
-    // If we are not editing an existing diagram, clear everything
-    if (!hasId) {
+    // only clear if it's truly a brand-new diagram AND you don't already have lines
+    if (!hasId && (lines?.length ?? 0) === 0) {
       setLines([]);
       setSelectedIndex(null);
       setIsDrawing(false);
-      // reset baseline so "no changes" logic doesn't block first save
       if (baselineHashRef && "current" in baselineHashRef) {
         baselineHashRef.current = hashLines([]);
       }
-      // draw a fresh scene
       drawScene();
     }
-  }, [activeModal, selectedDiagram]);
+
+    didInitDiagram.current = true; // mark initialized for this open
+  }, [activeModal]); // keep dep list tight
+
+  useEffect(() => {
+    if (activeModal !== "diagram") {
+      didInitDiagram.current = false;
+    }
+  }, [activeModal]);
 
   // Observe container size + window zoom
   useEffect(() => {
@@ -834,6 +843,8 @@ const Diagram = ({
 
   // --- stable diagram hashing (only fields that define "meaningful change") ---
   const baselineHashRef = useRef(null);
+
+  const didInitDiagram = useRef(false);
 
   function round2(n) {
     return Math.round(Number(n || 0) * 100) / 100;
