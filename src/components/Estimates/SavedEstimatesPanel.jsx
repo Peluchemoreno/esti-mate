@@ -1,6 +1,7 @@
 // src/components/Estimates/SavedEstimatesPanel.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import EstimateViewerModal from "../Estimates/EstimateViewerModal";
+
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 const brand = {
@@ -12,6 +13,10 @@ const brand = {
   muted: "#aaa",
   danger: "#ef4444",
 };
+
+// Module-scope in-memory blob cache for this tab/session
+// key: `${estimateId}|${updatedAt}` -> Blob
+const pdfBlobCache = new Map();
 
 export default function SavedEstimatesPanel({
   projectId,
@@ -55,18 +60,7 @@ export default function SavedEstimatesPanel({
     }
   };
 
-  // simple in-memory blob cache for this tab/session
-  const pdfBlobCache = new Map(); // key: `${id}|${updatedAt}` -> Blob
-
-  useEffect(() => {
-    const onCreated = () => {
-      // call your existing loader here
-      fetchEstimates(); // <-- whatever you already use to fetch the list
-    };
-    window.addEventListener("estimate-created", onCreated);
-    return () => window.removeEventListener("estimate-created", onCreated);
-  }, []);
-
+  // Fetch company logo as data URL (for PDF)
   useEffect(() => {
     if (!currentUser?._id || !token) return;
     fetch(`${BASE_URL}users/${currentUser._id}/logo`, {
@@ -93,11 +87,11 @@ export default function SavedEstimatesPanel({
         );
         setLogoUrl(null);
       });
-  }, [currentUser?._id, token]);
+  }, [BASE_URL, currentUser?._id, token]);
 
+  // Initial load + auto-refresh on create/delete
   useEffect(() => {
     fetchEstimates();
-    // auto-refresh when someone saves/deletes elsewhere
     const onSaved = () => fetchEstimates();
     const onDeleted = () => fetchEstimates();
     window.addEventListener("estimate-created", onSaved);
@@ -113,16 +107,11 @@ export default function SavedEstimatesPanel({
     setActiveEstimate(est);
     setViewerOpen(true);
   };
+
   const closeViewer = () => {
     setViewerOpen(false);
     setActiveEstimate(null);
   };
-
-  const money = (n) =>
-    Number(n || 0).toLocaleString(undefined, {
-      style: "currency",
-      currency: "USD",
-    });
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this estimate? This cannot be undone.")) return;
@@ -135,7 +124,7 @@ export default function SavedEstimatesPanel({
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error || res.statusText);
       }
-      // refresh
+      // refresh + notify
       await fetchEstimates();
       window.dispatchEvent(new Event("estimate-deleted"));
     } catch (e) {
@@ -146,6 +135,8 @@ export default function SavedEstimatesPanel({
   async function downloadPDF(est) {
     if (!est?._id) return;
     const key = `${est._id}|${est.updatedAt || ""}`;
+
+    // Use cached blob if available
     const cached = pdfBlobCache.get(key);
     if (cached) {
       const url = URL.createObjectURL(cached);
@@ -161,21 +152,28 @@ export default function SavedEstimatesPanel({
       URL.revokeObjectURL(url);
       return;
     }
-    // fetch full detail only when needed (keeps list lean). Route unchanged. :contentReference[oaicite:1]{index=1}
+
+    // Fetch full detail only on demand
     const token = localStorage.getItem("jwt");
     const res = await fetch(`${BASE_URL}api/estimates/${est._id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (!res.ok) {
+      return alert("Failed to load estimate.");
+    }
     const data = await res.json();
     const doc = data?.estimate;
     if (!doc) return alert("Failed to load estimate.");
-    // lazy-load heavy libs only now
+
+    // Lazy-load heavy libs when needed
     const [{ pdf }, { default: EstimatePDF }] = await Promise.all([
       import("@react-pdf/renderer"),
       import("../EstimatePDF/EstimatePDF"),
     ]);
-    // build minimal props similar to viewer (keeps behavior identical). :contentReference[oaicite:2]{index=2}
+
     const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
+
+    // Minimal, stable props into the PDF doc (no extra work)
     const element = (
       <EstimatePDF
         selectedDiagram={{
@@ -192,7 +190,7 @@ export default function SavedEstimatesPanel({
           notes: doc.notes || "",
         }}
         project={{
-          // keep same precedence as viewer modal
+          // Keep modal/viewer precedence: prefer live project info, fall back to snapshot
           billingName:
             project?.billingName ?? doc?.projectSnapshot?.billingName ?? "",
           billingAddress:
@@ -227,8 +225,10 @@ export default function SavedEstimatesPanel({
         showPrices={true}
       />
     );
+
     const blob = await pdf(element).toBlob();
     pdfBlobCache.set(key, blob);
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -312,38 +312,6 @@ export default function SavedEstimatesPanel({
         !error &&
         estimates.map((est) => {
           const padded = String(est.estimateNumber || 0).padStart(3, "0");
-          const proj = est.projectSnapshot || {};
-          const docProps = {
-            estimate: est, // pass full estimate so PDF can use projectSnapshot fallbacks when needed
-            selectedDiagram: {
-              imageData: est?.diagram?.imageData || null,
-              lines: Array.isArray(est?.diagram?.lines)
-                ? est.diagram.lines
-                : [],
-            },
-            activeModal: null,
-            currentUser,
-            logoUrl, // base64 logo you fetch in this component
-            estimateData: {
-              estimateNumber: String(est.estimateNumber || 0).padStart(3, "0"),
-              estimateDate: est.estimateDate || "",
-              paymentDue: est.paymentDue || "Upon completion.", // ensure default text
-              notes: est.notes || "",
-            },
-            // IMPORTANT: pass the live project so Bill To has billingName/billingAddress/billingPrimaryPhone,
-            // and Job Site can take projectName/projectAddress.
-            // If you *don’t* have `project` in scope, keep passing whatever you already pass here
-            // that contains those fields. Otherwise, we’ll fall back to estimate.projectSnapshot inside the PDF.
-            project,
-
-            products,
-            items: (est.items || []).map((it) => ({
-              name: it.name,
-              quantity: Number(it.quantity || 0),
-              price: Number(it.price || 0),
-            })),
-            // showPrices: true, // or whatever your toggle dictates for downloads
-          };
           return (
             <div
               key={est._id}
@@ -380,9 +348,8 @@ export default function SavedEstimatesPanel({
                   View
                 </button>
 
-                <PDFDownloadLink
-                  document={<EstimatePDF {...docProps} />}
-                  fileName={`Estimate-${padded}.pdf`}
+                <button
+                  onClick={() => downloadPDF(est)}
                   style={{
                     background: brand.accent,
                     color: "#fff",
@@ -390,10 +357,12 @@ export default function SavedEstimatesPanel({
                     borderRadius: 6,
                     padding: "6px 10px",
                     display: "inline-block",
+                    cursor: "pointer",
+                    border: "none",
                   }}
                 >
-                  {({ loading }) => (loading ? "Preparing…" : "Download")}
-                </PDFDownloadLink>
+                  Download
+                </button>
 
                 <button
                   onClick={() => handleDelete(est._id)}

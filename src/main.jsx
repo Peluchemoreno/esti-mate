@@ -5,6 +5,7 @@ import App from "./components/App/App";
 import "./vendor/normalize.css";
 import "./index.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "./shims/buffer";
 
 const queryClient = new QueryClient();
 

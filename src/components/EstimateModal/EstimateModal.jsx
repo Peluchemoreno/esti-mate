@@ -1,14 +1,8 @@
 // src/components/EstimateModal/EstimateModal.jsx
 import Modal from "react-modal";
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { computeAccessoriesFromLines } from "../../utils/priceResolver";
+
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 Modal.setAppElement("#root");
@@ -22,12 +16,6 @@ const prettyDsName = (raw = "") =>
     )
     .replace(/\s+/g, " ")
     .trim();
-
-// lazy imports to keep modal open fast; viewer hydrates right after paint
-const LazyPDFViewer = lazy(() =>
-  import("@react-pdf/renderer").then((m) => ({ default: m.PDFViewer }))
-);
-const LazyEstimatePDF = lazy(() => import("../EstimatePDF/EstimatePDF"));
 
 function foldItems(items) {
   const map = new Map();
@@ -87,6 +75,50 @@ function foldItems(items) {
   return Array.from(map.values());
 }
 
+// lazy import for the PDF document component
+let EstimatePDFMod = null;
+async function importEstimatePDF() {
+  if (!EstimatePDFMod) {
+    const m = await import("../EstimatePDF/EstimatePDF");
+    EstimatePDFMod = m.default || m;
+  }
+  return EstimatePDFMod;
+}
+
+// render React-PDF element -> Blob (lazy import renderer)
+async function renderEstimateToBlob(EstimatePDF, props) {
+  const { pdf } = await import("@react-pdf/renderer");
+  const element = <EstimatePDF {...props} />;
+  return pdf(element).toBlob();
+}
+
+// Optional downscale to keep image small for faster PDF render
+async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
+  try {
+    if (!dataUrl || typeof createImageBitmap !== "function") return dataUrl;
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const bmp = await createImageBitmap(blob);
+    const { width, height } = bmp;
+    const long = Math.max(width, height);
+    if (long <= maxSize) {
+      bmp.close?.();
+      return dataUrl;
+    }
+    const scale = maxSize / long;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const out = canvas.toDataURL("image/jpeg", 0.85);
+    bmp.close?.();
+    return out;
+  } catch {
+    return dataUrl;
+  }
+}
+
 // ——— component ———
 const EstimateModal = ({
   isOpen,
@@ -100,8 +132,6 @@ const EstimateModal = ({
   products, // visible catalog (listed: true)
 }) => {
   const [logoUrl, setLogoUrl] = useState(null);
-
-  // NEW: full catalog for pricing (includes unlisted elbows/offsets)
   const [pricingCatalog, setPricingCatalog] = useState(null);
 
   // immutable meta (auto-only)
@@ -120,14 +150,13 @@ const EstimateModal = ({
   const pid = project?._id || "none";
   const adHocItems = adHocItemsByProject[pid] || [];
 
-  // add this just after adHocItemsByProject / pid
+  // project-scoped draft; “setAdHocDraft” is a local helper, not a state setter
   const [adHocDraftByProject, setAdHocDraftByProject] = useState({});
   const adHocDraft = adHocDraftByProject[pid] || {
     name: "",
     quantity: 1,
     price: 0,
   };
-
   const setAdHocDraft = (patch) =>
     setAdHocDraftByProject((prev) => ({
       ...prev,
@@ -137,7 +166,6 @@ const EstimateModal = ({
       },
     }));
 
-  // commit draft into the real list (this is what triggers the PDF update)
   const addAdHocFromDraft = () => {
     const name = String(adHocDraft.name || "").trim();
     const quantity = Number(adHocDraft.quantity || 0);
@@ -166,19 +194,16 @@ const EstimateModal = ({
     setAdHocDraft({ name: "", quantity: 1, price: 0 });
   };
 
-  // price column toggle
   const [showPrices, setShowPrices] = useState(true);
 
-  const handleSaveAndClose = async () => {
+  const handleSaveAndClose = useCallback(async () => {
     try {
       const token = localStorage.getItem("jwt");
       if (!token) throw new Error("Not authenticated.");
 
-      // ✅ robust project id: support both _id and id
       const projectIdToSend = project?._id || project?.id || "";
       if (!projectIdToSend) throw new Error("Missing projectId.");
 
-      // ✅ ensure a diagram payload exists (server expects diagram)
       const diagramLines = Array.isArray(selectedDiagram?.lines)
         ? selectedDiagram.lines
         : [];
@@ -225,7 +250,15 @@ const EstimateModal = ({
     } catch (e) {
       alert(e.message || "Failed to save estimate.");
     }
-  };
+  }, [
+    BASE_URL,
+    estimateData.estimateDate,
+    estimateData.notes,
+    project,
+    selectedDiagram,
+    buildSavableItems,
+    handleCloseModal,
+  ]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -233,7 +266,7 @@ const EstimateModal = ({
     }
   }, [isOpen, setSelectedDiagram]);
 
-  // company logo
+  // company logo (to data URL)
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     if (token && currentUser?._id) {
@@ -255,9 +288,9 @@ const EstimateModal = ({
           console.error("Failed to fetch and convert logo:", err)
         );
     }
-  }, [activeModal, currentUser?._id]);
+  }, [BASE_URL, activeModal, currentUser?._id]);
 
-  // NEW: fetch full catalog just for pricing (includes unlisted)
+  // fetch full catalog for pricing (includes unlisted); fallback to visible products
   useEffect(() => {
     const token = localStorage.getItem("jwt");
     if (!isOpen || !token) return;
@@ -284,22 +317,21 @@ const EstimateModal = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [BASE_URL, isOpen]);
 
   // Refresh source products when catalog changes so computed accessories re-map immediately
   useEffect(() => {
     const onBump = () => {
       setNotesDraft((s) => s);
     };
-    window.addEventListener("catalog:updated", onBump);
-    window.addEventListener("storage", (e) => {
+    const onStorage = (e) => {
       if (e.key === "catalogVersion") onBump();
-    });
+    };
+    window.addEventListener("catalog:updated", onBump);
+    window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("catalog:updated", onBump);
-      window.removeEventListener("storage", (e) => {
-        if (e.key === "catalogVersion") onBump();
-      });
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
@@ -350,7 +382,7 @@ const EstimateModal = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, currentUser?._id]);
+  }, [BASE_URL, isOpen, currentUser?._id]);
 
   const handleCloseModal = useCallback(() => {
     // clear the diagram selection when the modal closes
@@ -361,14 +393,8 @@ const EstimateModal = ({
   // Choose catalog for pricing — prefer full pricing catalog if loaded
   const catalogForPricing = pricingCatalog || products;
 
-  // Convert selectedDiagram.accessoryData (the tallies you saved earlier)
-  // into the same "items" shape we fold for the PDF.
-  //
-  // accessoryData looks like:
-  // [ { '5" K-Style': [ { type:'End Cap', price, quantity, product }, ... ] }, ... ]
   function itemsFromAccessoryData(accessoryData = []) {
     const out = [];
-    const norm = (s) => String(s || "").toLowerCase();
 
     accessoryData.forEach((bucket) => {
       if (!bucket || typeof bucket !== "object") return;
@@ -383,7 +409,7 @@ const EstimateModal = ({
           // End caps
           if (/end\s*cap/i.test(type)) {
             out.push({
-              name: product.name, // e.g., 5" K-Style End Cap
+              name: product.name,
               quantity: qty,
               price,
               product,
@@ -397,7 +423,6 @@ const EstimateModal = ({
 
           // Strip/Bay/Custom miters
           if (/miter/i.test(type)) {
-            // Derive miterType + degrees from the "type" OR from entry.angle
             let miterType = "";
             let degrees = null;
 
@@ -405,7 +430,6 @@ const EstimateModal = ({
             else if (/bay/i.test(type)) miterType = "Bay";
             else if (/custom/i.test(type)) miterType = "Custom";
 
-            // Try to extract angle if present in "Custom Miter (9°)" OR entry.angle
             const m = type.match(/(\d+)\s*°/);
             if (m) degrees = Number(m[1]);
             if (degrees == null && entry?.angle != null) {
@@ -413,7 +437,6 @@ const EstimateModal = ({
               if (!Number.isNaN(d)) degrees = d;
             }
 
-            // Optional: override visible name for customs to show angle explicitly
             const nameOverride =
               miterType === "Custom" && degrees != null
                 ? `Custom Miter (${degrees}°)`
@@ -426,14 +449,12 @@ const EstimateModal = ({
               product,
               meta: {
                 kind: "miter",
-                type: miterType, // server-canonical field
-                // keep extra fields to avoid any merging later
-                miterType, // tolerate client shape elsewhere
+                type: miterType,
+                miterType,
                 degrees: degrees ?? undefined,
                 profileKey,
               },
             });
-            return;
           }
         });
       });
@@ -442,18 +463,13 @@ const EstimateModal = ({
     return out;
   }
 
-  // Accessories (elbows/offsets/miters/end caps) computed live
   const computedAccessories = useMemo(() => {
-    // elbows/offsets computed from live lines
     const eo = computeAccessoriesFromLines(
       selectedDiagram?.lines || [],
       catalogForPricing || [],
       {}
     );
-    // miters + end caps from the diagram’s saved tallies
     const me = itemsFromAccessoryData(selectedDiagram?.accessoryData || []);
-
-    // Combine; no fold here — we fold once at the end of buildSavableItems()
     return [...eo, ...me];
   }, [
     selectedDiagram?.lines,
@@ -461,15 +477,11 @@ const EstimateModal = ({
     catalogForPricing,
   ]);
 
-  // Merge any saved accessories with the freshly computed ones (prevents stale diagrams from hiding offsets)
-
-  // Preview should reflect the diagram *right now*, not previously saved accessories
   const mergedAccessories = useMemo(
     () => computedAccessories,
     [computedAccessories]
   );
 
-  // ad-hoc handlers
   const addAdHoc = useCallback(() => {
     setAdHocItemsByProject((prev) => {
       const list = prev[pid] || [];
@@ -497,11 +509,6 @@ const EstimateModal = ({
         [pid]: list.map((it) => (it.id === id ? { ...it, ...patch } : it)),
       };
     });
-
-  // Commit the notesDraft into estimateData.notes
-  const commitNotes = useCallback(() => {
-    setEstimateData((prev) => ({ ...prev, notes: notesDraft || "" }));
-  }, [notesDraft]);
 
   const removeAdHoc = (id) =>
     setAdHocItemsByProject((prev) => {
@@ -556,10 +563,129 @@ const EstimateModal = ({
         price: Number(it.price || 0),
       });
     });
-    return foldItems(rows);
+
+    return Object.freeze(foldItems(rows));
   }, [selectedDiagram?.lines, mergedAccessories, adHocItems]);
 
-  // header
+  // commit notes — moved inside component scope
+  const commitNotes = useCallback(() => {
+    setEstimateData((prev) => ({
+      ...prev,
+      notes: notesDraft || "",
+    }));
+  }, [notesDraft]);
+
+  // ======= PDF preview via blob + <iframe> with debounce & guards =======
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [isRendering, setIsRendering] = useState(false);
+  const abortRef = useRef({ aborted: false });
+  const timerRef = useRef(0);
+
+  // small, stable signature for rebuilds (avoid stringifying big objects)
+  const pdfKey = useMemo(() => {
+    const d = selectedDiagram || {};
+    const imgLen = d.imageData ? d.imageData.length : 0;
+    const linesN = Array.isArray(d.lines) ? d.lines.length : 0;
+    const accN = Array.isArray(mergedAccessories)
+      ? mergedAccessories.length
+      : 0;
+    const itemsN =
+      (Array.isArray(adHocItems) ? adHocItems.length : 0) +
+      (Array.isArray(buildSavableItems()) ? buildSavableItems().length : 0);
+    const show = showPrices ? 1 : 0;
+    const date = estimateData?.estimateDate || "";
+    const num = estimateData?.estimateNumber || "";
+    const logo = logoUrl ? 1 : 0;
+    return [imgLen, linesN, accN, itemsN, show, date, num, logo].join("|");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedDiagram?.imageData,
+    selectedDiagram?.lines,
+    mergedAccessories,
+    adHocItems,
+    buildSavableItems,
+    showPrices,
+    estimateData?.estimateDate,
+    estimateData?.estimateNumber,
+    logoUrl,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(async () => {
+      if (isRendering) return; // prevent overlap
+      let revoke;
+      abortRef.current.aborted = false;
+      setIsRendering(true);
+
+      try {
+        // allow modal to paint first
+        await new Promise((r) => setTimeout(r, 0));
+
+        const Doc = await importEstimatePDF();
+
+        // build normalized props snapshot
+        const normalizedLines = (selectedDiagram?.lines || []).map((l) =>
+          l.isDownspout
+            ? { ...l, downspoutSize: prettyDsName(l.downspoutSize) }
+            : l
+        );
+
+        const prepared = {
+          estimate,
+          selectedDiagram: {
+            ...selectedDiagram,
+            lines: normalizedLines,
+            accessories: { items: mergedAccessories },
+          },
+          items: buildSavableItems(),
+          currentUser,
+          logoUrl,
+          estimateData,
+          project,
+          products,
+          showPrices,
+          extraItems: adHocItems,
+        };
+
+        // shrink diagram image if huge
+        if (prepared.selectedDiagram?.imageData) {
+          const downsized = await maybeDownscaleDataUrl(
+            prepared.selectedDiagram.imageData
+          );
+          if (abortRef.current.aborted) return;
+          prepared.selectedDiagram.imageData = downsized;
+        }
+
+        if (abortRef.current.aborted) return;
+        const blob = await renderEstimateToBlob(Doc, prepared);
+        if (abortRef.current.aborted) return;
+
+        const url = URL.createObjectURL(blob);
+        revoke = () => URL.revokeObjectURL(url);
+        setPdfUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+      } catch (e) {
+        console.error("PDF render failed:", e);
+      } finally {
+        if (!abortRef.current.aborted) setIsRendering(false);
+      }
+    }, 300); // debounce
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      abortRef.current.aborted = true;
+    };
+  }, [
+    isOpen,
+    pdfKey,
+    // NOTE: do not depend directly on large objects to avoid thrash
+  ]);
+
   const headerBar = (
     <div
       style={{
@@ -592,9 +718,7 @@ const EstimateModal = ({
         </label>
 
         <button
-          onClick={() => {
-            setEstimateData((s) => ({ ...s, notes: notesDraft }));
-          }}
+          onClick={commitNotes}
           style={{
             padding: "8px 12px",
             borderRadius: 8,
@@ -665,7 +789,7 @@ const EstimateModal = ({
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                commitNotes(); // Commit notes on Enter key
+                commitNotes();
               }
             }}
             value={notesDraft}
@@ -758,7 +882,7 @@ const EstimateModal = ({
             </button>
           </div>
 
-          {/* READ-ONLY LIST of committed items (doesn't rerender while typing in the adder) */}
+          {/* READ-ONLY LIST of committed items */}
           <div style={{ display: "grid", gap: 6 }}>
             {adHocItems.length === 0 ? (
               <div style={{ color: "#aaa", fontSize: 12 }}>
@@ -810,32 +934,17 @@ const EstimateModal = ({
         </div>
       </div>
 
-      {/* PDF */}
+      {/* PDF area: visually identical container */}
       <div style={{ width: "100%", height: "calc(100% - 210px)" }}>
-        <Suspense fallback={<div style={{ padding: 8 }}>Loading preview…</div>}>
-          <LazyPDFViewer style={{ width: "100%", height: "100%" }}>
-            <LazyEstimatePDF
-              estimate={estimate}
-              selectedDiagram={{
-                ...selectedDiagram,
-                lines: (selectedDiagram?.lines || []).map((l) =>
-                  l.isDownspout
-                    ? { ...l, downspoutSize: prettyDsName(l.downspoutSize) }
-                    : l
-                ),
-                accessories: { items: mergedAccessories },
-              }}
-              items={buildSavableItems()}
-              currentUser={currentUser}
-              logoUrl={logoUrl}
-              estimateData={estimateData}
-              project={project}
-              products={products}
-              showPrices={showPrices}
-              extraItems={adHocItems}
-            />
-          </LazyPDFViewer>
-        </Suspense>
+        {!pdfUrl ? (
+          <div style={{ padding: 8 }}>Loading preview…</div>
+        ) : (
+          <iframe
+            title="Estimate Preview"
+            src={pdfUrl}
+            style={{ width: "100%", height: "100%", border: "none" }}
+          />
+        )}
       </div>
     </Modal>
   );

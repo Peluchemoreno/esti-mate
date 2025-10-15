@@ -8,4 +8,15 @@ export default defineConfig({
   server: {
     port: 9000,
   },
+  resolve: {
+    alias: {
+      buffer: "buffer", // ensure it resolves
+    },
+  },
+  optimizeDeps: {
+    include: ["buffer"], // prebundle
+  },
+  define: {
+    "process.env": {}, // avoid undefined at runtime
+  },
 });
