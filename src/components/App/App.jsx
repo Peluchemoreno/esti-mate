@@ -11,6 +11,7 @@ import CurrentUserContext from "../../contexts/CurrentUserContext/CurrentUserCon
 import { useState, useEffect, useCallback } from "react";
 import { ProductsProvider } from "../../contexts/ProductsContext";
 import { useSearchParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   signin,
   getUser,
@@ -54,6 +55,8 @@ function App() {
   const [authState, setAuthState] = useState({
     token: localStorage.getItem("jwt") || null,
   });
+  const location = useLocation();
+  const showDiagram = location.pathname.startsWith("/dashboard");
 
   useEffect(() => {
     const onStorage = () => {
@@ -341,10 +344,27 @@ function App() {
               <Route path="/billing/success" element={<BillingSuccess />} />
               <Route path="/billing/cancelled" element={<BillingCancelled />} />
             </Routes>
-            <>
-              {mobileDiagramActive ? (
-                <>
-                  <DisablePullToRefresh />
+            {showDiagram && (
+              <>
+                {mobileDiagramActive ? (
+                  <>
+                    <DisablePullToRefresh />
+                    <Diagram
+                      activeModal={activeModal}
+                      closeModal={closeModal}
+                      isMobile={isMobile}
+                      currentProjectId={currentProjectId}
+                      updateDiagram={updateDiagram}
+                      addDiagramToProject={addDiagramToProject}
+                      handlePassDiagramData={handlePassDiagramData}
+                      selectedDiagram={currentDiagram}
+                      originalDiagram={originalDiagram}
+                      setSelectedDiagram={setCurrentDiagram}
+                      setActiveModal={setActiveModal}
+                      diagrams={diagrams}
+                    />
+                  </>
+                ) : (
                   <Diagram
                     activeModal={activeModal}
                     closeModal={closeModal}
@@ -354,29 +374,14 @@ function App() {
                     addDiagramToProject={addDiagramToProject}
                     handlePassDiagramData={handlePassDiagramData}
                     selectedDiagram={currentDiagram}
-                    originalDiagram={originalDiagram}
                     setSelectedDiagram={setCurrentDiagram}
+                    originalDiagram={originalDiagram}
                     setActiveModal={setActiveModal}
                     diagrams={diagrams}
                   />
-                </>
-              ) : (
-                <Diagram
-                  activeModal={activeModal}
-                  closeModal={closeModal}
-                  isMobile={isMobile}
-                  currentProjectId={currentProjectId}
-                  updateDiagram={updateDiagram}
-                  addDiagramToProject={addDiagramToProject}
-                  handlePassDiagramData={handlePassDiagramData}
-                  selectedDiagram={currentDiagram}
-                  setSelectedDiagram={setCurrentDiagram}
-                  originalDiagram={originalDiagram}
-                  setActiveModal={setActiveModal}
-                  diagrams={diagrams}
-                />
-              )}
-            </>
+                )}
+              </>
+            )}
           </div>
         </>
       </ProductsProvider>

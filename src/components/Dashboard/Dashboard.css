@@ -50,7 +50,8 @@
   }
 
   .dashboard__hadmburger-menu-icon {
-    display: block;
+    display: inline-block;
+    background-color: red;
   }
 
   .dashboard__link {
@@ -64,4 +65,67 @@
   .dashboard__header {
     padding: 10px;
   }
+}
+
+/* ensure header stays above content */
+.dashboard__header { z-index: 1000; }
+
+/* base: show desktop links, hide hamburger */
+.dashboard__hamburger-btn { display: none; background: transparent; border: 0; padding: 8px; }
+.dashboard__hamburger-icon { width: 30px; height: 30px; display: block; }
+
+/* overlay behind the mobile sheet */
+.dashboard__overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 998;
+}
+
+/* mobile sheet (hidden by default) */
+.dashboard__mobile {
+  position: fixed;
+  top: 0; right: 0; left: 0;
+  transform: translateY(-100%);
+  transition: transform .25s ease;
+  background: var(--black);
+  padding: 72px 16px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+  z-index: 999;
+}
+.dashboard__mobile.is-open { transform: translateY(0); }
+
+.dashboard__navlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.dashboard__navlink {
+  display: block;
+  padding: 12px;
+  color: var(--white);
+  text-decoration: none;
+  background: rgba(255,255,255,.06);
+  border-radius: 10px;
+}
+.dashboard__navlink:hover { background: rgba(255,255,255,.12); }
+
+.dashboard__logout {
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.25);
+  background: transparent;
+  color: var(--white);
+  cursor: pointer;
+}
+
+/* MOBILE: hide desktop links/account; show hamburger */
+@media screen and (max-width: 650px) {
+  .dashboard__account-link { display: none; }
+  .dashboard__link { display: none; }
+  .dashboard__logo { margin: 0; width: 50px; }
+  .dashboard__header { padding: 10px; }
+  .dashboard__hamburger-btn { display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* DESKTOP: hide mobile sheet & overlay regardless of state */
+@media screen and (min-width: 651px) {
+  .dashboard__mobile, .dashboard__overlay { display: none !important; }
 }
