@@ -677,6 +677,13 @@ const Diagram = ({
     }
   }, [filteredProducts, tool]);
 
+  const savedGrid = Number(metaIn.gridSize) || gridSize;
+  const savedFeet = Number(metaIn.feetPerSquare) || feetPerSquare;
+  // Do not push raw savedGrid directly; we must match the geometric scale below.
+  if (metaIn && (metaIn.gridSize || metaIn.feetPerSquare)) {
+    if (savedFeet !== feetPerSquare) setFeetPerSquare(savedFeet);
+  }
+
   // hydrate lines when a diagram is selected
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -703,6 +710,7 @@ const Diagram = ({
     // If this diagram was saved on a different canvas size, scale coordinates
     const sx = curW / savedW;
     const sy = curH / savedH;
+    const kAvg = (sx + sy) / 2; // keep px/ft stable across anisotropic scale
 
     const scaleLine = (l) => {
       const copy = { ...l };
@@ -752,6 +760,12 @@ const Diagram = ({
       ...scaleLine(l),
     }));
 
+    // Align gridSize with the same overall geometric scaling applied to coordinates
+    if (metaIn && (metaIn.gridSize || metaIn.feetPerSquare)) {
+      const desiredGrid = Math.max(1, savedGrid * kAvg);
+      if (Math.abs(desiredGrid - gridSize) > 0.1) setGridSize(desiredGrid);
+    }
+
     // ----- Auto-fit once if content exceeds canvas by >10% -----
     const bbox = contentBBox(withIds);
     if (!bbox.empty) {
@@ -791,6 +805,8 @@ const Diagram = ({
           if (copy.centerY != null) copy.centerY += offY;
           return copy;
         });
+        // VERY IMPORTANT: scale gridSize by the same k to preserve px-per-foot
+        setGridSize((g) => Math.max(1, g * k));
       }
     }
 
