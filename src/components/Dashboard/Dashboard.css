@@ -92,7 +92,7 @@
   border-bottom: 1px solid rgba(255,255,255,.12);
   z-index: 999;
 }
-.dashboard__mobile.is-open { transform: translateY(0); }
+.dashboard__mobile.is-open { transform: translateY(30px); }
 
 .dashboard__navlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .dashboard__navlink {

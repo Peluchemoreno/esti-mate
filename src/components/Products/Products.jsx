@@ -1,7 +1,9 @@
 // src/components/Products/Products.jsx
 import "./Products.css";
-import { DataGrid, gridNumberComparator } from "@mui/x-data-grid";
-import { Box } from "@mui/material/";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+
+import { DataGrid } from "@mui/x-data-grid";
+import { Box, useMediaQuery } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import AddProductModal from "../AddProductModal/AddProductModal";
 import EditProductModal from "../EditProductModal/EditProductModal";
@@ -12,17 +14,15 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export default function Products({ activeModal, setActiveModal, closeModal }) {
   const { refresh } = useProductsCatalog();
-  const { data: products = [], isLoading, error } = useProductsListed();
+  const { data: products = [] } = useProductsListed();
   const [tableRows, setTableRows] = useState([]);
   const [currentItem, setCurrentItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const queryClient = useQueryClient();
 
-  const isGutter = (p) => p?.type === "gutter";
-
-  // prefers a saved user color, falls back to template defaults some UIs use
-  const resolveColor = (p) =>
-    p?.color || p?.colorCode || p?.defaultColor || p?.visual || null;
+  // Responsive breakpoints
+  const isSm = useMediaQuery("(max-width: 640px)");
+  const isXs = useMediaQuery("(max-width: 360px)");
 
   // Deduplicate defensively by _id (guards against double fetches/StrictMode)
   const uniqueRows = useMemo(() => {
@@ -149,7 +149,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
     []
   );
 
-  // Fetch once (and when modal closes after create/edit)
+  // Load rows when products change or after modal actions
   useEffect(() => {
     const list = Array.isArray(products) ? products : [];
     setTableRows(list);
@@ -182,13 +182,35 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
       }
     });
   }
+  const gridTheme = useMemo(
+    () =>
+      createTheme({
+        palette: { mode: "dark" },
+        components: {
+          MuiDataGrid: {
+            styleOverrides: {
+              root: { backgroundColor: "transparent" },
+              columnHeaders: { backgroundColor: "transparent" },
+              footerContainer: { backgroundColor: "transparent" },
+            },
+          },
+          MuiTablePagination: {
+            styleOverrides: {
+              root: { color: "var(--white)" },
+            },
+          },
+        },
+      }),
+    []
+  );
 
   return (
     <>
       <div className="products">
         <div className="products__header">
           <h3 className="products__header-title">Products</h3>
-          {/* <button className="products__create-item-button" onClick={handleAddItemClick}>
+          {/* Optional: enable to add items here
+          <button className="products__create-item-button" onClick={handleAddItemClick}>
             + Item
           </button> */}
         </div>
@@ -201,25 +223,39 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
               className="products__search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "8px",
-                fontSize: "14px",
-                borderRadius: "4px",
-                border: "1px solid #ccc",
-                color: "var(--white)",
-              }}
             />
           </div>
 
-          <DataGrid
-            rows={filteredRows}
-            columns={columns}
-            getRowId={(row) => row._id}
-            sx={{ color: "white" }}
-            autoHeight
-            disableRowSelectionOnClick
-          />
+          <ThemeProvider theme={gridTheme}>
+            <DataGrid
+              rows={filteredRows}
+              columns={columns}
+              getRowId={(row) => row._id}
+              autoHeight
+              disableRowSelectionOnClick
+              density={isSm ? "compact" : "standard"}
+              columnVisibilityModel={{
+                visual: !isSm, // hide Visual on small screens
+                quantity: !isXs, // hide Quantity on extra-narrow screens
+              }}
+              sx={{
+                backgroundColor: "transparent",
+                color: "var(--white)",
+                "& .MuiDataGrid-columnHeaders": {
+                  backgroundColor: "transparent",
+                },
+                "& .MuiDataGrid-footerContainer": {
+                  backgroundColor: "transparent",
+                },
+                "& .MuiTablePagination-root": { color: "var(--white)" },
+                "& .MuiDataGrid-cell": { color: "var(--white)" },
+                "& .MuiDataGrid-columnSeparator": { opacity: 0.15 },
+                "& .MuiDataGrid-withBorderColor": {
+                  borderColor: "rgba(255,255,255,.15)",
+                },
+              }}
+            />
+          </ThemeProvider>
         </Box>
       </div>
 

@@ -57,3 +57,34 @@ path {
  padding-left: 10px;
 }
 
+/* PRODUCTS LAYOUT */
+.products { width: 100%; }
+.products__header { display: flex; align-items: center; justify-content: space-between; }
+.products__header-title { margin: 10px 0; padding-left: 0; font-weight: 700; font-size: 20px; }
+.products__search-input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: var(--white); }
+
+/* STABLE MUI OVERRIDES — kill white header/footer rows in prod */
+.MuiDataGrid-root { background: transparent; color: var(--white); }
+.MuiDataGrid-columnHeaders { background: transparent !important; }
+.MuiDataGrid-footerContainer { background: transparent !important; }
+.MuiTablePagination-root { color: var(--white) !important; }
+
+/* cells/rows */
+.MuiDataGrid-cell { padding: 0 !important; }
+.MuiDataGrid-row, .MuiDataGrid-virtualScrollerRenderZone { background: transparent; }
+
+/* optional: lighten separators */
+.MuiDataGrid-columnSeparator { opacity: .15; }
+.MuiDataGrid-withBorderColor { border-color: rgba(255,255,255,.15) !important; }
+
+/* SVGs inside grid (sort icons, etc.) */
+.MuiSvgIcon-root path { fill: var(--white); }
+
+/* MOBILE TWEAKS */
+@media (max-width: 640px) {
+  .products__header { padding: 0 10px; }
+  .products__header-title { font-size: 18px; }
+}
+
+/* Keep these from your current file if you need them */
+.cell-data { padding-left: 10px; }
