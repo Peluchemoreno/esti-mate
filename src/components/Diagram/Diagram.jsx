@@ -795,7 +795,10 @@ const Diagram = ({
     }
 
     // clamp to canvas and reject invalids
-    withIds = sanitizeLines(withIds, curW, curH);
+    // clamp to canvas and reject invalids
+    withIds = sanitizeLines(withIds, curW, curH)
+      // clear any cached derived props so we never render stale labels
+      .map((l) => ({ ...l, measurement: undefined, midpoint: undefined }));
 
     // draw the scaled content exactly as your code does now
     setLines(withIds);
@@ -1355,14 +1358,21 @@ const Diagram = ({
       ctx.fill();
     }
 
-    if (line.midpoint && line.measurement) {
-      placeMeasurement(
-        line,
-        line.measurement,
-        line.midpoint[0],
-        line.midpoint[1]
-      );
-    }
+    // Derive fresh label position & feet from snapped endpoints
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+    const feetNow = convertToFeet(calculateDistance([x1, y1], [x2, y2]));
+    placeMeasurement(
+      {
+        ...line,
+        isHorizontal: line.isHorizontal,
+        isVertical: line.isVertical,
+        position: line.position,
+      },
+      feetNow,
+      midX,
+      midY
+    );
   }
 
   async function saveCurrentDiagram() {
