@@ -1,4 +1,5 @@
 import "./App.css";
+import "../../shims/buffer";
 import LandingPage from "../LandingPage/LandingPage";
 import CheckoutReturn from "../Stripe/CheckoutReturn";
 import Stripe from "../Stripe/Stripe";
