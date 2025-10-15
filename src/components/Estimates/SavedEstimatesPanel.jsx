@@ -1,8 +1,6 @@
 // src/components/Estimates/SavedEstimatesPanel.jsx
 import { useEffect, useMemo, useState } from "react";
 import EstimateViewerModal from "../Estimates/EstimateViewerModal";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import EstimatePDF from "../EstimatePDF/EstimatePDF";
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 const brand = {
@@ -56,6 +54,9 @@ export default function SavedEstimatesPanel({
       setLoading(false);
     }
   };
+
+  // simple in-memory blob cache for this tab/session
+  const pdfBlobCache = new Map(); // key: `${id}|${updatedAt}` -> Blob
 
   useEffect(() => {
     const onCreated = () => {
@@ -141,6 +142,102 @@ export default function SavedEstimatesPanel({
       alert(e.message || "Failed to delete");
     }
   };
+
+  async function downloadPDF(est) {
+    if (!est?._id) return;
+    const key = `${est._id}|${est.updatedAt || ""}`;
+    const cached = pdfBlobCache.get(key);
+    if (cached) {
+      const url = URL.createObjectURL(cached);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Estimate-${String(est.estimateNumber || 0).padStart(
+        3,
+        "0"
+      )}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    // fetch full detail only when needed (keeps list lean). Route unchanged. :contentReference[oaicite:1]{index=1}
+    const token = localStorage.getItem("jwt");
+    const res = await fetch(`${BASE_URL}api/estimates/${est._id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    const doc = data?.estimate;
+    if (!doc) return alert("Failed to load estimate.");
+    // lazy-load heavy libs only now
+    const [{ pdf }, { default: EstimatePDF }] = await Promise.all([
+      import("@react-pdf/renderer"),
+      import("../EstimatePDF/EstimatePDF"),
+    ]);
+    // build minimal props similar to viewer (keeps behavior identical). :contentReference[oaicite:2]{index=2}
+    const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
+    const element = (
+      <EstimatePDF
+        selectedDiagram={{
+          imageData: doc?.diagram?.imageData || null,
+          lines: Array.isArray(doc?.diagram?.lines) ? doc.diagram.lines : [],
+          accessories: doc?.accessories || undefined,
+        }}
+        currentUser={currentUser}
+        logoUrl={logoUrl}
+        estimateData={{
+          estimateNumber: paddedNum,
+          estimateDate: doc.estimateDate || "",
+          paymentDue: doc.paymentDue || "Upon completion.",
+          notes: doc.notes || "",
+        }}
+        project={{
+          // keep same precedence as viewer modal
+          billingName:
+            project?.billingName ?? doc?.projectSnapshot?.billingName ?? "",
+          billingAddress:
+            project?.billingAddress ??
+            doc?.projectSnapshot?.billingAddress ??
+            "",
+          billingPrimaryPhone:
+            project?.billingPrimaryPhone ??
+            doc?.projectSnapshot?.billingPrimaryPhone ??
+            "",
+          projectName:
+            project?.projectName ??
+            doc?.projectSnapshot?.projectName ??
+            project?.name ??
+            "",
+          projectAddress:
+            project?.projectAddress ??
+            doc?.projectSnapshot?.projectAddress ??
+            project?.address ??
+            "",
+          name: project?.projectName ?? doc?.projectSnapshot?.projectName ?? "",
+          address:
+            project?.projectAddress ??
+            doc?.projectSnapshot?.projectAddress ??
+            "",
+        }}
+        items={(doc.items || []).map((it) => ({
+          name: it.name,
+          quantity: Number(it.quantity || 0),
+          price: Number(it.price || 0),
+        }))}
+        showPrices={true}
+      />
+    );
+    const blob = await pdf(element).toBlob();
+    pdfBlobCache.set(key, blob);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Estimate-${paddedNum}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div

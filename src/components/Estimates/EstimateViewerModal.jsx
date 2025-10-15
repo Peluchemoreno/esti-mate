@@ -24,7 +24,7 @@ export default function EstimateViewerModal({
   const token =
     typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
 
-  const [doc, setDoc] = useState(fallbackEstimate || null);
+  const [doc, setDoc] = useState(() => fallbackEstimate || null);
   const [logoUrl, setLogoUrl] = useState(null);
   const [loading, setLoading] = useState(false);
 

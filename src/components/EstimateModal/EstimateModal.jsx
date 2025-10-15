@@ -1,8 +1,13 @@
 // src/components/EstimateModal/EstimateModal.jsx
 import Modal from "react-modal";
-import { PDFViewer } from "@react-pdf/renderer";
-import EstimatePDF from "../EstimatePDF/EstimatePDF";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { computeAccessoriesFromLines } from "../../utils/priceResolver";
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -18,13 +23,11 @@ const prettyDsName = (raw = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-// Commit the notesDraft into estimateData.notes (same as your Save Notes button)
-const commitNotes = () => {
-  setEstimateData((prev) => ({
-    ...prev,
-    notes: notesDraft || "",
-  }));
-};
+// lazy imports to keep modal open fast; viewer hydrates right after paint
+const LazyPDFViewer = lazy(() =>
+  import("@react-pdf/renderer").then((m) => ({ default: m.PDFViewer }))
+);
+const LazyEstimatePDF = lazy(() => import("../EstimatePDF/EstimatePDF"));
 
 function foldItems(items) {
   const map = new Map();
@@ -495,6 +498,11 @@ const EstimateModal = ({
       };
     });
 
+  // Commit the notesDraft into estimateData.notes
+  const commitNotes = useCallback(() => {
+    setEstimateData((prev) => ({ ...prev, notes: notesDraft || "" }));
+  }, [notesDraft]);
+
   const removeAdHoc = (id) =>
     setAdHocItemsByProject((prev) => {
       const list = prev[pid] || [];
@@ -804,28 +812,30 @@ const EstimateModal = ({
 
       {/* PDF */}
       <div style={{ width: "100%", height: "calc(100% - 210px)" }}>
-        <PDFViewer style={{ width: "100%", height: "100%" }}>
-          <EstimatePDF
-            estimate={estimate}
-            selectedDiagram={{
-              ...selectedDiagram,
-              lines: (selectedDiagram?.lines || []).map((l) =>
-                l.isDownspout
-                  ? { ...l, downspoutSize: prettyDsName(l.downspoutSize) }
-                  : l
-              ),
-              accessories: { items: mergedAccessories },
-            }}
-            items={buildSavableItems()}
-            currentUser={currentUser}
-            logoUrl={logoUrl}
-            estimateData={estimateData}
-            project={project}
-            products={products} // UI list (unchanged)
-            showPrices={showPrices}
-            extraItems={adHocItems}
-          />
-        </PDFViewer>
+        <Suspense fallback={<div style={{ padding: 8 }}>Loading preview…</div>}>
+          <LazyPDFViewer style={{ width: "100%", height: "100%" }}>
+            <LazyEstimatePDF
+              estimate={estimate}
+              selectedDiagram={{
+                ...selectedDiagram,
+                lines: (selectedDiagram?.lines || []).map((l) =>
+                  l.isDownspout
+                    ? { ...l, downspoutSize: prettyDsName(l.downspoutSize) }
+                    : l
+                ),
+                accessories: { items: mergedAccessories },
+              }}
+              items={buildSavableItems()}
+              currentUser={currentUser}
+              logoUrl={logoUrl}
+              estimateData={estimateData}
+              project={project}
+              products={products}
+              showPrices={showPrices}
+              extraItems={adHocItems}
+            />
+          </LazyPDFViewer>
+        </Suspense>
       </div>
     </Modal>
   );
