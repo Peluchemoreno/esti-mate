@@ -196,70 +196,6 @@ const EstimateModal = ({
 
   const [showPrices, setShowPrices] = useState(true);
 
-  const handleSaveAndClose = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("jwt");
-      if (!token) throw new Error("Not authenticated.");
-
-      const projectIdToSend = project?._id || project?.id || "";
-      if (!projectIdToSend) throw new Error("Missing projectId.");
-
-      const diagramLines = Array.isArray(selectedDiagram?.lines)
-        ? selectedDiagram.lines
-        : [];
-      const diagramImage = selectedDiagram?.imageData || null;
-      if (!diagramLines.length && !diagramImage) {
-        throw new Error("Missing diagram.");
-      }
-
-      const items = buildSavableItems();
-
-      const body = {
-        projectId: projectIdToSend,
-        projectSnapshot: {
-          name: project?.projectName || "",
-          address: project?.address || "",
-        },
-        diagram: {
-          imageData: diagramImage,
-          lines: diagramLines,
-        },
-        items,
-        estimateDate: estimateData.estimateDate,
-        notes: estimateData.notes || "",
-      };
-
-      const res = await fetch(`${BASE_URL}api/estimates`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || `HTTP ${res.status}`);
-      }
-
-      // notify the SavedEstimatesPanel to refresh
-      window.dispatchEvent(new Event("estimate-created"));
-
-      handleCloseModal();
-    } catch (e) {
-      alert(e.message || "Failed to save estimate.");
-    }
-  }, [
-    BASE_URL,
-    estimateData.estimateDate,
-    estimateData.notes,
-    project,
-    selectedDiagram,
-    buildSavableItems,
-    handleCloseModal,
-  ]);
-
   useEffect(() => {
     if (!isOpen) {
       setSelectedDiagram({});
@@ -384,12 +320,6 @@ const EstimateModal = ({
     };
   }, [BASE_URL, isOpen, currentUser?._id]);
 
-  const handleCloseModal = useCallback(() => {
-    // clear the diagram selection when the modal closes
-    setSelectedDiagram({});
-    if (onClose) onClose();
-  }, [onClose, setSelectedDiagram]);
-
   // Choose catalog for pricing — prefer full pricing catalog if loaded
   const catalogForPricing = pricingCatalog || products;
 
@@ -482,40 +412,7 @@ const EstimateModal = ({
     [computedAccessories]
   );
 
-  const addAdHoc = useCallback(() => {
-    setAdHocItemsByProject((prev) => {
-      const list = prev[pid] || [];
-      return {
-        ...prev,
-        [pid]: [
-          ...list,
-          {
-            id: crypto.randomUUID?.() || String(Date.now()),
-            name: "",
-            description: "",
-            quantity: 1,
-            price: 0,
-          },
-        ],
-      };
-    });
-  }, [pid]);
-
-  const updateAdHoc = (id, patch) =>
-    setAdHocItemsByProject((prev) => {
-      const list = prev[pid] || [];
-      return {
-        ...prev,
-        [pid]: list.map((it) => (it.id === id ? { ...it, ...patch } : it)),
-      };
-    });
-
-  const removeAdHoc = (id) =>
-    setAdHocItemsByProject((prev) => {
-      const list = prev[pid] || [];
-      return { ...prev, [pid]: list.filter((it) => it.id !== id) };
-    });
-
+  // —— define BEFORE any hook that references it ——
   const buildSavableItems = useCallback(() => {
     const rows = [];
 
@@ -567,7 +464,14 @@ const EstimateModal = ({
     return Object.freeze(foldItems(rows));
   }, [selectedDiagram?.lines, mergedAccessories, adHocItems]);
 
-  // commit notes — moved inside component scope
+  // define BEFORE handleSaveAndClose (it depends on this)
+  const handleCloseModal = useCallback(() => {
+    // clear the diagram selection when the modal closes
+    setSelectedDiagram({});
+    if (onClose) onClose();
+  }, [onClose, setSelectedDiagram]);
+
+  // commit notes — inside component scope
   const commitNotes = useCallback(() => {
     setEstimateData((prev) => ({
       ...prev,
@@ -608,6 +512,71 @@ const EstimateModal = ({
     estimateData?.estimateDate,
     estimateData?.estimateNumber,
     logoUrl,
+  ]);
+
+  // now it’s safe to define this: it references buildSavableItems + handleCloseModal
+  const handleSaveAndClose = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("jwt");
+      if (!token) throw new Error("Not authenticated.");
+
+      const projectIdToSend = project?._id || project?.id || "";
+      if (!projectIdToSend) throw new Error("Missing projectId.");
+
+      const diagramLines = Array.isArray(selectedDiagram?.lines)
+        ? selectedDiagram.lines
+        : [];
+      const diagramImage = selectedDiagram?.imageData || null;
+      if (!diagramLines.length && !diagramImage) {
+        throw new Error("Missing diagram.");
+      }
+
+      const items = buildSavableItems();
+
+      const body = {
+        projectId: projectIdToSend,
+        projectSnapshot: {
+          name: project?.projectName || "",
+          address: project?.address || "",
+        },
+        diagram: {
+          imageData: diagramImage,
+          lines: diagramLines,
+        },
+        items,
+        estimateDate: estimateData.estimateDate,
+        notes: estimateData.notes || "",
+      };
+
+      const res = await fetch(`${BASE_URL}api/estimates`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `HTTP ${res.status}`);
+      }
+
+      // notify the SavedEstimatesPanel to refresh
+      window.dispatchEvent(new Event("estimate-created"));
+
+      handleCloseModal();
+    } catch (e) {
+      alert(e.message || "Failed to save estimate.");
+    }
+  }, [
+    BASE_URL,
+    estimateData.estimateDate,
+    estimateData.notes,
+    project,
+    selectedDiagram,
+    buildSavableItems,
+    handleCloseModal,
   ]);
 
   useEffect(() => {
