@@ -295,6 +295,32 @@ function normalizeGutterKey(name = "") {
   return chunk ? `${size} ${titleCase(chunk)}` : size;
 }
 
+// Async replacement for canvas.toDataURL() to avoid blocking the main thread
+function canvasToDataURLAsync(canvas, type = "image/png", quality) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (canvas.toBlob) {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return resolve("");
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          },
+          type,
+          quality
+        );
+      } else {
+        // Fallback (older Safari), still synchronous but rarely hit
+        resolve(canvas.toDataURL(type, quality));
+      }
+    } catch (e) {
+      resolve("");
+    }
+  });
+}
+
 // ======= Component =======
 const Diagram = ({
   activeModal,
@@ -338,6 +364,29 @@ const Diagram = ({
       drawScene();
     }
   }, [activeModal]);
+
+  // When opening the modal to create a NEW diagram, make sure canvas is blank
+  useEffect(() => {
+    if (activeModal !== "diagram") return;
+
+    const hasId =
+      selectedDiagram &&
+      typeof selectedDiagram === "object" &&
+      selectedDiagram._id;
+
+    // If we are not editing an existing diagram, clear everything
+    if (!hasId) {
+      setLines([]);
+      setSelectedIndex(null);
+      setIsDrawing(false);
+      // reset baseline so "no changes" logic doesn't block first save
+      if (baselineHashRef && "current" in baselineHashRef) {
+        baselineHashRef.current = hashLines([]);
+      }
+      // draw a fresh scene
+      drawScene();
+    }
+  }, [activeModal, selectedDiagram]);
 
   // Observe container size + window zoom
   useEffect(() => {
@@ -2180,10 +2229,10 @@ const Diagram = ({
     const tempCanvas = document.createElement("canvas");
     const tempCtx = tempCanvas.getContext("2d");
 
-    // fixed, crisp thumb regardless of device
-    const thumbnailDisplaySize = 200;
-    const thumbnailInternalSize = 3 * thumbnailDisplaySize;
+    const thumbnailDisplaySize = 180;
+    const thumbnailInternalSize = 2 * thumbnailDisplaySize; // 360px square is plenty
 
+    // fixed, crisp thumb regardless of device
     tempCanvas.width = thumbnailInternalSize;
     tempCanvas.height = thumbnailInternalSize;
     tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
@@ -2210,7 +2259,11 @@ const Diagram = ({
     // draw from the hi-DPI source rect
     tempCtx.drawImage(canvas, srcX, srcY, srcW, srcH, dx, dy, destW, destH);
 
-    const thumbnailDataUrl = tempCanvas.toDataURL("image/png");
+    const thumbnailDataUrl = await canvasToDataURLAsync(
+      tempCanvas,
+      "image/png",
+      0.92
+    );
 
     // --- PRICE + ACCESSORIES ---
     let price = 0;
@@ -2725,6 +2778,14 @@ const Diagram = ({
           closeModal();
         })
         .then(() => {
+          // FULL reset so the next open starts blank
+          setSelectedDiagram({});
+          setLines([]);
+          setSelectedIndex(null);
+          setIsDrawing(false);
+          if (baselineHashRef && "current" in baselineHashRef) {
+            baselineHashRef.current = hashLines([]);
+          }
           clearCanvas();
         })
         .catch((err) => {
@@ -2744,6 +2805,14 @@ const Diagram = ({
           closeModal();
         })
         .then(() => {
+          // FULL reset so the next open starts blank
+          setSelectedDiagram({});
+          setLines([]);
+          setSelectedIndex(null);
+          setIsDrawing(false);
+          if (baselineHashRef && "current" in baselineHashRef) {
+            baselineHashRef.current = hashLines([]);
+          }
           clearCanvas();
         })
         .catch((err) => {
@@ -2792,6 +2861,13 @@ const Diagram = ({
         <img
           onClick={() => {
             closeModal();
+            setSelectedDiagram({});
+            setLines([]);
+            setSelectedIndex(null);
+            setIsDrawing(false);
+            if (baselineHashRef && "current" in baselineHashRef) {
+              baselineHashRef.current = hashLines([]);
+            }
           }}
           src={closeIcon}
           alt="close diagram"
@@ -2815,6 +2891,13 @@ const Diagram = ({
               // Match saveDiagram() behavior: close when nothing changed
               // testing the other branch
               closeModal();
+              setSelectedDiagram({});
+              setLines([]);
+              setSelectedIndex(null);
+              setIsDrawing(false);
+              if (baselineHashRef && "current" in baselineHashRef) {
+                baselineHashRef.current = hashLines([]);
+              }
               return;
             }
 
@@ -3080,14 +3163,7 @@ const Diagram = ({
         )}
 
         {(lines?.length ?? 0) === 0 && (
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              padding: "8px 0",
-            }}
-          >
+          <div className="diagram__grid-settings">
             <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span>Grid square size (px):</span>
               <input

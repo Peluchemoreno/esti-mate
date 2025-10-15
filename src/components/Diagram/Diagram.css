@@ -109,3 +109,11 @@
   -webkit-user-select: none;
   user-select: none;
 }
+
+.diagram__grid-settings {
+  position: absolute;
+  background-color: black;
+  top: 30px;
+  left: 5px;
+  padding: 10px;
+}
