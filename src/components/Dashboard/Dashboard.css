@@ -68,7 +68,7 @@
 }
 
 /* ensure header stays above content */
-.dashboard__header { z-index: 1000; }
+.dashboard__header { z-index: 998; }
 
 /* base: show desktop links, hide hamburger */
 .dashboard__hamburger-btn { display: none; background: transparent; border: 0; padding: 8px; }

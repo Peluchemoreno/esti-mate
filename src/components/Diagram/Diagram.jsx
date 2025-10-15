@@ -336,6 +336,9 @@ const Diagram = ({
   diagrams,
   setActiveModal,
 }) => {
+  // ------- Constants for UX fidelity on phones -------
+  const MIN_HANDLE_PX = 6; // CSS pixels minimum for handles
+  const PADDING_PX = 24; // auto-fit padding
   // Products (context first, then API)
   // ✅ Call hooks once at top-level, never conditionally
   const { data: pricingProducts = [], isLoading, error } = useProductsPricing(); // ALL items
@@ -517,6 +520,99 @@ const Diagram = ({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  // ------------ Utility: numeric safety & clamping ------------
+  const isFiniteNumber = (n) => Number.isFinite(n) && !Number.isNaN(n);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  function clampLine(l, cw, ch) {
+    const copy = { ...l };
+    const clampX = (x) => clamp(isFiniteNumber(x) ? x : 0, 0, cw);
+    const clampY = (y) => clamp(isFiniteNumber(y) ? y : 0, 0, ch);
+    if (copy.startX != null) copy.startX = clampX(copy.startX);
+    if (copy.startY != null) copy.startY = clampY(copy.startY);
+    if (copy.endX != null) copy.endX = clampX(copy.endX);
+    if (copy.endY != null) copy.endY = clampY(copy.endY);
+    if (copy.centerX != null) copy.centerX = clampX(copy.centerX);
+    if (copy.centerY != null) copy.centerY = clampY(copy.centerY);
+    if (copy.radius != null && !isFiniteNumber(copy.radius)) copy.radius = 0;
+    return copy;
+  }
+
+  function contentBBox(arr = []) {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    for (const l of arr) {
+      if (
+        l.isFreeMark &&
+        l.kind === "free-circle" &&
+        isFiniteNumber(l.centerX) &&
+        isFiniteNumber(l.centerY)
+      ) {
+        const r = Number(l.radius || 0);
+        minX = Math.min(minX, l.centerX - r);
+        minY = Math.min(minY, l.centerY - r);
+        maxX = Math.max(maxX, l.centerX + r);
+        maxY = Math.max(maxY, l.centerY + r);
+        continue;
+      }
+      const xs = [l.startX, l.endX, l.centerX].filter(isFiniteNumber);
+      const ys = [l.startY, l.endY, l.centerY].filter(isFiniteNumber);
+      if (xs.length) {
+        minX = Math.min(minX, ...xs);
+        maxX = Math.max(maxX, ...xs);
+      }
+      if (ys.length) {
+        minY = Math.min(minY, ...ys);
+        maxY = Math.max(maxY, ...ys);
+      }
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      return {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 0,
+        height: 0,
+        empty: true,
+      };
+    }
+    return {
+      left: minX,
+      top: minY,
+      right: maxX,
+      bottom: maxY,
+      width: Math.max(0, maxX - minX),
+      height: Math.max(0, maxY - minY),
+      empty: false,
+    };
+  }
+
+  function getCurrentMeta() {
+    const c = canvasRef.current;
+    const rect = c?.getBoundingClientRect?.() || { width: 0, height: 0 };
+    return {
+      canvasW: Math.round(rect.width || 0),
+      canvasH: Math.round(rect.height || 0),
+      dpr: window.devicePixelRatio || 1,
+      gridSize,
+      feetPerSquare,
+      version: 1,
+    };
+  }
+
+  function sanitizeLines(arr, cw, ch) {
+    return (arr || []).map((l) => clampLine(l, cw, ch)).filter(Boolean);
+  }
+
+  function buildDiagramPayload() {
+    const meta = getCurrentMeta();
+    const safe = sanitizeLines(lines, meta.canvasW, meta.canvasH);
+    return { lines: safe, meta };
+  }
+
   // one true render path
   function drawScene() {
     const canvas = canvasRef.current;
@@ -592,9 +688,18 @@ const Diagram = ({
     const curW = Math.max(1, Math.round(rect.width));
     const curH = Math.max(1, Math.round(rect.height));
 
-    const savedW = Number(selectedDiagram?.meta?.canvasW) || curW;
-    const savedH = Number(selectedDiagram?.meta?.canvasH) || curH;
-
+    // ----- Upgrader/backfill for old diagrams without meta -----
+    const metaIn = selectedDiagram?.meta || {};
+    const savedW = Number(metaIn.canvasW) || curW;
+    const savedH = Number(metaIn.canvasH) || curH;
+    const savedGrid = Number(metaIn.gridSize) || gridSize;
+    const savedFeet = Number(metaIn.feetPerSquare) || feetPerSquare;
+    // keep state if meta provided, else retain current state
+    if (metaIn && (metaIn.gridSize || metaIn.feetPerSquare)) {
+      // only update if different to avoid loops
+      if (savedGrid !== gridSize) setGridSize(savedGrid);
+      if (savedFeet !== feetPerSquare) setFeetPerSquare(savedFeet);
+    }
     // If this diagram was saved on a different canvas size, scale coordinates
     const sx = curW / savedW;
     const sy = curH / savedH;
@@ -642,10 +747,55 @@ const Diagram = ({
       return copy;
     };
 
-    const withIds = (selectedDiagram?.lines || []).map((l) => ({
+    let withIds = (selectedDiagram?.lines || []).map((l) => ({
       id: l.id || newId(),
       ...scaleLine(l),
     }));
+
+    // ----- Auto-fit once if content exceeds canvas by >10% -----
+    const bbox = contentBBox(withIds);
+    if (!bbox.empty) {
+      const overLeft = bbox.left < -0.1 * curW;
+      const overTop = bbox.top < -0.1 * curH;
+      const overRight = bbox.right > 1.1 * curW;
+      const overBottom = bbox.bottom > 1.1 * curH;
+      const exceeds = overLeft || overTop || overRight || overBottom;
+      const bw = Math.max(1, bbox.width);
+      const bh = Math.max(1, bbox.height);
+      const k = Math.min(
+        (curW - 2 * PADDING_PX) / bw,
+        (curH - 2 * PADDING_PX) / bh
+      );
+      if (exceeds && Number.isFinite(k) && k > 0 && k < 1_000) {
+        // scale then center
+        withIds = withIds.map((l) => {
+          const copy = { ...l };
+          const scale = (n) => Number(n) * k;
+          if (copy.startX != null) copy.startX = scale(copy.startX - bbox.left);
+          if (copy.endX != null) copy.endX = scale(copy.endX - bbox.left);
+          if (copy.centerX != null)
+            copy.centerX = scale(copy.centerX - bbox.left);
+          if (copy.startY != null) copy.startY = scale(copy.startY - bbox.top);
+          if (copy.endY != null) copy.endY = scale(copy.endY - bbox.top);
+          if (copy.centerY != null)
+            copy.centerY = scale(copy.centerY - bbox.top);
+          if (copy.radius != null) copy.radius = Number(copy.radius) * k; // circles by uniform k
+          // add offset to center inside canvas with padding
+          const offX = PADDING_PX + (curW - 2 * PADDING_PX - bw * k) / 2;
+          const offY = PADDING_PX + (curH - 2 * PADDING_PX - bh * k) / 2;
+          if (copy.startX != null) copy.startX += offX;
+          if (copy.endX != null) copy.endX += offX;
+          if (copy.centerX != null) copy.centerX += offX;
+          if (copy.startY != null) copy.startY += offY;
+          if (copy.endY != null) copy.endY += offY;
+          if (copy.centerY != null) copy.centerY += offY;
+          return copy;
+        });
+      }
+    }
+
+    // clamp to canvas and reject invalids
+    withIds = sanitizeLines(withIds, curW, curH);
 
     // draw the scaled content exactly as your code does now
     setLines(withIds);
@@ -840,7 +990,7 @@ const Diagram = ({
 
   // hit tests
   function hitTestLine(line, x, y) {
-    const EP = 10;
+    const EP = Math.max(6, gridSize * 0.6);
     if (calculateDistance([x, y], [line.startX, line.startY]) <= EP)
       return { hit: "start" };
     if (calculateDistance([x, y], [line.endX, line.endY]) <= EP)
@@ -866,7 +1016,7 @@ const Diagram = ({
     }
 
     // For stroked (not filled): near any edge within tolerance
-    const EP = 8;
+    const EP = Math.max(6, gridSize * 0.6);
     const onLeft = Math.abs(x - left) <= EP && y >= top && y <= top + h;
     const onRight = Math.abs(x - (left + w)) <= EP && y >= top && y <= top + h;
     const onTop = Math.abs(y - top) <= EP && x >= left && x <= left + w;
@@ -891,7 +1041,7 @@ const Diagram = ({
     }
 
     // For stroked only: near the ring
-    const EP = 8;
+    const EP = Math.max(6, gridSize * 0.6);
     return Math.abs(dist - R) <= EP;
   }
 
@@ -1143,7 +1293,7 @@ const Diagram = ({
         // show edit handles when selected (same UX as gutters)
         if (line.isSelected) {
           const handleR = Math.max(
-            3,
+            MIN_HANDLE_PX,
             (typeof gridSize === "number" ? gridSize : 8) / 2
           );
           ctx.setLineDash([]); // handles are solid
@@ -1198,10 +1348,10 @@ const Diagram = ({
     if (line.isSelected) {
       ctx.fillStyle = "orange";
       ctx.beginPath();
-      ctx.arc(x1, y1, gridSize / 2, 0, Math.PI * 2);
+      ctx.arc(x1, y1, Math.max(MIN_HANDLE_PX, gridSize / 2), 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(x2, y2, gridSize / 2, 0, Math.PI * 2);
+      ctx.arc(x2, y2, Math.max(MIN_HANDLE_PX, gridSize / 2), 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -1212,6 +1362,27 @@ const Diagram = ({
         line.midpoint[0],
         line.midpoint[1]
       );
+    }
+  }
+
+  async function saveCurrentDiagram() {
+    const payload = buildDiagramPayload();
+    // Prefer the host app’s provided callbacks; do not change their signatures
+    try {
+      if (
+        selectedDiagram &&
+        selectedDiagram._id &&
+        typeof updateDiagram === "function"
+      ) {
+        await updateDiagram(selectedDiagram._id, payload);
+      } else if (typeof addDiagramToProject === "function") {
+        await addDiagramToProject(currentProjectId, payload);
+      } else if (typeof handlePassDiagramData === "function") {
+        // last-resort generic bridge used elsewhere in your app
+        await handlePassDiagramData(payload);
+      }
+    } finally {
+      // no modal/UX assumptions here
     }
   }
 
