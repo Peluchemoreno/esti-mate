@@ -473,6 +473,8 @@ const EstimateModal = ({
     return Object.freeze(foldItems(rows));
   }, [selectedDiagram?.lines, mergedAccessories, adHocItems]);
 
+  const previewItems = useMemo(() => buildSavableItems(), [buildSavableItems]);
+
   // define BEFORE handleSaveAndClose (it depends on this)
   const handleCloseModal = useCallback(() => {
     // clear the diagram selection when the modal closes
@@ -504,7 +506,8 @@ const EstimateModal = ({
       : 0;
     const itemsN =
       (Array.isArray(adHocItems) ? adHocItems.length : 0) +
-      (Array.isArray(buildSavableItems()) ? buildSavableItems().length : 0);
+      (Array.isArray(previewItems) ? previewItems.length : 0);
+
     const show = showPrices ? 1 : 0;
     const date = estimateData?.estimateDate || "";
     const num = estimateData?.estimateNumber || "";
@@ -976,8 +979,8 @@ const EstimateModal = ({
                   <div style={{ fontWeight: "bold" }}>
                     {showPrices
                       ? "Amount Due: $" +
-                        (Array.isArray(items)
-                          ? items
+                        (Array.isArray(previewItems)
+                          ? previewItems
                               .reduce(
                                 (s, it) =>
                                   s +
@@ -993,8 +996,8 @@ const EstimateModal = ({
               </div>
 
               <div>
-                {Array.isArray(items) && items.length ? (
-                  items.map((it, idx) => (
+                {Array.isArray(previewItems) && previewItems.length ? (
+                  previewItems.map((it, idx) => (
                     <div
                       key={idx}
                       style={{
