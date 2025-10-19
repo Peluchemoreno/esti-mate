@@ -1,3 +1,4 @@
+/* src/components/EstimateModal/EstimateModal.css */
 .estimate-edit-form {
   border: 1px solid red;
 }
@@ -8,5 +9,23 @@
     height: 100% !important;
     width: 100% !important;
     border-radius: 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .ReactModal__Content {
+    inset: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+  }
+
+  /* make the control header stick to top above the preview */
+  .estimate-modal__header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #000;        /* match modal bg so it covers beneath */
+    padding-top: 4px;        /* small breathing room */
   }
 }

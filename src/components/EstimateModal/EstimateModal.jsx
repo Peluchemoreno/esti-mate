@@ -153,6 +153,9 @@ const EstimateModal = ({
 
   // notes draft: only commit when clicking "Save Notes"
   const [notesDraft, setNotesDraft] = useState(estimateData.notes);
+  const onSaveNotes = () => {
+    setEstimateData((s) => ({ ...s, notes: String(notesDraft || "") }));
+  };
 
   // ad-hoc (preview only, per-project bucket)
   const [adHocItemsByProject, setAdHocItemsByProject] = useState({});
@@ -202,6 +205,12 @@ const EstimateModal = ({
     // reset the draft without rerendering the PDF
     setAdHocDraft({ name: "", quantity: 1, price: 0 });
   };
+
+  const removeAdHoc = (id) =>
+    setAdHocItemsByProject((prev) => ({
+      ...prev,
+      [pid]: (prev[pid] || []).filter((x) => x.id !== id),
+    }));
 
   const [showPrices, setShowPrices] = useState(true);
 
@@ -669,6 +678,7 @@ const EstimateModal = ({
 
   const headerBar = (
     <div
+      className={isSmallScreen ? "estimate-modal__header" : undefined}
       style={{
         display: "flex",
         alignItems: "center",

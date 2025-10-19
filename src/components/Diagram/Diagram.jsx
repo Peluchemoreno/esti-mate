@@ -525,6 +525,9 @@ const Diagram = ({
     canvas.style.height = cssH + "px";
 
     const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     // draw in CSS pixels
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
@@ -627,6 +630,9 @@ const Diagram = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -698,6 +704,9 @@ const Diagram = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -1104,6 +1113,9 @@ const Diagram = ({
 
   function hitTestAnnotation(note, x, y) {
     const ctx = canvasRef.current.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.font = "1000 12px Arial";
     const text = note.note || "";
     const w = ctx.measureText(text).width;
@@ -1166,6 +1178,9 @@ const Diagram = ({
 
   function placeMeasurement(line, measurement, x, y) {
     const ctx = canvasRef.current.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.font = "900 12px Arial";
     ctx.textAlign = "center";
     ctx.fillStyle = "black";
@@ -2412,6 +2427,9 @@ const Diagram = ({
     const token = localStorage.getItem("jwt");
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
     // ⬇️ draw + yield one frame before reading back pixels (mobile fix)
     await ensureCanvasPainted(ctx, drawAllLines);
@@ -3041,6 +3059,9 @@ const Diagram = ({
   function clearCanvas() {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d", { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = false;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setLines([]);
     setLineLength(0);
@@ -3157,10 +3178,6 @@ const Diagram = ({
           {/* <option value="splashGuard">Splash Guard / Valley Shield</option> */}
           <option value="freeLine">Free Line</option>
         </select>
-
-        <div className="diagram__line-length-display">
-          Current line length: {lineLength}'
-        </div>
 
         {(tool === "freeLine" ||
           (selectedIndex !== null && lines[selectedIndex]?.isFreeMark)) && (
