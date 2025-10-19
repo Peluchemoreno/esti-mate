@@ -3472,4 +3472,66 @@ const Diagram = ({
   );
 };
 
+// ===== SVG Export (additive, non-breaking) =====
+export function exportDiagramAsSVG(lines = [], meta = {}) {
+  try {
+    const W = Number(meta.canvasW || 0) || 0;
+    const H = Number(meta.canvasH || 0) || 0;
+    const grid = Number(meta.gridSize || 8) || 8;
+    const parts = [];
+    parts.push(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="geometricPrecision" vector-effect="non-scaling-stroke">`
+    );
+
+    (lines || []).forEach((l) => {
+      const x1 = Number(l.startX || 0);
+      const y1 = Number(l.startY || 0);
+      const x2 = Number(l.endX ?? l.startX ?? 0);
+      const y2 = Number(l.endY ?? l.startY ?? 0);
+      const color = l.color || "#000";
+      const sw = Number(l.lineWidth || (l.isDownspout ? 2 : 3));
+
+      if (l.isNote) {
+        // (Optional) omit text in SVG for now; notes are rendered elsewhere.
+        return;
+      }
+
+      if (l.isDownspout) {
+        // four lines forming an X centered at (x1, y1)
+        const d = grid / 2.75;
+        parts.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
+            y1 + d
+          }" stroke="${color}" stroke-width="2" />`
+        );
+        parts.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
+            y1 + d
+          }" stroke="${color}" stroke-width="2" />`
+        );
+        parts.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
+            y1 - d
+          }" stroke="${color}" stroke-width="2" />`
+        );
+        parts.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
+            y1 - d
+          }" stroke="${color}" stroke-width="2" />`
+        );
+      } else {
+        // straight run
+        parts.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" />`
+        );
+      }
+    });
+
+    parts.push(`</svg>`);
+    return parts.join("");
+  } catch (e) {
+    return "";
+  }
+}
+
 export default Diagram;

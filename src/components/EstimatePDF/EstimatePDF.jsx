@@ -1,4 +1,3 @@
-// src/components/EstimatePDF/EstimatePDF.jsx
 import {
   Document,
   Page,
@@ -7,7 +6,107 @@ import {
   StyleSheet,
   Image,
 } from "@react-pdf/renderer";
+import { Svg, Line } from "@react-pdf/renderer";
 import { useEffect } from "react";
+
+// ---- vector diagram renderer (non-breaking) ----
+function DiagramGraphic({ selectedDiagram, style }) {
+  try {
+    const meta = selectedDiagram?.meta || null;
+    const lines = Array.isArray(selectedDiagram?.lines)
+      ? selectedDiagram.lines
+      : null;
+    const svgStr = selectedDiagram?.svg || null;
+
+    // Prefer vector from meta + lines
+    if (meta && lines && lines.length > 0) {
+      const W = Number(meta.canvasW || 0) || 0;
+      const H = Number(meta.canvasH || 0) || 0;
+      const grid = Number(meta.gridSize || 8) || 8;
+
+      return (
+        <Svg
+          style={style}
+          viewBox={`0 0 ${Math.max(1, W)} ${Math.max(1, H)}`}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {lines.map((l, i) => {
+            const x1 = Number(l.startX || 0);
+            const y1 = Number(l.startY || 0);
+            const x2 = Number(l.endX ?? l.startX ?? 0);
+            const y2 = Number(l.endY ?? l.startY ?? 0);
+            const color = l.color || "#000";
+            const base = l.isDownspout ? 2 : 3;
+            const sw = Number(l.lineWidth || base);
+
+            if (l.isDownspout) {
+              // draw the "X" used for downspout marker
+              const d = grid / 2.75;
+              return (
+                <Svg key={i}>
+                  <Line
+                    x1={x1}
+                    y1={y1}
+                    x2={x1 + d}
+                    y2={y1 + d}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                  <Line
+                    x1={x1}
+                    y1={y1}
+                    x2={x1 - d}
+                    y2={y1 + d}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                  <Line
+                    x1={x1}
+                    y1={y1}
+                    x2={x1 - d}
+                    y2={y1 - d}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                  <Line
+                    x1={x1}
+                    y1={y1}
+                    x2={x1 + d}
+                    y2={y1 - d}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                </Svg>
+              );
+            }
+
+            // straight gutter run
+            return (
+              <Line
+                key={i}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={color}
+                strokeWidth={sw}
+              />
+            );
+          })}
+        </Svg>
+      );
+    }
+
+    // If we only have an SVG string, embed as data URL (fallback).
+    if (svgStr) {
+      const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
+      return <Image src={dataUrl} style={style} />;
+    }
+  } catch (e) {
+    // swallow and fall through to raster if anything goes wrong
+  }
+  return null;
+}
 
 // ---- styles ----
 const styles = StyleSheet.create({
@@ -524,7 +623,14 @@ export default function EstimatePDF({
           {logoUrl ? <Image src={logoUrl} style={styles.logo} /> : null}
         </View>
 
-        {diagramImage ? (
+        {selectedDiagram?.lines?.length && selectedDiagram?.meta ? (
+          <View style={styles.bigDiagramWrap}>
+            <DiagramGraphic
+              selectedDiagram={selectedDiagram}
+              style={styles.bigDiagram}
+            />
+          </View>
+        ) : diagramImage ? (
           <View style={styles.bigDiagramWrap}>
             <Image src={diagramImage} style={styles.bigDiagram} />
           </View>

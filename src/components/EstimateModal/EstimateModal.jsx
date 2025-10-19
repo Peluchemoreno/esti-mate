@@ -131,6 +131,15 @@ const EstimateModal = ({
   currentUser,
   products, // visible catalog (listed: true)
 }) => {
+  const isSmallScreen =
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 768px)").matches;
+
+  const canInlinePDF =
+    typeof window !== "undefined" &&
+    window.matchMedia("(min-width: 769px)").matches &&
+    !/iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+
   const [logoUrl, setLogoUrl] = useState(null);
   const [pricingCatalog, setPricingCatalog] = useState(null);
 
@@ -726,17 +735,33 @@ const EstimateModal = ({
       contentLabel="Estimate Preview"
       style={{
         overlay: { backgroundColor: "rgba(0,0,0,0.5)" },
-        content: {
-          width: "60%",
-          height: "80%",
-          margin: "auto",
-          padding: "20px",
-          borderRadius: "10px",
-          backgroundColor: "#000",
-          border: "1px solid var(--white)",
-          color: "var(--white)",
-          overflow: "hidden",
-        },
+        content: isSmallScreen
+          ? {
+              width: "100%",
+              height: "100%",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              margin: 0,
+              padding: "12px",
+              backgroundColor: "#000",
+              border: "1px solid var(--white)",
+              color: "var(--white)",
+              overflow: "hidden",
+              borderRadius: 0,
+            }
+          : {
+              width: "60%",
+              height: "80%",
+              margin: "auto",
+              padding: "20px",
+              backgroundColor: "#000",
+              border: "1px solid var(--white)",
+              color: "var(--white)",
+              overflow: "hidden",
+              borderRadius: "10px",
+            },
       }}
     >
       {headerBar}
@@ -904,15 +929,138 @@ const EstimateModal = ({
       </div>
 
       {/* PDF area: visually identical container */}
-      <div style={{ width: "100%", height: "calc(100% - 210px)" }}>
-        {!pdfUrl ? (
-          <div style={{ padding: 8 }}>Loading preview…</div>
+      <div
+        style={{ width: "100%", height: "calc(100% - 210px)", minHeight: 0 }}
+      >
+        {canInlinePDF ? (
+          !pdfUrl ? (
+            <div style={{ padding: 8 }}>Loading preview…</div>
+          ) : (
+            <iframe
+              title="Estimate Preview"
+              src={pdfUrl}
+              style={{ width: "100%", height: "100%", border: "none" }}
+            />
+          )
         ) : (
-          <iframe
-            title="Estimate Preview"
-            src={pdfUrl}
-            style={{ width: "100%", height: "100%", border: "none" }}
-          />
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              overflow: "auto",
+              padding: 8,
+            }}
+          >
+            {/* Lightweight HTML fallback preview */}
+            <h3 style={{ marginTop: 0 }}>Estimate Preview (mobile)</h3>
+            <div
+              style={{ border: "1px solid #333", padding: 8, borderRadius: 8 }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: "bold" }}>
+                    {project?.name || "Project"}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>
+                    {estimateData?.estimateDate}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div>Estimate #{estimateData?.estimateNumber || "—"}</div>
+                  <div style={{ fontWeight: "bold" }}>
+                    {showPrices
+                      ? "Amount Due: $" +
+                        (Array.isArray(items)
+                          ? items
+                              .reduce(
+                                (s, it) =>
+                                  s +
+                                  Number(it.price || 0) *
+                                    Number(it.quantity || 0),
+                                0
+                              )
+                              .toFixed(2)
+                          : "0.00")
+                      : "Prices hidden"}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                {Array.isArray(items) && items.length ? (
+                  items.map((it, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: showPrices
+                          ? "1fr 60px 100px"
+                          : "1fr 80px",
+                        gap: 8,
+                        padding: "6px 0",
+                        borderBottom: "1px solid #222",
+                      }}
+                    >
+                      <div style={{ fontSize: 12 }}>{it.name}</div>
+                      <div style={{ textAlign: "right", fontSize: 12 }}>
+                        {Number(it.quantity || 0)}
+                      </div>
+                      {showPrices ? (
+                        <div style={{ textAlign: "right", fontSize: 12 }}>
+                          $
+                          {(
+                            Number(it.price || 0) * Number(it.quantity || 0)
+                          ).toFixed(2)}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>No items</div>
+                )}
+              </div>
+
+              {estimateData?.notes ? (
+                <div style={{ marginTop: 8, fontSize: 12 }}>
+                  <b>Notes:</b> {estimateData.notes}
+                </div>
+              ) : null}
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              {pdfUrl ? (
+                <a
+                  href={pdfUrl}
+                  download={`Estimate-${
+                    estimateData?.estimateNumber || ""
+                  }.pdf`}
+                  style={{
+                    display: "inline-block",
+                    padding: "8px 12px",
+                    border: "1px solid #666",
+                    borderRadius: 6,
+                    textDecoration: "none",
+                    color: "#fff",
+                  }}
+                >
+                  Download PDF
+                </a>
+              ) : (
+                <button
+                  disabled
+                  style={{ padding: 8, borderRadius: 6, opacity: 0.6 }}
+                >
+                  Preparing PDF…
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </Modal>

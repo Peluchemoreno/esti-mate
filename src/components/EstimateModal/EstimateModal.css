@@ -1,3 +1,12 @@
 .estimate-edit-form {
   border: 1px solid red;
 }
+
+@media (max-width: 768px) {
+  .ReactModal__Content {
+    inset: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+  }
+}

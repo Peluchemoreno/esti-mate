@@ -21,6 +21,11 @@ export default function EstimateViewerModal({
   selectedProject, // <-- live project (has billingName, etc.)
   products,
 }) {
+  const canInlinePDF =
+    typeof window !== "undefined" &&
+    window.matchMedia("(min-width: 769px)").matches &&
+    !/iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+
   const token =
     typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
 
@@ -190,11 +195,56 @@ export default function EstimateViewerModal({
       <div style={{ flex: 1, minHeight: 0 }}>
         {loading && <div style={{ padding: 16, color: "#aaa" }}>Loading…</div>}
 
-        {!loading && pdfProps && (
-          <PDFViewer style={{ width: "100%", height: "100%" }}>
+        {canInlinePDF ? (
+          <PDFViewer style={{ width: "100%", height: "100%" }} showToolbar>
             {/* IMPORTANT: pass project via pdfProps.project (not selectedProject) */}
             <EstimatePDF {...pdfProps} />
           </PDFViewer>
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              overflow: "auto",
+              padding: 8,
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Estimate Preview (mobile)</h3>
+            <div
+              style={{ border: "1px solid #333", padding: 8, borderRadius: 8 }}
+            >
+              {/* Very light summary to give visual parity */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: "bold" }}>
+                    {pdfProps?.project?.name || "Project"}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>
+                    {pdfProps?.estimateData?.estimateDate}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div>
+                    Estimate #{pdfProps?.estimateData?.estimateNumber || "—"}
+                  </div>
+                </div>
+              </div>
+              {pdfProps?.estimateData?.notes ? (
+                <div style={{ fontSize: 12 }}>
+                  <b>Notes:</b> {pdfProps.estimateData.notes}
+                </div>
+              ) : null}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              {/* If you have a persisted file URL, link it here. */}
+            </div>
+          </div>
         )}
 
         {!loading && !pdfProps && (
