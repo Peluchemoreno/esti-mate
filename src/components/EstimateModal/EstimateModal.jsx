@@ -17,6 +17,30 @@ const prettyDsName = (raw = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+// NEW: Normalize item names similar to PDF so mobile preview matches it.
+function prettifyLineItemName(raw) {
+  if (!raw) return "";
+  let name = String(raw);
+
+  // collapse duplicates like "corrugated corrugated"
+  name = name.replace(/\b(corrugated|smooth|box|round)\b\s+\1\b/gi, "$1");
+
+  // title-case those tokens
+  name = name.replace(/\b(corrugated|smooth|box|round)\b/gi, (m) => {
+    return m.charAt(0).toUpperCase() + m.slice(1).toLowerCase();
+  });
+
+  // normalize dimensions like 3 x 4 -> 3x4
+  name = name.replace(/(\d+)\s*[xX]\s*(\d+)/g, (_, a, b) => `${a}x${b}`);
+
+  // 3" 3" -> 3"
+  name = name.replace(/(\b\d+)"\s+\1"\b/g, `$1"`);
+
+  // collapse whitespace
+  name = name.replace(/\s{2,}/g, " ").trim();
+  return name;
+}
+
 function foldItems(items) {
   const map = new Map();
 
@@ -688,7 +712,17 @@ const EstimateModal = ({
       }}
     >
       <h2 style={{ margin: 0 }}>Estimate Preview</h2>
-      <div style={{ display: "flex", gap: 8, flexWrap: "nowrap" }}>
+
+      {/* Right-side controls */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "nowrap",
+          alignItems: "center",
+        }}
+      >
+        {/* Show prices toggle (unchanged) */}
         <label
           style={{
             display: "inline-flex",
@@ -736,6 +770,25 @@ const EstimateModal = ({
         >
           Save & Close
         </button>
+
+        {/* NEW: mobile-friendly explicit Close button in the header */}
+        {isSmallScreen && (
+          <button
+            onClick={handleCloseModal}
+            title="Close"
+            style={{
+              marginLeft: 8,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--white)",
+              background: "transparent",
+              color: "var(--white)",
+              cursor: "pointer",
+            }}
+          >
+            ✕ Close
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1004,6 +1057,46 @@ const EstimateModal = ({
                   </div>
                 </div>
               </div>
+
+              {/* NEW: Diagram section */}
+              <section>
+                <h4 style={{ margin: "8px 0" }}>Diagram</h4>
+                {selectedDiagram?.svg ? (
+                  <img
+                    alt="Diagram"
+                    src={`data:image/svg+xml;utf8,${encodeURIComponent(
+                      selectedDiagram.svg
+                    )}`}
+                    style={{
+                      width: "100%",
+                      height: 180,
+                      objectFit: "contain",
+                      background: "#111",
+                      border: "1px solid #333",
+                      borderRadius: 8,
+                    }}
+                  />
+                ) : selectedDiagram?.imageDataLarge ||
+                  selectedDiagram?.imageData ? (
+                  <img
+                    alt="Diagram"
+                    src={
+                      selectedDiagram.imageDataLarge ||
+                      selectedDiagram.imageData
+                    }
+                    style={{
+                      width: "100%",
+                      height: 180,
+                      objectFit: "contain",
+                      background: "#111",
+                      border: "1px solid #333",
+                      borderRadius: 8,
+                    }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>(No diagram)</div>
+                )}
+              </section>
 
               <div>
                 {Array.isArray(previewItems) && previewItems.length ? (

@@ -321,16 +321,58 @@ const styles = StyleSheet.create({
 // ---------- vector diagram (crisp) ----------
 function DiagramGraphic({ selectedDiagram, style }) {
   try {
-    const meta = selectedDiagram?.meta || null;
     const lines = Array.isArray(selectedDiagram?.lines)
       ? selectedDiagram.lines
       : null;
     const svgStr = selectedDiagram?.svg || null;
+    let meta = selectedDiagram?.meta || null;
 
-    if (meta && lines && lines.length > 0) {
+    if (lines && lines.length > 0) {
+      // Derive canvas bounds if meta missing, so we can still render vector
+      if (!meta) {
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        for (const l of lines) {
+          const xs = [l.startX, l.endX ?? l.startX].map((n) =>
+            Math.round(Number(n || 0))
+          );
+          const ys = [l.startY, l.endY ?? l.startY].map((n) =>
+            Math.round(Number(n || 0))
+          );
+          xs.forEach((x) => {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+          });
+          ys.forEach((y) => {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          });
+        }
+        const pad = 12; // small padding so strokes aren't clipped
+        const W = Math.max(
+          1,
+          (isFinite(maxX) ? maxX : 0) - (isFinite(minX) ? minX : 0) + pad * 2
+        );
+        const H = Math.max(
+          1,
+          (isFinite(maxY) ? maxY : 0) - (isFinite(minY) ? minY : 0) + pad * 2
+        );
+        meta = {
+          canvasW: W,
+          canvasH: H,
+          gridSize: 8,
+          offsetX: (isFinite(minX) ? minX : 0) - pad,
+          offsetY: (isFinite(minY) ? minY : 0) - pad,
+        };
+      }
+
       const W = Number(meta.canvasW || 0) || 0;
       const H = Number(meta.canvasH || 0) || 0;
       const grid = Number(meta.gridSize || 8) || 8;
+      const offX = Number(meta.offsetX || 0);
+      const offY = Number(meta.offsetY || 0);
 
       return (
         <Svg
@@ -340,10 +382,10 @@ function DiagramGraphic({ selectedDiagram, style }) {
         >
           {lines.map((l, i) => {
             const round = (n) => Math.round(Number(n || 0));
-            const x1 = round(l.startX);
-            const y1 = round(l.startY);
-            const x2 = round(l.endX ?? l.startX);
-            const y2 = round(l.endY ?? l.startY);
+            const x1 = round(l.startX) - offX;
+            const y1 = round(l.startY) - offY;
+            const x2 = round(l.endX ?? l.startX) - offX;
+            const y2 = round(l.endY ?? l.startY) - offY;
             const color = normalizeColor(l.color || "#000");
             const base = l.isDownspout ? 2 : 3;
             const sw = Math.max(1, Math.round(Number(l.lineWidth || base)));
@@ -406,11 +448,12 @@ function DiagramGraphic({ selectedDiagram, style }) {
       );
     }
 
+    // Fallback if only an SVG string is present
     if (svgStr) {
       const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
       return <Image src={dataUrl} style={style} />;
     }
-  } catch (e) {
+  } catch {
     // fall through to raster
   }
   return null;
