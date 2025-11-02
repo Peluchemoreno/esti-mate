@@ -25,6 +25,8 @@ export default function DownspoutModal({
 
   useEffect(() => {
     if (activeModal !== "downspout") return;
+    console.log("DownspoutModal opened in mode:", mode);
+    console.log(initialData);
     if (mode === "edit" && initialData) {
       setElbowSequence(String(initialData.elbowSequence || "").toUpperCase());
       setTotalFootage(String(initialData.measurement ?? ""));
@@ -43,6 +45,7 @@ export default function DownspoutModal({
 
   function handleDownspoutSubmit(e) {
     e.preventDefault();
+
     const downspoutData = {
       elbowSequence,
       totalFootage,
@@ -56,15 +59,19 @@ export default function DownspoutModal({
           ? downspoutSize.split(" ")[1]
           : downspoutSize.split(" ")[0],
     };
+
+    // This updates/creates the DS in lines (your existing wiring)
     addDownspout(downspoutData);
-    setActiveModal("diagram");
+
+    // Close the DS modal
     setIsDownspoutModalOpen(false);
-    if (mode === "create") {
-      // leave as-is for your current flow
-    } else {
-      // stay in Select when editing
-      setTool?.((prev) => prev);
-    }
+
+    // Do NOT open confirm here; just go back to the diagram modal.
+    setActiveModal("diagram");
+
+    // Leave tool as-is (optional; preserves select state)
+    setTool?.((prev) => prev);
+
     onClose?.();
   }
 

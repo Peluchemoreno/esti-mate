@@ -14,31 +14,60 @@ const t = (v) => (v == null ? "" : String(v)); // safe text for <Text>
 
 // Build legend entries with { label, color } from lines.
 // label = product name; color = product/color actually used to draw.
+// Build legend entries with { label, color, shape } from lines.
+// label = product name (prettified for gutters/DS); color = product/color actually used.
+// shape = "circle" for Splash Guard, "square" otherwise (for legend rendering).
 function legendEntriesFromLines(selectedDiagram, products = []) {
   const uniq = new Map(); // key by label
   const lines = selectedDiagram?.lines || [];
 
   for (const l of lines) {
-    if (!l || l.isNote || l.isFreeMark) continue;
+    if (!l || l.isNote) continue;
 
-    if (l.isDownspout) {
-      // Prefer product name if available, otherwise a normalized DS label
+    // Splash Guard (priced mark, rendered as a filled circle)
+    if (l.isSplashGuard) {
       const label =
         (l.currentProduct?.name && String(l.currentProduct.name)) ||
-        `${prettyDs(l.downspoutSize)} Downspout`;
+        "Splash Guard";
+      const col = normalizeColor(
+        l.color ||
+          l.currentProduct?.color ||
+          l.currentProduct?.colorCode ||
+          // fallback: try to find the Splash Guard product by name
+          ((Array.isArray(products) ? products : []).find((p) =>
+            /splash\s*guard/i.test(String(p?.name || ""))
+          ) &&
+            productColor(
+              (products || []).find((p) =>
+                /splash\s*guard/i.test(String(p?.name || ""))
+              )
+            )) ||
+          "#111"
+      );
 
-      // Prefer explicit line color if present, else resolve from products
+      if (!uniq.has(label))
+        uniq.set(label, { label, color: col, shape: "circle" });
+      continue;
+    }
+
+    // Downspout
+    if (l.isDownspout) {
+      const rawLabel =
+        (l.currentProduct?.name && String(l.currentProduct.name)) ||
+        `${prettyDs(l.downspoutSize)} Downspout`;
+      const label = prettifyLineItemName(rawLabel);
       const color = normalizeColor(
         l.color || findDownspoutProductColor(products, l)
       );
 
-      if (!uniq.has(label)) uniq.set(label, { label, color });
+      if (!uniq.has(label)) uniq.set(label, { label, color, shape: "square" });
       continue;
     }
 
     // Gutter run
     if (l.currentProduct) {
-      const label = String(l.currentProduct.name); // exact product name
+      const raw = String(l.currentProduct.name);
+      const label = prettyGutter(raw);
       const fallbackColor =
         l.currentProduct?.colorCode ||
         l.currentProduct?.visual ||
@@ -46,10 +75,10 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
         l.color;
 
       const color = normalizeColor(
-        l.color || findGutterProductColor(products, label, fallbackColor)
+        l.color || findGutterProductColor(products, raw, fallbackColor)
       );
 
-      if (!uniq.has(label)) uniq.set(label, { label, color });
+      if (!uniq.has(label)) uniq.set(label, { label, color, shape: "square" });
     }
   }
 
@@ -57,6 +86,7 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
   return Array.from(uniq.values()).map((e) => ({
     label: String(e.label || ""),
     color: normalizeColor(e.color || "#000"),
+    shape: e.shape === "circle" ? "circle" : "square",
   }));
 }
 
@@ -104,27 +134,43 @@ function prettifyLineItemName(raw) {
 }
 
 // Normalize DS label to '3" Round' or '3x4 Corrugated'
-const prettyDs = (raw = "") => {
+// Normalize DS label to '3" Round' or '3x4 Corrugated'
+// and never duplicate the style token.
+const STYLE_RX = /(corrugated|smooth|box|round)/i;
+
+function prettyDs(raw = "") {
   const s = String(raw || "").trim();
+
+  // detect common shapes
   const mCorr = s.match(/(\d+\s*x\s*\d+)\s*(corrugated)?/i); // 2x3 / 3x4
   const mRound = s.match(/(\d+)\s*"?\s*(?:inch|")\s*(round)?/i); // 3" Round
 
+  let label;
   if (mCorr) {
-    const size = mCorr[1].replace(/\s*/g, "").toLowerCase();
-    return `${size} Corrugated`.replace(
-      /^(\d+)x(\d+) Corrugated$/i,
-      (_, a, b) => `${a}x${b} Corrugated`
-    );
-  }
-  if (mRound) {
+    const size = mCorr[1].replace(/\s*/g, "");
+    label = `${size} Corrugated`;
+  } else if (mRound) {
     const inches = mRound[1];
-    return `${inches}" Round`;
+    label = `${inches}" Round`;
+  } else {
+    // fallback to the given string
+    label = s;
   }
-  return s
-    .replace(/"\s*round\s*"?\s*round/i, `" Round`)
-    .replace(/\s+/g, " ")
-    .trim();
-};
+
+  // 1) collapse duplicated style tokens like "corrugated corrugated"
+  label = label.replace(
+    /\b(corrugated|smooth|box|round)\b\s+\1\b/gi,
+    (_, w) => w
+  );
+
+  // 2) Title-case the single style word
+  label = label.replace(
+    STYLE_RX,
+    (m) => m[0].toUpperCase() + m.slice(1).toLowerCase()
+  );
+
+  return label.replace(/\s{2,}/g, " ").trim();
+}
 
 function productColor(p) {
   return normalizeColor(
@@ -224,6 +270,37 @@ function prettyGutter(raw = "") {
   }
   return s;
 }
+
+// Small swatch for legend/key: circle for Splash Guard, square otherwise
+const KeySwatch = ({ color = "#111", size = 10, shape = "square" }) => {
+  if (shape === "circle") {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color,
+          marginRight: 6,
+          borderWidth: 1,
+          borderColor: "#333",
+        }}
+      />
+    );
+  }
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: color,
+        marginRight: 6,
+        borderWidth: 1,
+        borderColor: "#333",
+      }}
+    />
+  );
+};
 
 // ---------- styles (React-PDF friendly; no CSS shorthands) ----------
 const styles = StyleSheet.create({
@@ -693,14 +770,13 @@ export default function EstimatePDF({
         )}
 
         {/* Legend */}
-        {/* Legend */}
         {legendEntriesFromLines(selectedDiagram, products).length > 0 && (
           <View style={styles.keySection}>
             <Text style={styles.sectionTitle}>Key</Text>
             <View style={styles.keyRow}>
               {legendEntriesFromLines(selectedDiagram, products).map((e, i) => (
                 <View key={i} style={styles.keyItem}>
-                  <View style={[styles.swatch, { backgroundColor: e.color }]} />
+                  <KeySwatch color={e.color} shape={e.shape} />
                   <Text style={styles.cell}>{e.label}</Text>
                 </View>
               ))}

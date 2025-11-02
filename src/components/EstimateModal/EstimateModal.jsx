@@ -165,6 +165,7 @@ const EstimateModal = ({
     !/iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
 
   const [logoUrl, setLogoUrl] = useState(null);
+  const [notesSaved, setNotesSaved] = useState(false);
   const [pricingCatalog, setPricingCatalog] = useState(null);
 
   // immutable meta (auto-only)
@@ -365,6 +366,79 @@ const EstimateModal = ({
   // Choose catalog for pricing — prefer full pricing catalog if loaded
   const catalogForPricing = pricingCatalog || products;
 
+  // Resolve correct gutter product by profile + size (avoid defaulting to 5" K-Style)
+  // Resolve correct gutter product by profile + size WITHOUT overriding a line that already has a product
+  function resolveGutterProductForLine(line) {
+    const list = Array.isArray(catalogForPricing) ? catalogForPricing : [];
+
+    // If the line already carries a gutter product, keep it. Do NOT “helpfully” re-guess.
+    if (
+      line?.currentProduct &&
+      /gutter/i.test(String(line.currentProduct?.name || ""))
+    ) {
+      return line.currentProduct;
+    }
+
+    const rawProfile = String(
+      line.profileKey || line.profile || ""
+    ).toLowerCase();
+    const rawSizeTok = String(line.sizeInches || "").replace(/\s+/g, "");
+
+    // Build desired tokens from line metadata
+    const wantsProfiles = [];
+    if (rawProfile.includes("k")) wantsProfiles.push("k-style");
+    if (rawProfile.includes("straight"))
+      wantsProfiles.push("straight face", "straight-face");
+    if (rawProfile.includes("half"))
+      wantsProfiles.push("half round", "half-round");
+    if (rawProfile.includes("box")) wantsProfiles.push("box");
+    if (rawProfile.includes("round")) wantsProfiles.push("round");
+
+    const sizeNeedle = /\d+"/.test(rawSizeTok)
+      ? rawSizeTok
+      : rawSizeTok.replace(/[^0-9]/g, "")
+      ? rawSizeTok.replace(/[^0-9]/g, "") + '"'
+      : null;
+
+    // STRICT match: name must include size + profile tokens
+    const strictHit = list.find((p) => {
+      const name = String(p.name || "").toLowerCase();
+      if (!/gutter/.test(name)) return false;
+
+      const hasProfile = wantsProfiles.length
+        ? wantsProfiles.some((tok) => name.includes(tok))
+        : false;
+      const hasSize = sizeNeedle
+        ? name.includes(sizeNeedle.replace(/"/g, "").toLowerCase()) ||
+          name.includes(sizeNeedle.toLowerCase())
+        : false;
+
+      return hasProfile && hasSize;
+    });
+    if (strictHit) return strictHit;
+
+    // RELAXED (profile+catalog size property), used only if we still don't have a product AND line doesn't have one
+    const relaxedHit = list.find((p) => {
+      const name = String(p.name || "").toLowerCase();
+      if (!/gutter/.test(name)) return false;
+
+      const hasProfile = wantsProfiles.length
+        ? wantsProfiles.some((tok) => name.includes(tok))
+        : false;
+      const matchesSizeProp = sizeNeedle
+        ? String(p.size || "")
+            .toLowerCase()
+            .includes(sizeNeedle.replace(/"/g, "").toLowerCase())
+        : false;
+
+      return hasProfile && matchesSizeProp;
+    });
+    if (relaxedHit) return relaxedHit;
+
+    // Final fallback: keep whatever the line had (if any) — do not arbitrarily change it to the first 5" K gutter
+    return line.currentProduct || null;
+  }
+
   function itemsFromAccessoryData(accessoryData = []) {
     const out = [];
 
@@ -461,26 +535,82 @@ const EstimateModal = ({
     // 1) Base priced lines (gutters, downspouts)
     (selectedDiagram?.lines || []).forEach((l) => {
       // skip notes/free marks
+
+      // Splash Guard (priced, quantity = 1 per mark)
+      if (l.isSplashGuard && l.currentProduct) {
+        const unit = Number(l.currentProduct?.price || 0);
+        const name = l.currentProduct?.name || "Splash Guard";
+        const qty = 1;
+
+        rows.push({
+          name,
+          quantity: qty,
+          price: unit,
+          product: l.currentProduct,
+          meta: {
+            kind: "splashGuard",
+            // carry color so PDF key & any UI swatch are accurate
+            color:
+              l.color ||
+              l.currentProduct?.color ||
+              l.currentProduct?.colorCode ||
+              l.currentProduct?.defaultColor ||
+              "#111111",
+          },
+        });
+
+        return;
+      }
       if (l.isNote || l.isFreeMark) return;
 
       if (l.isDownspout) {
-        const qty = Number(l.measurement || 0);
+        const qty = Number(l.totalFeet ?? l.measurement ?? 0);
         const unit = Number(l.price || l.currentProduct?.price || 0);
         const name =
           l.currentProduct?.name ||
           (l.downspoutSize ? `${l.downspoutSize} Downspout` : "Downspout");
         if (qty > 0 && unit >= 0) {
-          rows.push({ name, quantity: qty, price: unit });
+          rows.push({
+            name: prettifyLineItemName(name),
+            quantity: qty,
+            price: unit,
+          });
+        }
+
+        if (l.isGutter && l.currentProduct) {
+          const qty = Number(l.runFeet ?? l.measurement ?? 0);
+          const unit = Number(l.currentProduct?.price || 0);
+          const name = l.currentProduct?.name || "Gutter";
+          if (qty > 0 && unit >= 0) {
+            rows.push({
+              name,
+              quantity: Math.round(qty * 4) / 4,
+              price: unit,
+              product: l.currentProduct,
+              meta: {
+                kind: "gutter",
+                profileKey: l.profileKey || "",
+                size: l.sizeInches || "",
+              },
+            });
+          }
         }
         return;
       }
 
       // gutter lines
-      if (l.currentProduct && Number(l.measurement || 0) > 0) {
+      if (
+        (l.currentProduct || resolveGutterProductForLine(l)) &&
+        Number((l.runFeet ?? l.measurement) || 0) > 0
+      ) {
         rows.push({
-          name: l.currentProduct.name,
-          quantity: Number(l.measurement || 0),
-          price: Number(l.currentProduct.price || 0),
+          name: prettifyLineItemName(
+            (l.currentProduct || resolveGutterProductForLine(l)).name
+          ),
+          quantity: Number((l.runFeet ?? l.measurement) || 0),
+          price: Number(
+            (l.currentProduct || resolveGutterProductForLine(l))?.price || 0
+          ),
         });
       }
     });
@@ -488,7 +618,7 @@ const EstimateModal = ({
     // 2) Accessories (merged) — use their own unit price
     (mergedAccessories || []).forEach((it) => {
       rows.push({
-        name: it.name,
+        name: prettifyLineItemName(it.name),
         quantity: Number(it.quantity || 0),
         price: Number(it.price || 0),
       });
@@ -497,7 +627,7 @@ const EstimateModal = ({
     // 3) Impromptu items
     (adHocItems || []).forEach((it) => {
       rows.push({
-        name: it.name || "Custom",
+        name: prettifyLineItemName(it.name) || "Custom",
         quantity: Number(it.quantity || 0),
         price: Number(it.price || 0),
       });
@@ -521,6 +651,7 @@ const EstimateModal = ({
       ...prev,
       notes: notesDraft || "",
     }));
+    setNotesSaved(true);
   }, [notesDraft]);
 
   // ======= PDF preview via blob + <iframe> with debounce & guards =======
@@ -753,7 +884,7 @@ const EstimateModal = ({
             cursor: "pointer",
           }}
         >
-          Save Notes
+          {notesSaved ? "Saved" : "Save Notes"}
         </button>
 
         <button
@@ -814,7 +945,8 @@ const EstimateModal = ({
               backgroundColor: "#000",
               border: "1px solid var(--white)",
               color: "var(--white)",
-              overflow: "hidden",
+              // overflow: "hidden",
+              overflow: "auto",
               borderRadius: 0,
             }
           : {
@@ -835,14 +967,21 @@ const EstimateModal = ({
       {/* Controls: notes + ad-hoc list */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          display: "flex",
+          flexWrap: "wrap",
+          // gridTemplateColumns: "1fr 1fr",
           gap: 12,
           alignItems: "start",
           marginBottom: 12,
         }}
       >
-        <div style={{ flex: "1 1 280px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            width: "100%",
+          }}
+        >
           <label style={{ display: "block", marginBottom: 6 }}>Notes:</label>
           <input
             type="text"
@@ -853,7 +992,10 @@ const EstimateModal = ({
               }
             }}
             value={notesDraft}
-            onChange={(e) => setNotesDraft(e.target.value)}
+            onChange={(e) => {
+              setNotesDraft(e.target.value);
+              setNotesSaved(false);
+            }}
             placeholder="Add a short note for the diagram page…"
             style={{
               width: "100%",
@@ -867,67 +1009,84 @@ const EstimateModal = ({
           />
         </div>
 
-        <div style={{ flex: "1 1 300px" }}>
-          <label style={{ display: "block", marginBottom: 6 }}>
-            Add custom items:
-          </label>
-
-          {/* ONE-LINE ADDER: Name, Qty, Price, Add */}
-          <div
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            width: "100%",
+          }}
+        >
+          <label
             style={{
-              display: "grid",
-              gridTemplateColumns: "1.2fr 80px 100px 80px",
-              gap: 8,
-              alignItems: "center",
-              marginBottom: 10,
+              display: "block",
+              marginBottom: 6,
             }}
           >
-            <input
-              value={adHocDraft.name}
-              onChange={(e) => setAdHocDraft({ name: e.target.value })}
-              placeholder="Item name"
+            Add custom items:
+          </label>
+          {/* MOBILE-FRIENDLY ADDER */}
+          <div className="estimate-modal__adder" style={{ width: "100%" }}>
+            {/* Row 1: Name | Qty | Price */}
+            <div
+              className="adder-row"
               style={{
-                borderRadius: 6,
-                padding: 6,
-                background: "transparent",
-                color: "#fff",
-                border: "1px solid #666",
+                marginBottom: 8,
+                display: "flex",
+                gap: "5px",
               }}
-            />
-            <input
-              type="number"
-              min={0}
-              value={adHocDraft.quantity}
-              onChange={(e) =>
-                setAdHocDraft({ quantity: Number(e.target.value || 0) })
-              }
-              placeholder="Qty"
-              style={{
-                borderRadius: 6,
-                padding: 6,
-                background: "transparent",
-                color: "#fff",
-                border: "1px solid #666",
-              }}
-            />
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={adHocDraft.price}
-              onChange={(e) =>
-                setAdHocDraft({ price: Number(e.target.value || 0) })
-              }
-              placeholder="Unit Price"
-              style={{
-                borderRadius: 6,
-                padding: 6,
-                background: "transparent",
-                color: "#fff",
-                border: "1px solid #666",
-              }}
-            />
+            >
+              <input
+                value={adHocDraft.name}
+                onChange={(e) => setAdHocDraft({ name: e.target.value })}
+                placeholder="Item name"
+                style={{
+                  borderRadius: 6,
+                  padding: 6,
+                  background: "transparent",
+                  color: "#fff",
+                  border: "1px solid #666",
+                  flex: "1 1 80%",
+                }}
+              />
+              <input
+                type="number"
+                min={0}
+                value={adHocDraft.quantity}
+                onChange={(e) =>
+                  setAdHocDraft({ quantity: Number(e.target.value || 0) })
+                }
+                placeholder="Qty"
+                style={{
+                  borderRadius: 6,
+                  padding: 6,
+                  background: "transparent",
+                  color: "#fff",
+                  border: "1px solid #666",
+                  width: "20%",
+                }}
+              />
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={adHocDraft.price}
+                onChange={(e) =>
+                  setAdHocDraft({ price: Number(e.target.value || 0) })
+                }
+                placeholder="Unit Price"
+                style={{
+                  borderRadius: 6,
+                  padding: 6,
+                  background: "transparent",
+                  color: "#fff",
+                  border: "1px solid #666",
+                  width: "20%",
+                }}
+              />
+            </div>
+            {/* Row 2: Add (full width on mobile) */}
             <button
+              className="adder-add"
               onClick={addAdHocFromDraft}
               style={{
                 padding: "6px 10px",
@@ -936,12 +1095,12 @@ const EstimateModal = ({
                 background: "transparent",
                 color: "var(--white)",
                 cursor: "pointer",
+                width: "100%", // desktop keeps full width too; mobile rule ensures it fills container
               }}
             >
               Add
             </button>
           </div>
-
           {/* READ-ONLY LIST of committed items */}
           <div style={{ display: "grid", gap: 6 }}>
             {adHocItems.length === 0 ? (
@@ -996,7 +1155,11 @@ const EstimateModal = ({
 
       {/* PDF area: visually identical container */}
       <div
-        style={{ width: "100%", height: "calc(100% - 210px)", minHeight: 0 }}
+        style={{
+          width: "100%",
+          height: "calc(100% - 210px)",
+          minHeight: 0,
+        }}
       >
         {canInlinePDF ? (
           !pdfUrl ? (
@@ -1018,7 +1181,7 @@ const EstimateModal = ({
             }}
           >
             {/* Lightweight HTML fallback preview */}
-            <h3 style={{ marginTop: 0 }}>Estimate Preview (mobile)</h3>
+            <h3 style={{ marginTop: 0 }}>Estimate Preview</h3>
             <div
               style={{ border: "1px solid #333", padding: 8, borderRadius: 8 }}
             >

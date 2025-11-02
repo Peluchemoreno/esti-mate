@@ -31,12 +31,89 @@ const COMMON_COLORS = [
 ];
 
 // ------- small helpers -------
+// Use green only for the IN-PROGRESS preview when perfectly straight.
+// Never persist green into line.color.
+function renderStrokeColor(line, { isPreview = false } = {}) {
+  const base = line?.currentProduct?.color || line?.color || "#000";
+
+  if (isPreview && (line?.isHorizontal || line?.isVertical)) {
+    // alignment hint only while drawing
+    return "#00c853";
+  }
+  return base;
+}
+
+function feetFromPx(px, gridSize, feetPerSquare) {
+  return Number(px || 0) * (Number(feetPerSquare || 1) / Number(gridSize || 1));
+}
+function roundToQuarterFeet(n) {
+  return Math.round(Number(n || 0) * 4) / 4;
+}
+function distancePxOf(line) {
+  return calculateDistance([line.startX, line.startY], [line.endX, line.endY]);
+}
+
 const newId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const titleCase = (s = "") => s.replace(/\b\w/g, (c) => c.toUpperCase());
+
+function productFromToolName(toolValue, allProducts) {
+  if (!toolValue || !Array.isArray(allProducts)) return null;
+  // your <select> uses product.name as value for priced tools
+  const p = allProducts.find((x) => String(x?.name) === String(toolValue));
+  return p || null;
+}
+
+function applyGutterMetadata(lineDraft, toolValue, allProducts) {
+  // If the current tool is a priced gutter product, stamp metadata onto the line
+  const prod = productFromToolName(toolValue, allProducts);
+  if (!prod) return lineDraft;
+
+  const isGutter = /gutter/i.test(String(prod.name || ""));
+  if (!isGutter) return lineDraft;
+
+  return {
+    ...lineDraft,
+    isGutter: true,
+    // freeze the product & derived tokens on the line
+    currentProduct: prod,
+    profileKey: prod.profile || lineDraft.profileKey || "",
+    sizeInches: prod.size || lineDraft.sizeInches || "",
+    color: lineDraft.color || prod.color || prod.colorCode || lineDraft.color,
+  };
+}
+
+// Parse labels like `6" K-Style`, `5" Straight Face`, `6" Half Round`, `6" Box`
+function splitSizeAndProfileFromKey(label) {
+  const s = String(label || "").trim();
+  // size at the start: 5", 6", 7"
+  const m = s.match(/^\s*(\d+)\s*"\s*(.+)$/i);
+  let sizeInches = null;
+  let profileKey = "custom";
+
+  if (m) {
+    sizeInches = `${m[1]}"`;
+    const rest = m[2].toLowerCase();
+    if (rest.includes("k")) profileKey = "k-style";
+    else if (rest.includes("straight")) profileKey = "straight-face";
+    else if (rest.includes("half")) profileKey = "half-round";
+    else if (rest.includes("box")) profileKey = "box";
+    else if (rest.includes("custom")) profileKey = "custom";
+  } else {
+    // no leading size — try to infer profile only
+    const low = s.toLowerCase();
+    if (low.includes("k")) profileKey = "k-style";
+    else if (low.includes("straight")) profileKey = "straight-face";
+    else if (low.includes("half")) profileKey = "half-round";
+    else if (low.includes("box")) profileKey = "box";
+    else if (low.includes("custom")) profileKey = "custom";
+  }
+
+  return { sizeInches, profileKey };
+}
 
 const PROFILE_ALIASES = [
   [/k[-\s]?style/i, "K-Style"],
@@ -361,6 +438,53 @@ const Diagram = ({
 
   const boxClickRef = useRef({ x: 0, y: 0, index: null });
 
+  // Cycle-through selection when clicking stacked elements
+  const selectCycleRef = useRef({
+    x: 0,
+    y: 0,
+    stack: [], // indices (top-first)
+    idx: -1, // current position in stack
+    time: 0, // last click ts
+  });
+
+  function getHitStackAt(x, y) {
+    // Build top-first list of indices that are hit at (x,y)
+    const hits = [];
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const el = lines[i];
+      let ok = false;
+
+      if (el.isNote) {
+        ok = !!hitTestAnnotation(el, x, y);
+      } else if (el.isDownspout) {
+        ok = !!hitTestDownspout(el, x, y);
+      } else if (el.isFreeMark) {
+        if (el.kind === "free-line") {
+          ok = !!hitTestLine(
+            {
+              startX: el.startX,
+              startY: el.startY,
+              endX: el.endX,
+              endY: el.endY,
+            },
+            x,
+            y
+          );
+        } else if (el.kind === "free-square") {
+          ok = hitTestFreeSquare(el, x, y);
+        } else if (el.kind === "free-circle") {
+          ok = hitTestFreeCircle(el, x, y);
+        }
+      } else {
+        // gutter/priced line
+        ok = !!hitTestLine(el, x, y);
+      }
+
+      if (ok) hits.push(i);
+    }
+    return hits; // top-most first
+  }
+
   useEffect(() => {
     if (activeModal === "diagram") {
       setCanvasSize();
@@ -630,18 +754,22 @@ const Diagram = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
     ctx.imageSmoothingEnabled = false;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // grid first
     drawGrid(ctx);
-    // existing lines
-    (lines || []).forEach((L) => drawLine(ctx, L));
-    // in-progress line
-    if (isDrawing && currentLine) drawLine(ctx, currentLine);
+
+    // existing committed lines (never preview)
+    (lines || []).forEach((L) => drawLine(ctx, L, { isPreview: false }));
+
+    // in-progress line (preview = true -> may render green)
+    if (isDrawing && currentLine)
+      drawLine(ctx, currentLine, { isPreview: true });
   }
 
   const [downspoutCoordinates, setDownspoutCoordinates] = useState([0, 0]);
@@ -832,7 +960,43 @@ const Diagram = ({
     // clamp to canvas and reject invalids
     withIds = sanitizeLines(withIds, curW, curH)
       // clear any cached derived props so we never render stale labels
-      .map((l) => ({ ...l, measurement: undefined, midpoint: undefined }));
+      .map((l) => {
+        const copy = { ...l, midpoint: undefined };
+        if (copy.isDownspout) {
+          // Preserve or backfill totalFeet for downspouts
+          const tf = Number(copy.totalFeet ?? copy.measurement ?? 0);
+          copy.totalFeet = isNaN(tf) ? 0 : tf;
+          // Keep measurement equal to totalFeet for DS so UI that reads `measurement` still works
+          copy.measurement = copy.totalFeet;
+        } else {
+          // For gutters/free-lines, drop cached measurement to force recompute
+          copy.measurement = undefined;
+        }
+
+        // --- GUTTER HYDRATION SAFETY ---
+        if (copy.isGutter) {
+          // Preserve snapshot fields if they exist on the saved line
+          if (!copy.currentProduct && l.currentProduct)
+            copy.currentProduct = l.currentProduct;
+          if (!copy.profileKey && l.profileKey) copy.profileKey = l.profileKey;
+          if (!copy.sizeInches && l.sizeInches) copy.sizeInches = l.sizeInches;
+          if (!copy.color && l.color) copy.color = l.color;
+
+          // Recompute runFeet ONLY if missing or not finite, using saved meta scale
+          if (!Number.isFinite(copy.runFeet)) {
+            const px = calculateDistance(
+              [copy.startX, copy.startY],
+              [copy.endX, copy.endY]
+            );
+            const ft =
+              Number(px || 0) *
+              (Number(savedFeet || 1) / Number(savedGrid || 1));
+            copy.runFeet = Math.round(ft);
+          }
+        }
+
+        return copy;
+      });
 
     // draw the scaled content exactly as your code does now
     setLines(withIds);
@@ -889,7 +1053,16 @@ const Diagram = ({
           x: round2(l.startX),
           y: round2(l.startY),
           size: l.downspoutSize || null,
-          seq: String(l.elbowSequence || "").trim(),
+          // ✅ include profile in the hash so style changes are detected
+          profile: String(l.profile || "")
+            .trim()
+            .toLowerCase(),
+          // ✅ include footage (totalFeet/measurement) so footage edits are detected
+          feet: Number(l.totalFeet ?? l.measurement ?? 0),
+          // keep existing pieces
+          seq: String(l.elbowSequence || "")
+            .trim()
+            .toUpperCase(),
           c: normColor(l.color || "#000"),
         };
       }
@@ -1202,7 +1375,7 @@ const Diagram = ({
     }
   }
 
-  function drawLine(ctx, line) {
+  function drawLine(ctx, line, { isPreview = false } = {}) {
     const x1 = snap(line.startX);
     const y1 = snap(line.startY);
     const x2 = snap(line.endX);
@@ -1385,9 +1558,11 @@ const Diagram = ({
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = line.isSelected
+    const stroke = line.isSelected
       ? "orange"
-      : line.currentProduct?.color || line.color || "#000";
+      : renderStrokeColor(line, { isPreview });
+
+    ctx.strokeStyle = stroke;
     ctx.stroke();
 
     if (line.isSelected) {
@@ -1455,54 +1630,62 @@ const Diagram = ({
     });
 
     // If we came from clicking an existing DS box: update instead of creating a new line
+    // Diagram.jsx — inside addDownspout (edit branch)
     if (editingDownspoutIndex !== null) {
-      setLines((prev) => {
-        const next = [...prev];
-        const ds = next[editingDownspoutIndex];
-        if (!ds || !ds.isDownspout) return prev;
+      // Build the next lines snapshot with the edited DS baked in
+      const next = lines.map((ln, idx) => {
+        if (idx !== editingDownspoutIndex) return ln;
 
-        // Keep product mapping logic consistent with add flow
-        const currentDownspout = (allProducts || []).find((p) => {
-          return (
-            /ownspout/i.test(p.name) &&
-            p.name
-              .toLowerCase()
-              .includes(downspoutData.profile.toLowerCase()) &&
-            (p.name.includes(downspoutData.downspoutSize) ||
-              p.size === downspoutData.downspoutSize)
-          );
-        });
+        const ds = { ...ln };
 
         // Force uppercase sequence and update footage (measurement)
         ds.elbowSequence = String(
           downspoutData.elbowSequence || ""
         ).toUpperCase();
-        ds.profile = downspoutData.profile; // persist the profile family ("corrugated" | "smooth" | "box" | "round")
-        ds.measurement = parseInt(downspoutData.totalFootage, 10) || 0;
+        const tf = parseInt(downspoutData.totalFootage, 10);
+        ds.totalFeet = isNaN(tf) ? 0 : tf;
+        ds.measurement = ds.totalFeet; // keep legacy readers happy
 
-        // If size/profile changed in modal, reflect that too
+        // Map product/color exactly like create path
+        ds.price = currentDownspout?.price || ds.price || 0;
+        ds.color = currentDownspout?.visual || ds.color || "#000";
+
+        // Keep these consistent with your stored DS shape
+        ds.profile = downspoutData.profile;
         ds.downspoutSize = downspoutData.downspoutSize;
         ds.currentProduct = {
-          price: currentDownspout?.price || ds.currentProduct?.price || 0,
+          price: currentDownspout?.price || 0,
           name: formatDownspoutName(
             downspoutData.downspoutSize,
             downspoutData.profile
           ),
-          description:
-            currentDownspout?.description ||
-            ds.currentProduct?.description ||
-            "",
+          description: currentDownspout?.description || "",
         };
-        ds.price = currentDownspout?.price || ds.price || 0;
-        ds.color = currentDownspout?.visual || ds.color || "#000";
+        ds.rainBarrel = downspoutData.rainBarrel;
+        ds.splashBlock = downspoutData.splashBlock;
+        ds.undergroundDrainage = downspoutData.undergroundDrainage;
 
-        return next;
+        return ds;
       });
 
-      // Close modal and clear edit state
+      // Commit the edit
+      setLines(next);
+
+      // Close DS modal and clear edit state
       setIsDownspoutModalOpen(false);
-      setActiveModal(null);
       setEditingDownspoutIndex(null);
+
+      // Decide which modal to show based on real change vs baseline
+      const currentHash = hashLines(next);
+      const hasChanged = currentHash !== baselineHashRef.current;
+
+      if (hasChanged && selectedDiagram?._id) {
+        // Existing diagram was modified -> show overwrite prompt
+        setActiveModal("confirmDiagramOverwrite");
+      } else {
+        // New diagram (no _id) or no material change -> return to canvas
+        setActiveModal("diagram");
+      }
       return;
     }
 
@@ -1513,7 +1696,9 @@ const Diagram = ({
       endX: downspoutCoordinates[0],
       endY: downspoutCoordinates[1],
       midpoint: null,
-      measurement: parseInt(downspoutData.totalFootage, 10),
+      // Persist both legacy measurement and canonical totalFeet for DS
+      totalFeet: Number.parseInt(downspoutData.totalFootage, 10) || 0,
+      measurement: Number.parseInt(downspoutData.totalFootage, 10) || 0,
       color: currentDownspout?.color || "#000",
       isSelected: false,
       isDownspout: true,
@@ -1577,121 +1762,133 @@ const Diagram = ({
       return;
     }
 
-    // Splash Guard / Valley Shield (solid circle mark, not priced)
+    // Splash Guard / Valley Shield (solid circle mark, priced)
+    // --- Splash Guard (priced mark, filled circle) ---
     if (tool === "splashGuard") {
+      // Find the Splash Guard product from your catalog
+      const prod =
+        (Array.isArray(allProducts) ? allProducts : []).find((p) =>
+          /splash\s*guard/i.test(String(p?.name || ""))
+        ) || null;
+
+      // Resolve its display color (prefer explicit color fields from product)
+      const col =
+        prod?.color ??
+        prod?.visual ??
+        prod?.colorCode ??
+        prod?.defaultColor ??
+        "#111111";
+
+      // Commit a priced, filled-circle mark; still a "free" shape for canvas hit-tests
       const mark = {
         id: newId(),
-        isFreeMark: true,
+        isFreeMark: true, // still a free mark for UI behavior
+        isSplashGuard: true, // <-- SIGNAL this is a priced item
         kind: "free-circle",
         fill: true,
-        color: "#111111",
+        color: col, // <-- draw with product color
         dashed: false,
         strokeWidth: 2,
         centerX: snappedX,
         centerY: snappedY,
-        startX: snappedX, // <-- add
+        startX: snappedX,
         startY: snappedY,
         radius: 4,
         isSelected: false,
+
+        // Freeze a pricing snapshot for line items
+        currentProduct: prod
+          ? {
+              _id: prod._id,
+              name: prod.name,
+              price: Number(prod.price || 0),
+              color: col,
+              description: prod.description || "",
+              profile: prod.profile || "",
+              size: prod.size || "",
+            }
+          : null,
+        price: Number(prod?.price || 0),
       };
+
       setLines((prev) => [...prev, mark]);
       return;
     }
 
     // Select
+    // Select
     if (tool === "select") {
-      let hitIndex = null;
-      let dragMode = "none";
-      let end = null;
+      const now = Date.now();
+      const sameSpot =
+        Math.hypot(
+          selectCycleRef.current.x - x,
+          selectCycleRef.current.y - y
+        ) <= Math.max(6, gridSize * 0.25);
+      const withinWindow = now - selectCycleRef.current.time < 800; // ms between clicks
 
-      for (let i = lines.length - 1; i >= 0; i--) {
-        const el = lines[i];
-
-        if (el.isNote) {
-          if (hitTestAnnotation(el, x, y)) {
-            // bring note to front
-            bringToFront(i);
-            // start as a move, but decide click-vs-drag on mouseup
-            setDragging({ mode: "move", end: null, lastX: x, lastY: y });
-            noteClickRef.current = { x, y, index: lines.length - 1 }; // after bringToFront
-            return;
-          }
-        } else if (el.isDownspout) {
-          const hit = hitTestDownspout(el, x, y);
-          if (hit) {
-            if (hit.part === "box") {
-              // start a box-drag, but decide "open modal vs drag" on mouseup
-              bringToFront(i);
-              setDragging({ mode: "move-box", end: null, lastX: x, lastY: y });
-              boxClickRef.current = { x, y, index: lines.length - 1 }; // top after bringToFront
-              return;
-            } else {
-              // click on the X moves the whole DS
-              hitIndex = i;
-              dragMode = "move";
-              break;
-            }
-          }
-        } else if (el.isFreeMark) {
-          // Unified free-shape hit-testing: line endpoints/body OR square/circle
-          let h = null;
-
-          if (el.kind === "free-line") {
-            h = hitTestLine(
-              {
-                startX: el.startX,
-                startY: el.startY,
-                endX: el.endX,
-                endY: el.endY,
-              },
-              x,
-              y
-            );
-          } else if (el.kind === "free-square") {
-            h = hitTestFreeSquare(el, x, y) ? { hit: "body" } : null;
-          } else if (el.kind === "free-circle") {
-            h = hitTestFreeCircle(el, x, y) ? { hit: "body" } : null;
-          }
-
-          if (h) {
-            hitIndex = i;
-            if (h.hit === "start" || h.hit === "end") {
-              dragMode = "drag-end";
-              end = h.hit === "start" ? "start" : "end";
-            } else {
-              dragMode = "move";
-            }
-            break;
-          }
-        } else {
-          const hit = hitTestLine(el, x, y);
-          if (hit) {
-            hitIndex = i;
-            if (hit.hit === "start" || hit.hit === "end") {
-              dragMode = "drag-end";
-              end = hit.hit;
-            } else {
-              dragMode = "move";
-            }
-            break;
-          }
-        }
+      // Compute stack at this click location when first click or moved
+      if (!sameSpot || !withinWindow) {
+        selectCycleRef.current.stack = getHitStackAt(x, y);
+        selectCycleRef.current.idx = -1;
       }
 
-      if (hitIndex !== null) {
-        bringToFront(hitIndex);
-        setDragging({
-          mode: dragMode,
-          end: end ?? null,
-          lastX: x,
-          lastY: y,
-        });
+      selectCycleRef.current.time = now;
+      selectCycleRef.current.x = x;
+      selectCycleRef.current.y = y;
+
+      const stack = selectCycleRef.current.stack;
+      if (!stack.length) {
+        // Clear selection if nothing hit
+        setLines((prev) => prev.map((l) => ({ ...l, isSelected: false })));
+        setSelectedIndex(null);
+        setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
         return;
       }
 
-      setLines((prev) => prev.map((l) => ({ ...l, isSelected: false })));
-      setSelectedIndex(null);
-      setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
+      // Advance to next item in the stack (cycle)
+      selectCycleRef.current.idx =
+        (selectCycleRef.current.idx + 1) % stack.length;
+
+      const hitIndex = stack[selectCycleRef.current.idx];
+      const el = lines[hitIndex];
+
+      // Mark selection
+      setLines((prev) =>
+        prev.map((l, idx) => ({ ...l, isSelected: idx === hitIndex }))
+      );
+      setSelectedIndex(hitIndex);
+
+      // Decide initial drag mode for the selected element
+      let dragMode = "none";
+      let end = null;
+
+      if (el.isNote) {
+        dragMode = "move";
+      } else if (el.isDownspout) {
+        // Clicking anywhere on DS icon moves whole DS; box dragging handled in mousemove
+        dragMode = "move";
+      } else if (el.isFreeMark) {
+        if (el.kind === "free-line") {
+          // allow moving the whole line; endpoints handled by line hit-test
+          dragMode = "move";
+        } else if (el.kind === "free-square") {
+          dragMode = "move-free-square";
+        } else if (el.kind === "free-circle") {
+          // Splash Guard path -> free-circle, filled
+          dragMode = "move-free-circle";
+        }
+      } else {
+        // gutter line: allow move or end-drag depending on where we clicked
+        const h = hitTestLine(el, x, y);
+        if (h?.hit === "start" || h?.hit === "end") {
+          dragMode = "drag-end";
+          end = h.hit; // "start" | "end"
+        } else {
+          dragMode = "move";
+        }
+      }
+
+      setDragging({ mode: dragMode, end, lastX: x, lastY: y });
       return;
     }
 
@@ -1771,17 +1968,20 @@ const Diagram = ({
       return;
     }
 
-    // Default: start drawing a new GUTTER line (priced)
-    setCurrentLine({
+    // ...inside handleMouseDown(e) when starting a priced (gutter) line
+    const baseDraft = {
+      id: newId(),
       startX: snappedX,
       startY: snappedY,
       endX: snappedX,
       endY: snappedY,
-      isVertical: false,
-      isHorizontal: false,
       isSelected: false,
       color: "black",
-    });
+      isVertical: false,
+      isHorizontal: false,
+    };
+    const stamped = applyGutterMetadata(baseDraft, tool, allProducts);
+    setCurrentLine(stamped);
     setIsDrawing(true);
   }
 
@@ -1792,6 +1992,7 @@ const Diagram = ({
     const sx = snap(x);
     const sy = snap(y);
 
+    // --- SELECTION / MOVEMENT HANDLING ---
     if (
       tool === "select" &&
       dragging.mode !== "none" &&
@@ -1806,24 +2007,19 @@ const Diagram = ({
         if (!el) return prev;
 
         if (el.isNote) {
-          // unchanged
           el.startX += dx;
           el.startY += dy;
           el.endX = el.startX;
           el.endY = el.startY;
         } else if (el.isDownspout) {
           if (dragging.mode === "move-box") {
-            // Reposition the box by angle around the X
             const angle = Math.atan2(y - el.startY, x - el.startX);
-            // optional: snap angle slightly if you want discrete stops
             el.elbowBoxAngle = angle;
-            // keep radius stable; or allow CTRL+drag to adjust radius later
             el.elbowBoxRadius =
               typeof el.elbowBoxRadius === "number"
                 ? el.elbowBoxRadius
                 : gridSize * 4;
           } else {
-            // moving the entire downspout (X)
             el.startX += dx;
             el.startY += dy;
             el.endX = el.startX;
@@ -1851,8 +2047,12 @@ const Diagram = ({
             el.endX += dx;
             el.endY += dy;
           } else if (el.kind === "free-circle") {
+            // ✅ Splash guard movement (circle)
             el.centerX += dx;
             el.centerY += dy;
+            // keep legacy startX/startY in sync for hit detection
+            el.startX = el.centerX;
+            el.startY = el.centerY;
           }
         } else {
           if (dragging.mode === "move") {
@@ -1871,6 +2071,7 @@ const Diagram = ({
           }
           updateLineComputedProps(el);
         }
+
         return next;
       });
 
@@ -1878,6 +2079,7 @@ const Diagram = ({
       return;
     }
 
+    // --- DRAWING HANDLING ---
     if (
       isDrawing &&
       tool !== "downspout" &&
@@ -1885,13 +2087,13 @@ const Diagram = ({
       tool !== "note"
     ) {
       if (tool === "freeLine") {
-        // Only lines are drag-updated; circle/square are click-to-place
         if ((currentLine.kind || "free-line") === "free-line") {
           setCurrentLine((prev) => ({ ...prev, endX: sx, endY: sy }));
         }
         return;
       }
 
+      // Straight-line guidance coloring
       if (
         isLineParallelToSide(
           currentLine.startX,
@@ -1942,7 +2144,6 @@ const Diagram = ({
         if (ds?.isDownspout) {
           setEditingDownspoutIndex(selectedIndex);
           setDownspoutCoordinates([ds.startX, ds.startY]);
-          setIsDownspoutModalOpen(true);
           setActiveModal("downspout");
         }
       }
@@ -2018,7 +2219,7 @@ const Diagram = ({
       return;
     }
 
-    // Commit gutter line (priced)
+    /* // Commit gutter line (priced)
     if (isDrawing) {
       const prod = currentProductFromTool();
       const committed = { ...currentLine };
@@ -2037,6 +2238,81 @@ const Diagram = ({
       committed.currentProduct = prod || null;
       committed.color = prod ? productColor(prod) : "black";
 
+      if (
+        committed.startX === committed.endX &&
+        committed.startY === committed.endY
+      ) {
+        setIsDrawing(false);
+        setLineLength(0);
+        return;
+      }
+
+      setLines((prev) => [...prev, committed]);
+      setIsDrawing(false);
+      setLineLength(0);
+    } */
+    if (isDrawing) {
+      const prod = currentProductFromTool(); // your existing helper
+      const committed = { ...currentLine };
+
+      // --- geometry first ---
+      committed.midpoint = [
+        (committed.startX + committed.endX) / 2,
+        (committed.startY + committed.endY) / 2,
+      ];
+      committed.measurement = convertToFeet(
+        calculateDistance(
+          [committed.startX, committed.startY],
+          [committed.endX, committed.endY]
+        )
+      );
+
+      // --- STAMP (conservatively) based on the product currently selected ---
+      if (prod) {
+        const isGutterProd = /gutter/i.test(String(prod.name || ""));
+
+        if (isGutterProd) {
+          committed.isGutter = true;
+          const px = distancePxOf(committed);
+          committed.runFeet = roundToQuarterFeet(
+            feetFromPx(px, feetPerSquare, gridSize)
+          );
+
+          // Do NOT override if already stamped on mousedown or previously edited
+          if (!committed.currentProduct) committed.currentProduct = prod;
+          if (!committed.profileKey) committed.profileKey = prod.profile || "";
+          if (!committed.sizeInches) committed.sizeInches = prod.size || "";
+
+          // Only paint color if not already set
+          const colorFrom = committed.currentProduct || prod || null;
+          committed.color =
+            productColor(colorFrom) || committed.color || "#000";
+        } else {
+          // Non-gutter priced tool: you may still want to bind the product,
+          // but do not flag as gutter or touch profile/size
+          if (!committed.currentProduct) committed.currentProduct = prod;
+          if (!committed.color) committed.color = productColor(prod) || "black";
+        }
+      } else {
+        // No tool product selected; ensure there's at least some color
+        if (!committed.color) committed.color = "black";
+      }
+
+      // --- compute any derived props that might rely on meta (runFeet, flags, etc.) ---
+      updateLineComputedProps(committed);
+      // compute runFeet from px using current scale; round to quarter foot
+      if (committed.isGutter) {
+        const pxDist = calculateDistance(
+          [committed.startX, committed.startY],
+          [committed.endX, committed.endY]
+        );
+        const ft =
+          Number(pxDist || 0) *
+          (Number(feetPerSquare || 1) / Number(gridSize || 1));
+        committed.runFeet = Math.round(ft * 4) / 4;
+      }
+
+      // reject zero-length lines
       if (
         committed.startX === committed.endX &&
         committed.startY === committed.endY
@@ -2485,6 +2761,11 @@ const Diagram = ({
     // draw from the hi-DPI source rect
     tempCtx.drawImage(canvas, srcX, srcY, srcW, srcH, dx, dy, destW, destH);
 
+    setSelectedIndex(null);
+    setLines((prev) =>
+      prev.map((l) => (l.isSelected ? { ...l, isSelected: false } : l))
+    );
+
     const thumbnailDataUrl = await canvasToDataURLAsync(
       tempCanvas,
       "image/png",
@@ -2508,11 +2789,13 @@ const Diagram = ({
     });
 
     const analysis = analyzeJoints(lines);
+    console.log("analysis: ", analysis);
     const endcapMiterData = {
       endCapsByProduct: analysis.endCapsByProduct,
       mitersByProduct: analysis.mitersByProduct,
       mixedMiters: analysis.mixedMiters,
     };
+    console.log("endcapMiterData: ", endcapMiterData);
 
     const caseIncludes = (hay, needle) =>
       String(hay).toLowerCase().includes(String(needle).toLowerCase());
@@ -2587,22 +2870,36 @@ const Diagram = ({
         });
       };
 
+      // Helper: find the "Custom Miter" product by name (global for any profile/size)
+      const findCustomMiterByName = () => {
+        const lower = (p) => String(p || "").toLowerCase();
+        return (
+          (allProducts || []).find(
+            (p) =>
+              lower(p?.type) === "accessory" &&
+              lower(p?.name) === "custom miter"
+          ) || null
+        );
+      };
+
       // ---------------- End Caps ----------------
-      Object.keys(analysisData.endCapsByProduct || {}).forEach((profileKey) => {
+      Object.keys(analysisData.endCapsByProduct || {}).forEach((keyLabel) => {
         const endCapCount = Number(
-          analysisData.endCapsByProduct[profileKey] || 0
+          analysisData.endCapsByProduct[keyLabel] || 0
         );
         if (!endCapCount) return;
 
-        const sizeInches = null; // pass actual if you can infer
+        // Parse size/profile from label like `6" K-Style`
+        const { sizeInches, profileKey } = splitSizeAndProfileFromKey(keyLabel);
 
         const endCapTpl = findGutterAccessoryTemplate(allProducts, {
           profileKey,
-          sizeInches,
+          sizeInches, // <-- pass the actual size so we don't default to 5"
           kind: "end cap",
         });
+
         if (endCapTpl) {
-          (endCaps[profileKey] ||= []).push({
+          (endCaps[keyLabel] ||= []).push({
             type: "End Cap",
             price: endCapTpl.price,
             quantity: endCapCount,
@@ -2612,27 +2909,27 @@ const Diagram = ({
           pushCatalogItem(endCapTpl, endCapCount, {
             kind: "endcap",
             profileKey,
-            inches: sizeInches || undefined,
+            sizeInches,
           });
         }
       });
 
-      // ---------------- Miters ----------------
-      Object.keys(analysisData.mitersByProduct || {}).forEach((profileKey) => {
-        const m = analysisData.mitersByProduct[profileKey] || {};
+      // ---------------- Miters (strip + bay + custom) ----------------
+      Object.keys(analysisData.mitersByProduct || {}).forEach((keyLabel) => {
+        const m = analysisData.mitersByProduct[keyLabel] || {};
         const stripQty = Number(m.inside90 || 0) + Number(m.outside90 || 0);
         const bayQty = Number(m.bay135 || 0);
 
-        const sizeInches = null;
+        const { sizeInches, profileKey } = splitSizeAndProfileFromKey(keyLabel);
 
         if (stripQty > 0) {
           const strip = findGutterAccessoryTemplate(allProducts, {
             profileKey,
-            sizeInches,
+            sizeInches, // <-- pass the actual size
             kind: "strip miter",
           });
           if (strip) {
-            (miters[profileKey] ||= []).push({
+            (miters[keyLabel] ||= []).push({
               type: "Strip Miter",
               price: strip.price,
               quantity: stripQty,
@@ -2642,6 +2939,7 @@ const Diagram = ({
               kind: "miter",
               profileKey,
               miterType: "strip",
+              sizeInches,
             });
           }
         }
@@ -2649,11 +2947,11 @@ const Diagram = ({
         if (bayQty > 0) {
           const bay = findGutterAccessoryTemplate(allProducts, {
             profileKey,
-            sizeInches,
+            sizeInches, // <-- pass the actual size
             kind: "bay miter",
           });
           if (bay) {
-            (miters[profileKey] ||= []).push({
+            (miters[keyLabel] ||= []).push({
               type: "Bay 135 Miter",
               price: bay.price,
               quantity: bayQty,
@@ -2664,16 +2962,23 @@ const Diagram = ({
               profileKey,
               miterType: "bay",
               degrees: 135,
+              sizeInches,
             });
           }
         }
 
+        // Custom angles
         (Array.isArray(m.custom) ? m.custom : []).forEach(
           ({ angle, count }) => {
             const qty = Number(count || 0);
             if (!qty) return;
 
+            // Always pick the “Custom Miter” product by name, regardless of profile/size
+            const customByName = findCustomMiterByName();
+
+            // If not found by name, try the resolver (still pass the real size/profile)
             const custom =
+              customByName ||
               findGutterAccessoryTemplate(allProducts, {
                 profileKey,
                 sizeInches,
@@ -2681,18 +2986,19 @@ const Diagram = ({
               }) ||
               findGutterAccessoryTemplate(allProducts, {
                 profileKey,
-                sizeInches: null,
+                sizeInches: null, // last resort
                 kind: "custom miter",
               });
 
             if (custom) {
-              (customMiters[profileKey] ||= []).push({
+              (customMiters[keyLabel] ||= []).push({
                 type: `Custom Miter (${angle}°)`,
                 price: custom.price,
                 quantity: qty,
                 product: custom,
                 angle,
               });
+              // Display can show angle, product is the generic "Custom Miter"
               pushCatalogItem(
                 custom,
                 qty,
@@ -2701,6 +3007,7 @@ const Diagram = ({
                   profileKey,
                   miterType: "custom",
                   degrees: angle,
+                  sizeInches,
                 },
                 `Custom Miter (${angle}°)`
               );
@@ -2906,6 +3213,7 @@ const Diagram = ({
 
     // de-duplicate ALL accessories before pricing/rendering
     const allAccessoriesUnfolded = [...accessoryLineItems, ...elbowOffsetItems];
+    console.log(accessoryLineItems);
     const allAccessories = foldAccessoryItems(allAccessoriesUnfolded);
 
     // price from folded list ONLY
@@ -2996,6 +3304,8 @@ const Diagram = ({
         ...metaViewport,
       },
     };
+
+    console.log("saving data: ", data);
 
     function handleAddDiagramToProject() {
       addDiagramToProject(resolvedProjectId, token, data)
@@ -3108,33 +3418,37 @@ const Diagram = ({
           alt="save diagram"
           className="diagram__icon diagram__save"
           onClick={() => {
-            // Defensive: ensure baseline exists
-            if (baselineHashRef.current == null) {
-              baselineHashRef.current = hashLines(lines);
-            }
+            setLines((prev) =>
+              prev.map((l) => (l.isSelected ? { ...l, isSelected: false } : l))
+            );
+            try {
+              const nextHash = hashLines(lines);
+              const hasChanged = nextHash !== baselineHashRef.current;
 
-            const currentHash = hashLines(lines);
-            const hasChanged = currentHash !== baselineHashRef.current;
-
-            if (!hasChanged) {
-              // Match saveDiagram() behavior: close when nothing changed
-              // testing the other branch
-              closeModal();
-              setSelectedDiagram({});
-              setLines([]);
-              setSelectedIndex(null);
-              setIsDrawing(false);
-              if (baselineHashRef && "current" in baselineHashRef) {
-                baselineHashRef.current = hashLines([]);
+              // Existing diagram changed -> open confirm modal
+              if (selectedDiagram?._id && hasChanged) {
+                setActiveModal("confirmDiagramOverwrite");
+                return;
               }
-              return;
-            }
 
-            const isOverwrite = Boolean(selectedDiagram?._id);
-            if (isOverwrite) {
-              setActiveModal("confirmDiagramOverwrite");
-            } else {
-              saveDiagram("add");
+              // New diagram or no change -> follow your existing save path
+              // If you already have a function, call it here (e.g., saveDiagram(), handleSave(), etc.)
+              if (typeof saveDiagram === "function") {
+                saveDiagram();
+              } else if (typeof handleSave === "function") {
+                handleSave();
+              } else {
+                // fallback: if you were previously just closing without saving
+                // leave this empty or implement your minimal persist
+              }
+
+              // Update baseline so next edits are compared properly
+              baselineHashRef.current = nextHash;
+
+              // Close or keep modal as your current flow dictates
+              // setActiveModal(null); // uncomment if your flow closes after save
+            } catch (err) {
+              console.error("Save diagram failed:", err);
             }
           }}
         />
@@ -3175,7 +3489,7 @@ const Diagram = ({
           <option value="downspout">Downspout</option>
           <option value="select">Select</option>
           <option value="note">Notation</option>
-          {/* <option value="splashGuard">Splash Guard / Valley Shield</option> */}
+          <option value="splashGuard">Splash Guard / Valley Shield</option>
           <option value="freeLine">Free Line</option>
         </select>
 

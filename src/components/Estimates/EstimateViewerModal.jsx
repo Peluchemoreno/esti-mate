@@ -79,6 +79,48 @@ export default function EstimateViewerModal({
   }, [isOpen, token, currentUser?._id]);
 
   // Build the exact props EstimatePDF expects, preferring selectedProject over snapshot
+  function buildItemsFromSaved(doc) {
+    try {
+      const rows = [];
+      const diagram = doc?.diagram || {};
+      const lines = Array.isArray(diagram.lines) ? diagram.lines : [];
+      const accessories = doc?.accessories?.items || doc?.accessoryItems || [];
+      lines.forEach((l) => {
+        if (l.isNote || l.isFreeMark) return;
+        if (l.isDownspout) {
+          const qty = Number(l.totalFeet ?? l.measurement ?? 0);
+          const unit = Number(l.price || l.currentProduct?.price || 0);
+          const name =
+            l.currentProduct?.name ||
+            (l.downspoutSize
+              ? String(l.downspoutSize).replace(/\s*/g, "") + " Downspout"
+              : "Downspout");
+          if (qty > 0 && unit >= 0)
+            rows.push({ name, quantity: qty, price: unit });
+          return;
+        }
+        // gutter lines
+        if (l.currentProduct && Number((l.runFeet ?? l.measurement) || 0) > 0) {
+          rows.push({
+            name: l.currentProduct.name,
+            quantity: Number((l.runFeet ?? l.measurement) || 0),
+            price: Number(l.currentProduct.price || 0),
+          });
+        }
+      });
+      (accessories || []).forEach((it) => {
+        rows.push({
+          name: it.name,
+          quantity: Number(it.quantity || 0),
+          price: Number(it.price || 0),
+        });
+      });
+      return rows;
+    } catch {
+      return [];
+    }
+  }
+  // Build the exact props EstimatePDF expects, preferring selectedProject over snapshot
   const pdfProps = useMemo(() => {
     if (!doc) return null;
 
@@ -130,7 +172,10 @@ export default function EstimateViewerModal({
       },
 
       // Items saved with estimate (incl. impromptu)
-      items: (doc.items || []).map((it) => ({
+      items: (Array.isArray(doc?.items) && doc.items.length
+        ? doc.items
+        : buildItemsFromSaved(doc)
+      ).map((it) => ({
         name: it.name,
         quantity: Number(it.quantity || 0),
         price: Number(it.price || 0),
@@ -243,6 +288,77 @@ export default function EstimateViewerModal({
             </div>
             <div style={{ marginTop: 12 }}>
               {/* If you have a persisted file URL, link it here. */}
+              {/* Diagram preview */}
+              {pdfProps?.selectedDiagram?.imageData ||
+              (pdfProps?.selectedDiagram?.lines || []).length > 0 ? (
+                <div
+                  style={{
+                    marginTop: 12,
+                    border: "1px solid #333",
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
+                  <div style={{ fontWeight: "bold", marginBottom: 6 }}>
+                    Diagram
+                  </div>
+                  {pdfProps?.selectedDiagram?.imageData ? (
+                    <img
+                      alt="Diagram preview"
+                      src={pdfProps.selectedDiagram.imageData}
+                      style={{
+                        width: "100%",
+                        height: "auto",
+                        display: "block",
+                      }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>
+                      (Vector diagram will render in the downloaded PDF)
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* Items (same dataset passed to PDF) */}
+              {(pdfProps?.items || []).length > 0 ? (
+                <div
+                  style={{
+                    marginTop: 12,
+                    border: "1px solid #333",
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
+                  <div style={{ fontWeight: "bold", marginBottom: 6 }}>
+                    Items
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto auto",
+                      gap: 6,
+                      fontSize: 14,
+                    }}
+                  >
+                    {pdfProps.items.map((it, i) => (
+                      <div key={i} style={{ display: "contents" }}>
+                        <div>{it.name}</div>
+                        <div style={{ textAlign: "right" }}>
+                          {Number(it.quantity || 0)}
+                        </div>
+                        {pdfProps.showPrices ? (
+                          <div style={{ textAlign: "right" }}>
+                            ${Number(it.price || 0).toFixed(2)}
+                          </div>
+                        ) : (
+                          <div />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         )}

@@ -72,6 +72,7 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
           const type = String(params.row?.type || "").toLowerCase();
           const isGutter = type === "gutter";
           const isDownspout = type === "downspout";
+          const isSplashGuard = params.row?.name === "Splash Guard";
           // prefer saved color, then template/defaults
           const color =
             params.row?.color ??
@@ -80,7 +81,8 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
             params.row?.defaultColor ??
             null;
 
-          const showSwatch = (isGutter || isDownspout) && !!color;
+          const showSwatch =
+            (isGutter || isDownspout || isSplashGuard) && !!color;
 
           return (
             <Box
