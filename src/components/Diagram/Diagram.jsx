@@ -374,14 +374,32 @@ function normalizeGutterKey(name = "") {
 
 // Async replacement for canvas.toDataURL() to avoid blocking the main thread
 function canvasToDataURLAsync(canvas, type = "image/png", quality) {
+  const DEV = true;
   return new Promise((resolve, reject) => {
+    if (DEV) {
+      try {
+        performance.mark("PDF/Canvas snapshot:start");
+      } catch {}
+    }
     try {
       if (canvas.toBlob) {
         canvas.toBlob(
           (blob) => {
             if (!blob) return resolve("");
             const reader = new FileReader();
-            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onloadend = () => {
+              if (DEV) {
+                try {
+                  performance.mark("PDF/Canvas snapshot:end");
+                  performance.measure(
+                    "PDF/Canvas snapshot",
+                    "PDF/Canvas snapshot:start",
+                    "PDF/Canvas snapshot:end"
+                  );
+                } catch {}
+              }
+              resolve(String(reader.result || ""));
+            };
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           },
@@ -390,9 +408,30 @@ function canvasToDataURLAsync(canvas, type = "image/png", quality) {
         );
       } else {
         // Fallback (older Safari), still synchronous but rarely hit
-        resolve(canvas.toDataURL(type, quality));
+        const out = canvas.toDataURL(type, quality);
+        if (DEV) {
+          try {
+            performance.mark("PDF/Canvas snapshot:end");
+            performance.measure(
+              "PDF/Canvas snapshot",
+              "PDF/Canvas snapshot:start",
+              "PDF/Canvas snapshot:end"
+            );
+          } catch {}
+        }
+        resolve(out);
       }
     } catch (e) {
+      if (DEV) {
+        try {
+          performance.mark("PDF/Canvas snapshot:end");
+          performance.measure(
+            "PDF/Canvas snapshot (error)",
+            "PDF/Canvas snapshot:start",
+            "PDF/Canvas snapshot:end"
+          );
+        } catch {}
+      }
       resolve("");
     }
   });

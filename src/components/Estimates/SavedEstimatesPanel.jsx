@@ -26,6 +26,38 @@ export default function SavedEstimatesPanel({
 }) {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
+  const __DEV__ = true;
+  function pdfMark(n) {
+    if (!__DEV__) return;
+    try {
+      performance.mark(n);
+    } catch {}
+  }
+  function pdfMeasure(n, a, b) {
+    if (!__DEV__) return;
+    try {
+      performance.measure(n, a, b);
+    } catch {}
+  }
+  function pdfReportAndClear() {
+    if (!__DEV__) return;
+    try {
+      const rows = performance
+        .getEntriesByType("measure")
+        .filter((e) => e.name.startsWith("PDF/"))
+        .map((e) => ({
+          Stage: e.name.replace(/^PDF\//, ""),
+          Duration_ms: e.duration.toFixed(2),
+        }));
+      if (rows.length) {
+        console.groupCollapsed("📄 Estimate PDF Performance (Download)");
+        console.table(rows);
+        console.groupEnd();
+      }
+      performance.clearMarks();
+      performance.clearMeasures();
+    } catch {}
+  }
 
   const [loading, setLoading] = useState(false);
   const [estimates, setEstimates] = useState([]);
@@ -134,11 +166,11 @@ export default function SavedEstimatesPanel({
 
   async function downloadPDF(est) {
     if (!est?._id) return;
-    const key = `${est._id}|${est.updatedAt || ""}`;
 
-    // Use cached blob if available
+    const key = `${est._id}|${est.updatedAt || ""}`;
     const cached = pdfBlobCache.get(key);
     if (cached) {
+      // Cached path: quick return, no heavy profiling
       const url = URL.createObjectURL(cached);
       const a = document.createElement("a");
       a.href = url;
@@ -153,90 +185,127 @@ export default function SavedEstimatesPanel({
       return;
     }
 
-    // Fetch full detail only on demand
-    const token = localStorage.getItem("jwt");
-    const res = await fetch(`${BASE_URL}api/estimates/${est._id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      return alert("Failed to load estimate.");
+    if (__DEV__) console.time("Full PDF generation");
+    let hadError = false;
+
+    try {
+      const token = localStorage.getItem("jwt");
+      const res = await fetch(`${BASE_URL}api/estimates/${est._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load estimate.");
+      const data = await res.json();
+      const doc = data?.estimate;
+      if (!doc) throw new Error("No estimate data found.");
+
+      // Lazy imports with timings
+      pdfMark("PDF/Import @react-pdf:start");
+      pdfMark("PDF/Import EstimatePDF:start");
+
+      const [{ pdf }, { default: EstimatePDF }] = await Promise.all([
+        import("@react-pdf/renderer").then((m) => {
+          pdfMark("PDF/Import @react-pdf:end");
+          pdfMeasure(
+            "PDF/Import @react-pdf",
+            "PDF/Import @react-pdf:start",
+            "PDF/Import @react-pdf:end"
+          );
+          return m;
+        }),
+        import("../EstimatePDF/EstimatePDF").then((m) => {
+          pdfMark("PDF/Import EstimatePDF:end");
+          pdfMeasure(
+            "PDF/Import EstimatePDF",
+            "PDF/Import EstimatePDF:start",
+            "PDF/Import EstimatePDF:end"
+          );
+          return m;
+        }),
+      ]);
+
+      const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
+
+      const element = (
+        <EstimatePDF
+          selectedDiagram={{
+            imageData: doc?.diagram?.imageData || null,
+            lines: Array.isArray(doc?.diagram?.lines) ? doc.diagram.lines : [],
+            accessories: doc?.accessories || undefined,
+          }}
+          currentUser={currentUser}
+          logoUrl={logoUrl}
+          estimateData={{
+            estimateNumber: paddedNum,
+            estimateDate: doc.estimateDate || "",
+            paymentDue: doc.paymentDue || "Upon completion.",
+            notes: doc.notes || "",
+          }}
+          project={{
+            billingName:
+              project?.billingName ?? doc?.projectSnapshot?.billingName ?? "",
+            billingAddress:
+              project?.billingAddress ??
+              doc?.projectSnapshot?.billingAddress ??
+              "",
+            billingPrimaryPhone:
+              project?.billingPrimaryPhone ??
+              doc?.projectSnapshot?.billingPrimaryPhone ??
+              "",
+            projectName:
+              project?.projectName ??
+              doc?.projectSnapshot?.projectName ??
+              project?.name ??
+              "",
+            projectAddress:
+              project?.projectAddress ??
+              doc?.projectSnapshot?.projectAddress ??
+              project?.address ??
+              "",
+            name:
+              project?.projectName ?? doc?.projectSnapshot?.projectName ?? "",
+            address:
+              project?.projectAddress ??
+              doc?.projectSnapshot?.projectAddress ??
+              "",
+          }}
+          items={(doc.items || []).map((it) => ({
+            name: it.name,
+            quantity: Number(it.quantity || 0),
+            price: Number(it.price || 0),
+          }))}
+        />
+      );
+
+      // Render to Blob with timings
+      pdfMark("PDF/Render-to-Blob:start");
+      const blob = await pdf(element).toBlob();
+      pdfMark("PDF/Render-to-Blob:end");
+      pdfMeasure(
+        "PDF/Render-to-Blob",
+        "PDF/Render-to-Blob:start",
+        "PDF/Render-to-Blob:end"
+      );
+
+      pdfBlobCache.set(key, blob);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Estimate-${paddedNum}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      hadError = true;
+      console.error("PDF generation failed:", e);
+      alert(e.message || "Failed to generate PDF.");
+    } finally {
+      if (__DEV__) {
+        console.timeEnd("Full PDF generation");
+        pdfReportAndClear();
+      }
+      if (hadError) return;
     }
-    const data = await res.json();
-    const doc = data?.estimate;
-    if (!doc) return alert("Failed to load estimate.");
-
-    // Lazy-load heavy libs when needed
-    const [{ pdf }, { default: EstimatePDF }] = await Promise.all([
-      import("@react-pdf/renderer"),
-      import("../EstimatePDF/EstimatePDF"),
-    ]);
-
-    const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
-
-    // Minimal, stable props into the PDF doc (no extra work)
-    const element = (
-      <EstimatePDF
-        selectedDiagram={{
-          imageData: doc?.diagram?.imageData || null,
-          lines: Array.isArray(doc?.diagram?.lines) ? doc.diagram.lines : [],
-          accessories: doc?.accessories || undefined,
-        }}
-        currentUser={currentUser}
-        logoUrl={logoUrl}
-        estimateData={{
-          estimateNumber: paddedNum,
-          estimateDate: doc.estimateDate || "",
-          paymentDue: doc.paymentDue || "Upon completion.",
-          notes: doc.notes || "",
-        }}
-        project={{
-          // Keep modal/viewer precedence: prefer live project info, fall back to snapshot
-          billingName:
-            project?.billingName ?? doc?.projectSnapshot?.billingName ?? "",
-          billingAddress:
-            project?.billingAddress ??
-            doc?.projectSnapshot?.billingAddress ??
-            "",
-          billingPrimaryPhone:
-            project?.billingPrimaryPhone ??
-            doc?.projectSnapshot?.billingPrimaryPhone ??
-            "",
-          projectName:
-            project?.projectName ??
-            doc?.projectSnapshot?.projectName ??
-            project?.name ??
-            "",
-          projectAddress:
-            project?.projectAddress ??
-            doc?.projectSnapshot?.projectAddress ??
-            project?.address ??
-            "",
-          name: project?.projectName ?? doc?.projectSnapshot?.projectName ?? "",
-          address:
-            project?.projectAddress ??
-            doc?.projectSnapshot?.projectAddress ??
-            "",
-        }}
-        items={(doc.items || []).map((it) => ({
-          name: it.name,
-          quantity: Number(it.quantity || 0),
-          price: Number(it.price || 0),
-        }))}
-        showPrices={true}
-      />
-    );
-
-    const blob = await pdf(element).toBlob();
-    pdfBlobCache.set(key, blob);
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Estimate-${paddedNum}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   }
 
   return (

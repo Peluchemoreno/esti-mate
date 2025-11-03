@@ -25,6 +25,38 @@ export default function EstimateViewerModal({
     typeof window !== "undefined" &&
     window.matchMedia("(min-width: 769px)").matches &&
     !/iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+  const __DEV__ = true;
+  function pdfMark(n) {
+    if (!__DEV__) return;
+    try {
+      performance.mark(n);
+    } catch {}
+  }
+  function pdfMeasure(n, a, b) {
+    if (!__DEV__) return;
+    try {
+      performance.measure(n, a, b);
+    } catch {}
+  }
+  function pdfReportAndClear() {
+    if (!__DEV__) return;
+    try {
+      const rows = performance
+        .getEntriesByType("measure")
+        .filter((e) => e.name.startsWith("PDF/"))
+        .map((e) => ({
+          Stage: e.name.replace(/^PDF\//, ""),
+          Duration_ms: e.duration.toFixed(2),
+        }));
+      if (rows.length) {
+        console.groupCollapsed("📄 Estimate PDF Performance (Viewer)");
+        console.table(rows);
+        console.groupEnd();
+      }
+      performance.clearMarks();
+      performance.clearMeasures();
+    } catch {}
+  }
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
@@ -32,6 +64,26 @@ export default function EstimateViewerModal({
   const [doc, setDoc] = useState(() => fallbackEstimate || null);
   const [logoUrl, setLogoUrl] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Measure the preview render time once we have a doc and can inline
+  useEffect(() => {
+    if (!__DEV__) return;
+    if (!isOpen || !canInlinePDF || !doc) return;
+    // Mark "start" just before next paint that shows the PDF
+    pdfMark("PDF/Preview render:start");
+    // Finish on next frame after layout/paint
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        pdfMark("PDF/Preview render:end");
+        pdfMeasure(
+          "PDF/Preview render",
+          "PDF/Preview render:start",
+          "PDF/Preview render:end"
+        );
+        pdfReportAndClear();
+      }, 0);
+    });
+  }, [__DEV__, isOpen, canInlinePDF, doc]);
 
   // fetch the estimate by id when opened
   useEffect(() => {

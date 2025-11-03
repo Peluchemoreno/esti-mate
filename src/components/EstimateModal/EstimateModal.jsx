@@ -7,6 +7,41 @@ const BASE_URL = import.meta.env.VITE_API_URL;
 
 Modal.setAppElement("#root");
 
+// ======= DEV-only profiling helpers =======
+const __DEV__ = true;
+function pdfMark(name) {
+  if (!__DEV__) return;
+  try {
+    performance.mark(name);
+  } catch {}
+}
+function pdfMeasure(label, start, end) {
+  if (!__DEV__) return;
+  try {
+    performance.measure(label, start, end);
+  } catch {}
+}
+function pdfReportAndClear() {
+  if (!__DEV__) return;
+  try {
+    const rows = performance
+      .getEntriesByType("measure")
+      .filter((e) => e.name.startsWith("PDF/"))
+      .map((e) => ({
+        Stage: e.name.replace(/^PDF\//, ""),
+        Duration_ms: e.duration.toFixed(2),
+      }));
+    if (rows.length) {
+      // show a single compact table
+      console.groupCollapsed("📄 Estimate PDF Performance");
+      console.table(rows);
+      console.groupEnd();
+    }
+    performance.clearMarks();
+    performance.clearMeasures();
+  } catch {}
+}
+
 // ——— helpers ———
 const prettyDsName = (raw = "") =>
   String(raw)
@@ -103,7 +138,14 @@ function foldItems(items) {
 let EstimatePDFMod = null;
 async function importEstimatePDF() {
   if (!EstimatePDFMod) {
+    pdfMark("PDF/Import EstimatePDF:start");
     const m = await import("../EstimatePDF/EstimatePDF");
+    pdfMark("PDF/Import EstimatePDF:end");
+    pdfMeasure(
+      "PDF/Import EstimatePDF",
+      "PDF/Import EstimatePDF:start",
+      "PDF/Import EstimatePDF:end"
+    );
     EstimatePDFMod = m.default || m;
   }
   return EstimatePDFMod;
@@ -111,14 +153,39 @@ async function importEstimatePDF() {
 
 // render React-PDF element -> Blob (lazy import renderer)
 async function renderEstimateToBlob(EstimatePDF, props) {
+  if (__DEV__) console.time("Full PDF generation");
+
+  pdfMark("PDF/Import @react-pdf:start");
   const { pdf } = await import("@react-pdf/renderer");
+  pdfMark("PDF/Import @react-pdf:end");
+  pdfMeasure(
+    "PDF/Import @react-pdf",
+    "PDF/Import @react-pdf:start",
+    "PDF/Import @react-pdf:end"
+  );
+
   const element = <EstimatePDF {...props} />;
-  return pdf(element).toBlob();
+
+  pdfMark("PDF/Render-to-Blob:start");
+  const blob = await pdf(element).toBlob();
+  pdfMark("PDF/Render-to-Blob:end");
+  pdfMeasure(
+    "PDF/Render-to-Blob",
+    "PDF/Render-to-Blob:start",
+    "PDF/Render-to-Blob:end"
+  );
+
+  if (__DEV__) {
+    console.timeEnd("Full PDF generation");
+    pdfReportAndClear();
+  }
+  return blob;
 }
 
 // Optional downscale to keep image small for faster PDF render
 async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
   try {
+    pdfMark("PDF/Downscale image:start");
     if (!dataUrl || typeof createImageBitmap !== "function") return dataUrl;
     const res = await fetch(dataUrl);
     const blob = await res.blob();
@@ -127,7 +194,14 @@ async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
     const long = Math.max(width, height);
     if (long <= maxSize) {
       bmp.close?.();
-      return dataUrl;
+      const out = dataUrl;
+      pdfMark("PDF/Downscale image:end");
+      pdfMeasure(
+        "PDF/Downscale image",
+        "PDF/Downscale image:start",
+        "PDF/Downscale image:end"
+      );
+      return out;
     }
     const scale = maxSize / long;
     const canvas = document.createElement("canvas");
@@ -137,8 +211,20 @@ async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
     ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
     const out = canvas.toDataURL("image/jpeg", 0.85);
     bmp.close?.();
+    pdfMark("PDF/Downscale image:end");
+    pdfMeasure(
+      "PDF/Downscale image",
+      "PDF/Downscale image:start",
+      "PDF/Downscale image:end"
+    );
     return out;
   } catch {
+    pdfMark("PDF/Downscale image:end");
+    pdfMeasure(
+      "PDF/Downscale image (error)",
+      "PDF/Downscale image:start",
+      "PDF/Downscale image:end"
+    );
     return dataUrl;
   }
 }
