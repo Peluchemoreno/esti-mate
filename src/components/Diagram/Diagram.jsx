@@ -1865,8 +1865,14 @@ const Diagram = ({
       if (el.isNote) {
         dragMode = "move";
       } else if (el.isDownspout) {
-        // Clicking anywhere on DS icon moves whole DS; box dragging handled in mousemove
-        dragMode = "move";
+        // 👇 NEW: differentiate box vs center
+        const partHit = hitTestDownspout(el, x, y); // {part: "box"} | {part: "center"} | null
+        if (partHit?.part === "box") {
+          dragMode = "move-box";
+          boxClickRef.current = { x, y, index: hitIndex }; // track for click-vs-drag -> open modal
+        } else {
+          dragMode = "move"; // dragging the X
+        }
       } else if (el.isFreeMark) {
         if (el.kind === "free-line") {
           // allow moving the whole line; endpoints handled by line hit-test
