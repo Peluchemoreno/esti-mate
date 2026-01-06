@@ -1,4 +1,6 @@
-// testing the branch
+// trsting the branch
+
+import CS2 from "canvas2svg";
 
 import "./Diagram.css";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,7 +27,6 @@ const COMMON_COLORS = [
   "#ff0000",
   "#00aaff",
   "#00c853",
-  "#ffab00",
   "#9c27b0",
   "#000000",
 ];
@@ -2800,6 +2801,25 @@ const Diagram = ({
     const dy = (thumbnailInternalSize - destH) / 2;
 
     // white background
+    // --- DEV-ONLY logging for vector vs raster thumbnail path ---
+    if (true) {
+      // Vector is possible if we at least have line geometry.
+      const vectorPossible = Array.isArray(lines) && lines.length > 0;
+      if (vectorPossible) {
+        console.info(
+          "[THUMBNAIL] VECTOR data available (lines present). Using RASTER path currently."
+        );
+      } else {
+        console.info(
+          "[THUMBNAIL] Falling back to RASTER thumbnail → PNG/JPEG."
+        );
+        const missing = [];
+        if (!Array.isArray(lines) || lines.length === 0)
+          missing.push("lines[]");
+        console.debug("[THUMBNAIL] Missing geometry data:", missing);
+      }
+    }
+
     tempCtx.fillStyle = "#ffffff";
     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
@@ -3271,6 +3291,8 @@ const Diagram = ({
     const metaViewport = {
       canvasW: Math.round(rect.width),
       canvasH: Math.round(rect.height),
+      gridSize,
+      feetPerSquare,
     };
 
     function normalizeAccessoriesForAPI(items) {
@@ -3327,9 +3349,18 @@ const Diagram = ({
       });
     }
 
+    const svg = exportDiagramAsSVG(lines, {
+      ...(selectedDiagram?.meta || {}),
+      ...metaViewport,
+    });
+
+    // Convenient data-url form for <img src="..."> when you want it
+    const svgDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+
     const data = {
       lines: [...lines],
       imageData: thumbnailDataUrl,
+      svg,
       totalFootage,
       price: parseFloat(price).toFixed(2),
       // legacy fields
@@ -3409,6 +3440,7 @@ const Diagram = ({
 
     // after successful save/add/overwrite:
     baselineHashRef.current = hashLines(lines);
+    console.log("this is the rendered image: ", data.imageData);
   }
 
   function clearCanvas() {
@@ -3849,65 +3881,177 @@ const Diagram = ({
 };
 
 // ===== SVG Export (additive, non-breaking) =====
-export function exportDiagramAsSVG(lines = [], meta = {}) {
-  try {
-    const W = Number(meta.canvasW || 0) || 0;
-    const H = Number(meta.canvasH || 0) || 0;
-    const grid = Number(meta.gridSize || 8) || 8;
-    const parts = [];
-    parts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="geometricPrecision" vector-effect="non-scaling-stroke">`
+export function exportDiagramAsSVG(lines, meta) {
+  const W = Number(meta?.canvasW || 0) || 1000;
+  const H = Number(meta?.canvasH || 0) || 800;
+  const grid = Number(meta?.gridSize || 10) || 10;
+
+  const esc = (s) =>
+    String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&apos;");
+
+  const out = [];
+  out.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="geometricPrecision" vector-effect="non-scaling-stroke">`
+  );
+
+  // If you ever want a background like your canvas, uncomment:
+  // out.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"/>`);
+
+  for (const l of lines || []) {
+    if (!l) continue;
+
+    const x1 = Number(l.startX || 0);
+    const y1 = Number(l.startY || 0);
+    const x2 = Number(l.endX ?? l.startX ?? 0);
+    const y2 = Number(l.endY ?? l.startY ?? 0);
+
+    const stroke = esc(l.color || "#000000");
+    const sw = Math.max(1, Number(l.lineWidth || (l.isDownspout ? 2 : 3)));
+
+    // ---- Notes / annotations (text) ----
+    if (l.isNote && l.noteText) {
+      // matches your canvas style: Arial, bold-ish, black
+      // Canvas baseline differs from SVG; this is "close enough" visually.
+      out.push(
+        `<text x="${x1}" y="${y1}" font-family="Arial" font-size="12" font-weight="700" fill="#000000" text-anchor="middle" dominant-baseline="middle">${esc(
+          l.noteText
+        )}</text>`
+      );
+      continue;
+    }
+
+    // ---- Splash Guard mark (filled circle) ----
+    if (l.isSplashGuard) {
+      const r = Math.max(2, grid / 2.5);
+      out.push(
+        `<circle cx="${x1}" cy="${y1}" r="${r}" fill="${stroke}" stroke="${stroke}" stroke-width="1" />`
+      );
+      continue;
+    }
+
+    // ---- Free marks (line / square / circle) ----
+    if (l.isFreeMark) {
+      const type = String(l.freeType || "");
+      const dashed = !!l.isDashed;
+      const dash = dashed ? ` stroke-dasharray="${Math.max(2, sw * 2)}"` : "";
+
+      if (type === "line") {
+        out.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"${dash} />`
+        );
+        continue;
+      }
+
+      if (type === "square") {
+        const s = Math.max(6, Number(l.size || grid * 1.5));
+        const half = s / 2;
+        const fill = l.isFilled ? stroke : "none";
+        out.push(
+          `<rect x="${x1 - half}" y="${
+            y1 - half
+          }" width="${s}" height="${s}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash} />`
+        );
+        continue;
+      }
+
+      if (type === "circle") {
+        const r = Math.max(4, Number(l.size || grid * 1.5) / 2);
+        const fill = l.isFilled ? stroke : "none";
+        out.push(
+          `<circle cx="${x1}" cy="${y1}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash} />`
+        );
+        continue;
+      }
+
+      // unknown free mark fallback
+      out.push(
+        `<circle cx="${x1}" cy="${y1}" r="${Math.max(
+          3,
+          grid / 3
+        )}" fill="${stroke}" />`
+      );
+      continue;
+    }
+
+    // ---- Downspout (X + draggable label box) ----
+    if (l.isDownspout) {
+      const d = grid / 2.75;
+
+      // X mark (matches your drawDownspoutX)
+      out.push(
+        `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
+          y1 + d
+        }" stroke="${stroke}" stroke-width="2" />`
+      );
+      out.push(
+        `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
+          y1 + d
+        }" stroke="${stroke}" stroke-width="2" />`
+      );
+      out.push(
+        `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
+          y1 - d
+        }" stroke="${stroke}" stroke-width="2" />`
+      );
+      out.push(
+        `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
+          y1 - d
+        }" stroke="${stroke}" stroke-width="2" />`
+      );
+
+      // Box (matches your drawDownspoutBox coords + styling)
+      const x = Number(l.downspoutBoxX ?? x1 + grid * 0.8);
+      const y = Number(l.downspoutBoxY ?? y1 - grid * 2.7);
+      const w = Number(l.downspoutBoxW ?? grid * 4.0);
+      const h = Number(l.downspoutBoxH ?? grid * 3.5);
+
+      out.push(
+        `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#444444" stroke="${stroke}" stroke-width="2" />`
+      );
+
+      // Text (matches your fillText)
+      const label1 = l.downspoutSize || "Downspout";
+      const label2 =
+        l.measurement != null && l.measurement !== ""
+          ? `${l.measurement} ft`
+          : "";
+
+      out.push(
+        `<text x="${x + w / 2}" y="${
+          y + h / 2.3
+        }" font-family="Arial" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${esc(
+          label1
+        )}</text>`
+      );
+
+      if (label2) {
+        out.push(
+          `<text x="${x + w / 2}" y="${
+            y + (h * 2) / 3
+          }" font-family="Arial" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${esc(
+            label2
+          )}</text>`
+        );
+      }
+
+      continue;
+    }
+
+    // ---- Normal gutter lines (and any other straight strokes) ----
+    const dashed = !!l.isDashed;
+    const dash = dashed ? ` stroke-dasharray="${Math.max(2, sw * 2)}"` : "";
+    out.push(
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"${dash} />`
     );
-
-    (lines || []).forEach((l) => {
-      const x1 = Number(l.startX || 0);
-      const y1 = Number(l.startY || 0);
-      const x2 = Number(l.endX ?? l.startX ?? 0);
-      const y2 = Number(l.endY ?? l.startY ?? 0);
-      const color = l.color || "#000";
-      const sw = Number(l.lineWidth || (l.isDownspout ? 2 : 3));
-
-      if (l.isNote) {
-        // (Optional) omit text in SVG for now; notes are rendered elsewhere.
-        return;
-      }
-
-      if (l.isDownspout) {
-        // four lines forming an X centered at (x1, y1)
-        const d = grid / 2.75;
-        parts.push(
-          `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
-            y1 + d
-          }" stroke="${color}" stroke-width="2" />`
-        );
-        parts.push(
-          `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
-            y1 + d
-          }" stroke="${color}" stroke-width="2" />`
-        );
-        parts.push(
-          `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
-            y1 - d
-          }" stroke="${color}" stroke-width="2" />`
-        );
-        parts.push(
-          `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
-            y1 - d
-          }" stroke="${color}" stroke-width="2" />`
-        );
-      } else {
-        // straight run
-        parts.push(
-          `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" />`
-        );
-      }
-    });
-
-    parts.push(`</svg>`);
-    return parts.join("");
-  } catch (e) {
-    return "";
   }
+
+  out.push(`</svg>`);
+  return out.join("");
 }
 
 export default Diagram;

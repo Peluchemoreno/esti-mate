@@ -7,7 +7,11 @@ import {
   Image,
   Svg,
   Line,
+  Circle,
+  G,
+  Rect,
 } from "@react-pdf/renderer";
+import { useEffect } from "react";
 
 // ---------- tiny helpers ----------
 const t = (v) => (v == null ? "" : String(v)); // safe text for <Text>
@@ -385,131 +389,349 @@ const styles = StyleSheet.create({
   },
 
   bigDiagramWrap: { marginTop: 10, alignItems: "center" },
-  bigDiagram: {
-    width: 500,
-    height: 500,
-    objectFit: "contain",
+
+  // Border lives on a View wrapper; the <Svg> itself will be sized numerically
+  bigDiagramFrame: {
     borderWidth: 1,
     borderColor: "#dddddd",
+    padding: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   page2Notes: { marginTop: 10, fontSize: 10 },
 });
 
 // ---------- vector diagram (crisp) ----------
-function DiagramGraphic({ selectedDiagram, style }) {
+// ---------- vector diagram (crisp + fit-to-box) ----------
+function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
   try {
+    const dev =
+      typeof import.meta !== "undefined" &&
+      import.meta?.env &&
+      import.meta.env.DEV;
+
     const lines = Array.isArray(selectedDiagram?.lines)
       ? selectedDiagram.lines
       : null;
     const svgStr = selectedDiagram?.svg || null;
     let meta = selectedDiagram?.meta || null;
 
+    // DEV visibility
+    if (dev) {
+      console.info(
+        `[PDF] DiagramGraphic: lines=${lines?.length || 0}, meta=${
+          meta ? "yes" : "no"
+        }, rawSVG=${svgStr ? "yes" : "no"}, max=${maxWidth}x${maxHeight}`
+      );
+    }
+
+    // --- VECTOR PATH ---
     if (lines && lines.length > 0) {
-      // Derive canvas bounds if meta missing, so we can still render vector
+      // Derive bounds if meta missing
+      // Derive bounds if meta missing (MUST include notes + ds boxes or they'll get clipped)
       if (!meta) {
-        let minX = Infinity,
-          minY = Infinity,
-          maxX = -Infinity,
-          maxY = -Infinity;
+        // Derive bounds if meta missing (MUST include notes + ds boxes or they'll get clipped)
+        // ALSO: if meta exists, expand it to include notes + elbow-sequence boxes.
+        // --- helpers ---
+        const pushPt = (bounds, x, y) => {
+          x = Number(x);
+          y = Number(y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+          if (x < bounds.minX) bounds.minX = x;
+          if (y < bounds.minY) bounds.minY = y;
+          if (x > bounds.maxX) bounds.maxX = x;
+          if (y > bounds.maxY) bounds.maxY = y;
+        };
+
+        const pushRect = (bounds, x, y, w, h) => {
+          x = Number(x);
+          y = Number(y);
+          w = Number(w);
+          h = Number(h);
+          if (![x, y, w, h].every(Number.isFinite)) return;
+          pushPt(bounds, x, y);
+          pushPt(bounds, x + w, y);
+          pushPt(bounds, x, y + h);
+          pushPt(bounds, x + w, y + h);
+        };
+
+        // 1) Start from existing meta bounds if present, else empty bounds.
+        const b = meta
+          ? {
+              minX: Number(meta.offsetX || 0),
+              minY: Number(meta.offsetY || 0),
+              maxX: Number(meta.offsetX || 0) + Number(meta.canvasW || 0),
+              maxY: Number(meta.offsetY || 0) + Number(meta.canvasH || 0),
+            }
+          : {
+              minX: Infinity,
+              minY: Infinity,
+              maxX: -Infinity,
+              maxY: -Infinity,
+            };
+
+        // 2) Expand bounds with ALL geometry (endpoints + notes + elbow boxes)
         for (const l of lines) {
-          const xs = [l.startX, l.endX ?? l.startX].map((n) =>
-            Math.round(Number(n || 0))
-          );
-          const ys = [l.startY, l.endY ?? l.startY].map((n) =>
-            Math.round(Number(n || 0))
-          );
-          xs.forEach((x) => {
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-          });
-          ys.forEach((y) => {
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          });
+          if (!l) continue;
+
+          const xA = Math.round(Number(l.startX || 0));
+          const yA = Math.round(Number(l.startY || 0));
+          const xB = Math.round(Number((l.endX ?? l.startX) || 0));
+          const yB = Math.round(Number((l.endY ?? l.startY) || 0));
+
+          // Always include endpoints
+          pushPt(b, xA, yA);
+          pushPt(b, xB, yB);
+
+          // Notes / annotations: include rough text extents
+          if (l.isNote && (l.note || l.text)) {
+            const text = String(l.note || l.text || "");
+            const fs = Number(l.fontSize || 14);
+
+            // width ~ 0.6em per char, height ~ 1.2em (crude but effective)
+            const w = Math.max(10, text.length * fs * 0.6);
+            const h = Math.max(10, fs * 1.2);
+
+            // your PDF note render uses y + fs baseline; include a generous box
+            pushRect(b, xA, yA - h, w, h * 2);
+          }
+
+          // Downspout elbow-sequence box: include its derived rect in ABSOLUTE coords
+          if (l.isDownspout) {
+            const seq = String(l.elbowSequence || "").trim();
+            if (!seq) continue;
+
+            const ang = Number(l.elbowBoxAngle || 0);
+            const r = Number(l.elbowBoxRadius || 0);
+
+            const fontSize = 12;
+            const padX = Math.max(4, fontSize * 0.35);
+            const padY = Math.max(2, fontSize * 0.25);
+            const textW = Math.max(1, seq.length * fontSize * 0.62);
+            const boxW = Math.ceil(textW + padX * 2);
+            const boxH = Math.ceil(fontSize + padY * 2);
+
+            // center point (absolute coords)
+            const cx = xA + Math.cos(ang) * r;
+            const cy = yA + Math.sin(ang) * r;
+
+            // We use the unrotated rect for bounds (rotation doesn't change needed extent much).
+            const boxX = cx - boxW / 2;
+            const boxY = cy - boxH / 2;
+
+            pushRect(b, boxX, boxY, boxW, boxH);
+          }
         }
-        const pad = 12; // small padding so strokes aren't clipped
-        const W = Math.max(
-          1,
-          (isFinite(maxX) ? maxX : 0) - (isFinite(minX) ? minX : 0) + pad * 2
-        );
-        const H = Math.max(
-          1,
-          (isFinite(maxY) ? maxY : 0) - (isFinite(minY) ? minY : 0) + pad * 2
-        );
+
+        // 3) Apply padding + normalize meta
+        const pad = 48;
+        const minX = Number.isFinite(b.minX) ? b.minX : 0;
+        const minY = Number.isFinite(b.minY) ? b.minY : 0;
+        const maxX = Number.isFinite(b.maxX) ? b.maxX : 1;
+        const maxY = Number.isFinite(b.maxY) ? b.maxY : 1;
+
+        const W = Math.max(1, Math.round(maxX - minX + pad * 2));
+        const H = Math.max(1, Math.round(maxY - minY + pad * 2));
+
         meta = {
           canvasW: W,
           canvasH: H,
-          gridSize: 8,
-          offsetX: (isFinite(minX) ? minX : 0) - pad,
-          offsetY: (isFinite(minY) ? minY : 0) - pad,
+          offsetX: Math.round(minX - pad),
+          offsetY: Math.round(minY - pad),
+          // preserve any existing meta fields you rely on
+          ...(meta || {}),
         };
       }
 
-      const W = Number(meta.canvasW || 0) || 0;
-      const H = Number(meta.canvasH || 0) || 0;
+      const W = Number(meta.canvasW || 0) || 1;
+      const H = Number(meta.canvasH || 0) || 1;
       const grid = Number(meta.gridSize || 8) || 8;
       const offX = Number(meta.offsetX || 0);
       const offY = Number(meta.offsetY || 0);
 
+      // Fit-to-box sizing (prevents React-PDF from doing a second rescale -> blur)
+      const boxW = Math.max(1, Number(maxWidth || 1));
+      const boxH = Math.max(1, Number(maxHeight || 1));
+      const scale = Math.min(boxW / W, boxH / H);
+      const outW = Math.max(1, Math.floor(W * scale));
+      const outH = Math.max(1, Math.floor(H * scale));
+
+      if (dev) {
+        console.info(
+          `[PDF] VECTOR fit: canvas=${W}x${H} box=${boxW}x${boxH} -> out=${outW}x${outH} scale=${scale.toFixed(
+            4
+          )}`
+        );
+      }
+
       return (
         <Svg
-          style={style}
-          viewBox={`0 0 ${Math.max(1, W)} ${Math.max(1, H)}`}
+          width={outW}
+          height={outH}
+          viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="xMidYMid meet"
         >
           {lines.map((l, i) => {
+            console.log(l);
             const round = (n) => Math.round(Number(n || 0));
+
+            // translate from "absolute canvas coords" -> "cropped viewBox coords"
             const x1 = round(l.startX) - offX;
             const y1 = round(l.startY) - offY;
             const x2 = round(l.endX ?? l.startX) - offX;
             const y2 = round(l.endY ?? l.startY) - offY;
-            const color = normalizeColor(l.color || "#000");
+
+            const color = normalizeColor(
+              l.color ||
+                l.gutterColor ||
+                l.currentProduct?.color ||
+                l.currentProduct?.colorCode ||
+                l.currentProduct?.defaultColor ||
+                l.meta?.color ||
+                "#000"
+            );
+
             const base = l.isDownspout ? 2 : 3;
             const sw = Math.max(1, Math.round(Number(l.lineWidth || base)));
 
-            if (l.isDownspout) {
-              const d = grid / 2.75;
+            // ---------- 1) NOTES / ANNOTATIONS ----------
+            // Your Diagram.jsx stores notes as { isNote: true, note, startX, startY, fontSize, color }
+            if (l.isNote && (l.note || l.text)) {
+              const text = String(l.note || l.text || "");
+              const fs = Number(l.fontSize || 10);
+
+              // NOTE: SVG text baseline differs; push down slightly so it matches canvas feel
               return (
-                <Svg key={i}>
-                  <Line
-                    x1={x1}
-                    y1={y1}
-                    x2={x1 + d}
-                    y2={y1 + d}
-                    stroke={color}
-                    strokeWidth={2}
-                  />
-                  <Line
-                    x1={x1}
-                    y1={y1}
-                    x2={x1 - d}
-                    y2={y1 + d}
-                    stroke={color}
-                    strokeWidth={2}
-                  />
-                  <Line
-                    x1={x1}
-                    y1={y1}
-                    x2={x1 - d}
-                    y2={y1 - d}
-                    stroke={color}
-                    strokeWidth={2}
-                  />
-                  <Line
-                    x1={x1}
-                    y1={y1}
-                    x2={x1 + d}
-                    y2={y1 - d}
-                    stroke={color}
-                    strokeWidth={2}
-                  />
-                </Svg>
+                <Text
+                  key={`note-${i}`}
+                  x={x1}
+                  y={y1 + fs}
+                  fontSize={fs}
+                  fill={color}
+                >
+                  {text}
+                </Text>
               );
             }
 
-            return (
+            // ---------- 2) DOWNSPOUT BOX + TEXT (and still draw the X marker) ----------
+            // Supports TWO shapes of data:
+            // A) legacy explicit box coords: boxX/boxY/boxW/boxH (+ boxText etc)
+            // B) elbow box: elbowSequence + elbowBoxAngle (radians) + elbowBoxRadius (px)
+            if (l.isDownspout) {
+              const color = normalizeColor(l.color || "#000");
+
+              // X marker size
+              const d = grid / 2.75;
+
+              // TEXT: elbow sequence ONLY
+              const seq = String(l.elbowSequence || "").trim();
+              if (!seq) {
+                // still draw the X even if no sequence
+                return (
+                  <>
+                    <Line
+                      key={`dsx-a-${i}`}
+                      x1={x1 - d}
+                      y1={y1 - d}
+                      x2={x1 + d}
+                      y2={y1 + d}
+                      stroke={color}
+                      strokeWidth={2}
+                    />
+                    <Line
+                      key={`dsx-b-${i}`}
+                      x1={x1 + d}
+                      y1={y1 - d}
+                      x2={x1 - d}
+                      y2={y1 + d}
+                      stroke={color}
+                      strokeWidth={2}
+                    />
+                  </>
+                );
+              }
+
+              // Angle + radius from your object (radians)
+              const ang = Number(l.elbowBoxAngle || 0);
+              const deg = (ang * 180) / Math.PI;
+              const r = Number(l.elbowBoxRadius || 0);
+
+              // Auto-size box to JUST fit the text
+              const fontSize = 12;
+              const padX = Math.max(4, fontSize * 0.35);
+              const padY = Math.max(2, fontSize * 0.25);
+
+              // crude text width approximation (works well enough in PDFs)
+              const textW = Math.max(1, seq.length * fontSize * 0.62);
+              const boxW = Math.ceil(textW + padX * 2);
+              const boxH = Math.ceil(fontSize + padY * 2);
+
+              // Box center is offset from the downspout anchor by radius at angle
+              const cx = x1 + Math.cos(ang) * r;
+              const cy = y1 + Math.sin(ang) * r;
+
+              const boxX = cx - boxW / 2;
+              const boxY = cy - boxH / 2;
+
+              const fill = "#e6e6e6";
+              const stroke = color;
+              const textColor = "#000";
+
+              return (
+                <G key={`ds-${i}`}>
+                  {/* X marker */}
+                  <Line
+                    key={`dsx-a-${i}`}
+                    x1={x1 - d}
+                    y1={y1 - d}
+                    x2={x1 + d}
+                    y2={y1 + d}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                  <Line
+                    key={`dsx-b-${i}`}
+                    x1={x1 + d}
+                    y1={y1 - d}
+                    x2={x1 - d}
+                    y2={y1 + d}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+
+                  {/* Rotated elbow sequence box */}
+                  <Rect
+                    key={`dsbox-${i}`}
+                    x={boxX}
+                    y={boxY}
+                    width={boxW}
+                    height={boxH}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={1}
+                    rx={2}
+                    ry={2}
+                  />
+                  <Text
+                    key={`dsboxtext-${i}`}
+                    x={cx}
+                    y={cy + fontSize * 0.35}
+                    fontSize={fontSize}
+                    fill={textColor}
+                    textAnchor="middle"
+                  >
+                    {seq}
+                  </Text>
+                </G>
+              );
+            }
+
+            // ---------- 3) NORMAL LINE ----------
+            const lineEl = (
               <Line
-                key={i}
+                key={`ln-${i}`}
                 x1={x1}
                 y1={y1}
                 x2={x2}
@@ -520,19 +742,104 @@ function DiagramGraphic({ selectedDiagram, style }) {
                 strokeLinejoin="round"
               />
             );
+
+            // ---------- 4) MEASUREMENT LABELS ----------
+            // Your Diagram.jsx stores measurement on the line (often: measurement or runFeet/totalFeet)
+            // and orientation info (often: isHorizontal/isVertical + position).
+            const rawMeasure =
+              l.measurement != null
+                ? l.measurement
+                : l.runFeet != null
+                ? l.runFeet
+                : l.totalFeet != null
+                ? l.totalFeet
+                : null;
+
+            // only label real measured segments (gutters & DS runs), skip misc marks
+            const showMeasure =
+              rawMeasure != null &&
+              !Number.isNaN(Number(rawMeasure)) &&
+              Number(rawMeasure) > 0 &&
+              !l.isFreeMark;
+
+            if (!showMeasure) return lineEl;
+
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+
+            const isH =
+              l.isHorizontal != null
+                ? !!l.isHorizontal
+                : Math.abs(y2 - y1) < Math.abs(x2 - x1);
+            const isV =
+              l.isVertical != null
+                ? !!l.isVertical
+                : Math.abs(x2 - x1) < Math.abs(y2 - y1);
+
+            // mimic your canvas offsets: labels sit just outside the line
+            const pos = String(l.position || "").toLowerCase(); // "top" | "bottom" | "left" | "right"
+            const pad = Math.max(10, grid * 0.9);
+
+            let lx = midX;
+            let ly = midY;
+
+            if (isH) {
+              ly = pos === "bottom" ? midY + pad : midY - pad;
+            } else if (isV) {
+              lx = pos === "right" ? midX + pad : midX - pad;
+            } else {
+              // diagonal: lift slightly
+              ly = midY - pad;
+            }
+
+            const measureText = `${Number(rawMeasure)}'`;
+            const fs = 10;
+
+            // background pill (helps readability and makes it “match” canvas)
+            const bgW = Math.max(34, measureText.length * 6.2);
+            const bgH = 14;
+
+            return (
+              <>
+                {lineEl}
+                {/* <Rect
+                  key={`m-bg-${i}`}
+                  x={lx - bgW / 2}
+                  y={ly - bgH + 2}
+                  width={bgW}
+                  height={bgH}
+                  fill="#ffffff"
+                  stroke="#000000"
+                  strokeWidth={0.5}
+                  rx={2}
+                  ry={2}
+                /> */}
+                <Text
+                  key={`m-t-${i}`}
+                  x={lx}
+                  y={ly}
+                  fontSize={fs}
+                  fill="#000"
+                  textAnchor="middle"
+                >
+                  {measureText}
+                </Text>
+              </>
+            );
           })}
         </Svg>
       );
     }
 
-    // Fallback if only an SVG string is present
+    // --- RASTER FALLBACK (only if no lines, but you have raw SVG) ---
     if (svgStr) {
       const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
-      return <Image src={dataUrl} style={style} />;
+      return <Image src={dataUrl} />;
     }
-  } catch {
-    // fall through to raster
+  } catch (e) {
+    // fall through
   }
+
   return null;
 }
 
@@ -630,6 +937,7 @@ export default function EstimatePDF({
   const diagramImage =
     selectedDiagram?.imageDataLarge || selectedDiagram?.imageData || null;
 
+  useEffect(() => {}, [selectedDiagram]);
   const itemHeaderWidth = showPrices ? "70%" : "85%";
   const qtyHeaderWidth = showPrices ? "10%" : "15%";
   const amtHeaderWidth = "20%";
@@ -648,6 +956,74 @@ export default function EstimatePDF({
       estimate?.projectSnapshot?.address ||
       project?.address
   );
+
+  function DiagramPdf({ lines, meta, maxHeight = 300 }) {
+    const width = meta?.canvasW || 1100;
+    const height = meta?.canvasH || 900;
+
+    // scale canvas → fit maxHeight
+    const scale = maxHeight / height;
+    const scaledWidth = width * scale;
+
+    return (
+      <Svg
+        width={scaledWidth}
+        height={maxHeight}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {lines.map((l, i) => {
+          // NOTES / TEXT
+          if (l.isNote && l.text) {
+            return (
+              <Text
+                key={i}
+                x={l.x}
+                y={l.y}
+                fontSize={l.fontSize || 14}
+                fill={l.color || "#000"}
+              >
+                {l.text}
+              </Text>
+            );
+          }
+
+          // DOWNPOUT MARKER (example)
+          if (l.isDownspout && l.x != null && l.y != null) {
+            return (
+              <Rect
+                key={i}
+                x={l.x - 6}
+                y={l.y - 6}
+                width={12}
+                height={12}
+                stroke={l.color || "#000"}
+                strokeWidth={2}
+                fill="none"
+              />
+            );
+          }
+
+          // STANDARD LINES (gutters, arrows, fascia, etc)
+          if (l.x1 != null && l.y1 != null && l.x2 != null && l.y2 != null) {
+            return (
+              <Line
+                key={i}
+                x1={l.x1}
+                y1={l.y1}
+                x2={l.x2}
+                y2={l.y2}
+                stroke={l.color || "#000"}
+                strokeWidth={l.width || 3}
+              />
+            );
+          }
+
+          return null;
+        })}
+      </Svg>
+    );
+  }
 
   return (
     <Document>
@@ -754,16 +1130,33 @@ export default function EstimatePDF({
           {logoUrl ? <Image src={logoUrl} style={styles.logo} /> : null}
         </View>
 
-        {selectedDiagram?.lines?.length && selectedDiagram?.meta ? (
+        {selectedDiagram?.lines?.length ? (
           <View style={styles.bigDiagramWrap}>
-            <DiagramGraphic
-              selectedDiagram={selectedDiagram}
-              style={styles.bigDiagram}
-            />
+            <View style={styles.bigDiagramFrame} wrap={false}>
+              <DiagramGraphic
+                selectedDiagram={selectedDiagram}
+                // Letter page width = 612pt; you have 40pt padding left + 40pt right => ~532pt usable
+                maxWidth={532}
+                // Keep room for legend/notes under it
+                maxHeight={320}
+              />
+            </View>
           </View>
         ) : diagramImage ? (
           <View style={styles.bigDiagramWrap}>
-            <Image src={diagramImage} style={styles.bigDiagram} />
+            {selectedDiagram?.lines?.length && selectedDiagram?.meta ? (
+              <View wrap={false} style={{ marginBottom: 12 }}>
+                <DiagramGraphic
+                  selectedDiagram={selectedDiagram}
+                  style={styles.bigDiagram}
+                />
+              </View>
+            ) : selectedDiagram?.imageData ? (
+              <Image
+                src={selectedDiagram.imageData}
+                style={styles.bigDiagram}
+              />
+            ) : null}
           </View>
         ) : (
           <Text>(No diagram image)</Text>

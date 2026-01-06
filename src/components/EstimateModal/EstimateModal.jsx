@@ -2,6 +2,7 @@
 import Modal from "react-modal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { computeAccessoriesFromLines } from "../../utils/priceResolver";
+import { Svg, Line } from "@react-pdf/renderer";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -745,6 +746,8 @@ const EstimateModal = ({
   const [isRendering, setIsRendering] = useState(false);
   const abortRef = useRef({ aborted: false });
   const timerRef = useRef(0);
+  // track which render attempt is the latest
+  const genSeqRef = useRef(0);
 
   // small, stable signature for rebuilds (avoid stringifying big objects)
   const pdfKey = useMemo(() => {
@@ -769,7 +772,7 @@ const EstimateModal = ({
     selectedDiagram?.lines,
     mergedAccessories,
     adHocItems,
-    buildSavableItems,
+    previewItems?.length,
     showPrices,
     estimateData?.estimateDate,
     estimateData?.estimateNumber,
@@ -845,11 +848,18 @@ const EstimateModal = ({
     if (!isOpen) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
+
+    // schedule the work (you already had 300ms debounce)
     timerRef.current = window.setTimeout(async () => {
       if (isRendering) return; // prevent overlap
+
+      // mark this attempt
+      const runId = ++genSeqRef.current;
+
       let revoke;
       abortRef.current.aborted = false;
       setIsRendering(true);
+      setPdfUrl(null); // show "Preparing..." immediately
 
       try {
         // allow modal to paint first
@@ -857,7 +867,7 @@ const EstimateModal = ({
 
         const Doc = await importEstimatePDF();
 
-        // build normalized props snapshot
+        // build normalized props snapshot (unchanged)
         const normalizedLines = (selectedDiagram?.lines || []).map((l) =>
           l.isDownspout
             ? { ...l, downspoutSize: prettyDsName(l.downspoutSize) }
@@ -881,41 +891,58 @@ const EstimateModal = ({
           extraItems: adHocItems,
         };
 
-        // shrink diagram image if huge
+        // optional downscale (unchanged)
         if (prepared.selectedDiagram?.imageData) {
           const downsized = await maybeDownscaleDataUrl(
             prepared.selectedDiagram.imageData
           );
-          if (abortRef.current.aborted) return;
+          if (abortRef.current.aborted || runId !== genSeqRef.current) return;
           prepared.selectedDiagram.imageData = downsized;
         }
 
-        if (abortRef.current.aborted) return;
+        if (abortRef.current.aborted || runId !== genSeqRef.current) return;
+
         const blob = await renderEstimateToBlob(Doc, prepared);
-        if (abortRef.current.aborted) return;
+        if (abortRef.current.aborted || runId !== genSeqRef.current) return;
 
         const url = URL.createObjectURL(blob);
         revoke = () => URL.revokeObjectURL(url);
-        setPdfUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return url;
-        });
+
+        // only set state if this attempt is still the latest
+        if (!abortRef.current.aborted && runId === genSeqRef.current) {
+          setPdfUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return url;
+          });
+        }
       } catch (e) {
         console.error("PDF render failed:", e);
       } finally {
-        if (!abortRef.current.aborted) setIsRendering(false);
+        // only clear the spinner if this attempt is still current
+        if (!abortRef.current.aborted && runId === genSeqRef.current) {
+          setIsRendering(false);
+        }
       }
-    }, 300); // debounce
+    }, 300);
 
+    // IMPORTANT: do NOT mark aborted on every dependency change,
+    // because that kills in-flight renders. Just clear the timer.
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      abortRef.current.aborted = true;
     };
   }, [
     isOpen,
     pdfKey,
-    // NOTE: do not depend directly on large objects to avoid thrash
+    // NOTE: keep large objects out to avoid thrash
   ]);
+
+  // Hard abort only on unmount of this component
+  useEffect(() => {
+    return () => {
+      abortRef.current.aborted = true;
+      // revoke the last URL if you keep one in a ref; pdfUrl cleanup already happens elsewhere
+    };
+  }, []);
 
   const headerBar = (
     <div

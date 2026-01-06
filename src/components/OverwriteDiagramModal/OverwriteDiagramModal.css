@@ -36,3 +36,8 @@
   right: 10px;
   cursor: pointer;
 }
+
+.diagram-confirm__title {
+  font-size: 1.5rem;
+  margin: 10px 0;
+}

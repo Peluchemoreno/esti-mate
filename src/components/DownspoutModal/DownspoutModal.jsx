@@ -141,7 +141,9 @@ export default function DownspoutModal({
     >
       <form className="downspout-modal__form" onSubmit={handleDownspoutSubmit}>
         <header>
-          <h2>{mode === "edit" ? "Update Downspout" : "Downspout Details"}</h2>
+          <h2 style={{ margin: "15px 0" }}>
+            {mode === "edit" ? "Update Downspout" : "Downspout Details"}
+          </h2>
         </header>
         <div className="downspout-modal__body">
           <label className="add-item__label">

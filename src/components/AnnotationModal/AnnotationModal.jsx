@@ -35,7 +35,7 @@ export function AnnotationModal({
 
   const isOpen = activeModal === "note";
   const isEdit = mode === "edit";
-  const title = isEdit ? "Update note" : "Add a note here";
+  const title = isEdit ? "Update note" : "Add a note";
   const actionLabel = isEdit ? "Update Note" : "Add Note";
 
   return (
