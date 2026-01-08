@@ -1760,7 +1760,6 @@ const Diagram = ({
       elbowBoxAngle: Math.PI / 4, // 45°, keeps your current “bottom-right-ish” vibe
       elbowBoxRadius: gridSize * 5, // tweak as you like
     };
-    console.log(currentDownspout);
     setLines((prev) => [...prev, formatted]);
   }
 
@@ -3440,7 +3439,6 @@ const Diagram = ({
 
     // after successful save/add/overwrite:
     baselineHashRef.current = hashLines(lines);
-    console.log("this is the rendered image: ", data.imageData);
   }
 
   function clearCanvas() {

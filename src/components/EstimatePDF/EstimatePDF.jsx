@@ -7,7 +7,6 @@ import {
   Image,
   Svg,
   Line,
-  Circle,
   G,
   Rect,
 } from "@react-pdf/renderer";
@@ -372,7 +371,7 @@ const styles = StyleSheet.create({
   },
   amountText: { fontSize: 12, fontWeight: "bold", textAlign: "right" },
 
-  keySection: { marginTop: 16 },
+  keySection: { marginTop: 20 },
   keyRow: { flexDirection: "row", flexWrap: "wrap" },
   keyItem: {
     flexDirection: "row",
@@ -392,8 +391,6 @@ const styles = StyleSheet.create({
 
   // Border lives on a View wrapper; the <Svg> itself will be sized numerically
   bigDiagramFrame: {
-    borderWidth: 1,
-    borderColor: "#dddddd",
     padding: 0,
     alignItems: "center",
     justifyContent: "center",
@@ -573,7 +570,6 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
           preserveAspectRatio="xMidYMid meet"
         >
           {lines.map((l, i) => {
-            console.log(l);
             const round = (n) => Math.round(Number(n || 0));
 
             // translate from "absolute canvas coords" -> "cropped viewBox coords"
@@ -1031,7 +1027,8 @@ export default function EstimatePDF({
       <Page size="LETTER" style={styles.page}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={{ fontSize: 22, fontWeight: "bold" }}>ESTIMATE</Text>
+            {/* <Text style={{ fontSize: 22, fontWeight: "bold" }}>ESTIMATE</Text> */}
+            {logoUrl ? <Image src={logoUrl} style={styles.logo} /> : null}
             <Text style={{ marginTop: 6 }}>
               {t(currentUser?.company || currentUser?.name)}
             </Text>
@@ -1040,7 +1037,12 @@ export default function EstimatePDF({
           </View>
 
           <View style={styles.rightMeta}>
-            {logoUrl ? <Image src={logoUrl} style={styles.logo} /> : null}
+            {/* {logoUrl ? <Image src={logoUrl} style={styles.logo} /> : null} */}
+            <Text
+              style={{ fontSize: 22, fontWeight: "bold", marginBottom: 24 }}
+            >
+              ESTIMATE
+            </Text>
             <View style={{ marginTop: 8, alignItems: "flex-end" }}>
               <Text>
                 Estimate Number: {t(estimateData?.estimateNumber || "—")}
@@ -1138,7 +1140,7 @@ export default function EstimatePDF({
                 // Letter page width = 612pt; you have 40pt padding left + 40pt right => ~532pt usable
                 maxWidth={532}
                 // Keep room for legend/notes under it
-                maxHeight={320}
+                maxHeight={500}
               />
             </View>
           </View>
@@ -1183,6 +1185,8 @@ export default function EstimatePDF({
           </View>
         ) : null}
       </Page>
+      {/* add a page for the installer diagram here*/}
+      {/* add more pages as needed */}
     </Document>
   );
 }

@@ -25,8 +25,6 @@ export default function DownspoutModal({
 
   useEffect(() => {
     if (activeModal !== "downspout") return;
-    console.log("DownspoutModal opened in mode:", mode);
-    console.log(initialData);
     if (mode === "edit" && initialData) {
       setElbowSequence(String(initialData.elbowSequence || "").toUpperCase());
       setTotalFootage(String(initialData.measurement ?? ""));
