@@ -7,6 +7,7 @@ import {
   Image,
   Svg,
   Line,
+  Circle,
   G,
   Rect,
 } from "@react-pdf/renderer";
@@ -589,7 +590,13 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
             );
 
             const base = l.isDownspout ? 2 : 3;
-            const sw = Math.max(1, Math.round(Number(l.lineWidth || base)));
+            let sw = Math.max(1, Math.round(Number(l.lineWidth || base)));
+
+            // ✅ Splash Guards are rendered as a "dot" via a zero-length Line with round caps.
+            // Make them ~20% bigger by increasing strokeWidth.
+            if (l.isSplashGuard) {
+              sw = Math.max(1, Math.round(sw * 2));
+            }
 
             // ---------- 1) NOTES / ANNOTATIONS ----------
             // Your Diagram.jsx stores notes as { isNote: true, note, startX, startY, fontSize, color }
@@ -609,6 +616,78 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
                   {text}
                 </Text>
               );
+            }
+
+            // ---------- FREE MARKS (square/circle) — match canvas behavior ----------
+            // NOTE: do NOT include priced Splash Guard here; keep its current dot behavior.
+            if (l.isFreeMark && !l.isSplashGuard) {
+              const stroke = color;
+              const strokeWidth = Math.max(1, Number(l.strokeWidth ?? sw));
+              const dashed = !!l.dashed;
+
+              // React-PDF SVG expects strokeDasharray as a string like "6 4"
+              const dashLen = Math.max(2, strokeWidth * 3);
+              const dashGap = Math.max(2, strokeWidth * 2);
+              const dashProps = dashed
+                ? { strokeDasharray: `${dashLen} ${dashGap}` }
+                : {};
+
+              // ---- Square ----
+              if (l.kind === "free-square") {
+                const left =
+                  Math.min(Number(l.startX || 0), Number(l.endX || 0)) - offX;
+                const top =
+                  Math.min(Number(l.startY || 0), Number(l.endY || 0)) - offY;
+                const w = Math.abs(Number(l.endX || 0) - Number(l.startX || 0));
+                const h = Math.abs(Number(l.endY || 0) - Number(l.startY || 0));
+
+                // filled vs hollow
+                const fill = l.fill ? stroke : "none";
+
+                return (
+                  <Rect
+                    key={`fm-sq-${i}`}
+                    x={Math.round(left)}
+                    y={Math.round(top)}
+                    width={Math.round(w)}
+                    height={Math.round(h)}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    {...dashProps}
+                  />
+                );
+              }
+
+              // ---- Circle ----
+              if (l.kind === "free-circle") {
+                const cx = Math.round(
+                  Number(l.centerX ?? l.startX ?? 0) - offX
+                );
+                const cy = Math.round(
+                  Number(l.centerY ?? l.startY ?? 0) - offY
+                );
+
+                // radius is stored on the object (you set defaults in Diagram.jsx)
+                const r = Math.max(1, Number(l.radius ?? grid * 0.8));
+
+                const fill = l.fill ? stroke : "none";
+
+                return (
+                  <Circle
+                    key={`fm-ci-${i}`}
+                    cx={cx}
+                    cy={cy}
+                    r={r}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    {...dashProps}
+                  />
+                );
+              }
+
+              // free-line stays handled by the normal line renderer (with your dash fix)
             }
 
             // ---------- 2) DOWNSPOUT BOX + TEXT (and still draw the X marker) ----------
@@ -725,6 +804,14 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
             }
 
             // ---------- 3) NORMAL LINE ----------
+            // ---------- 3) NORMAL LINE (including FreeMark dashed rendering) ----------
+            const isFreeLine =
+              !!l.isFreeMark &&
+              (l.kind === "free-line" || l.freeType === "line");
+
+            const isDashed = !!(l.dashed ?? l.isDashed); // support both shapes
+            const dash = Math.max(2, sw * 2);
+
             const lineEl = (
               <Line
                 key={`ln-${i}`}
@@ -736,9 +823,12 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
                 strokeWidth={sw}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                // only apply dashes to the free-line tool (so gutters stay untouched)
+                {...(isFreeLine && isDashed
+                  ? { strokeDasharray: `${dash},${dash}` }
+                  : {})}
               />
             );
-
             // ---------- 4) MEASUREMENT LABELS ----------
             // Your Diagram.jsx stores measurement on the line (often: measurement or runFeet/totalFeet)
             // and orientation info (often: isHorizontal/isVertical + position).
@@ -788,7 +878,7 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
               ly = midY - pad;
             }
 
-            const measureText = `${Number(rawMeasure)}'`;
+            const measureText = `${Math.round(Number(rawMeasure))}'`;
             const fs = 10;
 
             // background pill (helps readability and makes it “match” canvas)
@@ -876,7 +966,7 @@ export default function EstimatePDF({
       }
     } else if (l.currentProduct) {
       const name = String(l.currentProduct.name || "Gutter");
-      const qty = Number(l.measurement || 0);
+      const qty = Math.ceil(Number(l.measurement || 0));
       const unit = Number(l.currentProduct.price || 0);
       baseRows.push({
         name,
@@ -918,13 +1008,27 @@ export default function EstimatePDF({
         }))
       : null;
 
+  // Quantities must ALWAYS be whole numbers in the PDF.
+  const qInt = (q) => {
+    const n = Number(q || 0);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round(n); // change to Math.ceil if you prefer "always round up"
+  };
+
   // final rows for the items table (we respect what caller passes in)
-  const rows =
+  const rowsRaw =
     Array.isArray(items) && items.length
       ? items
       : Array.isArray(extraItems) && extraItems.length
       ? extraItems
       : [];
+
+  // Normalize quantities to whole numbers (display + math)
+  const rows = (rowsRaw || []).map((r) => ({
+    ...r,
+    quantity: qInt(r.quantity),
+  }));
+
   const total = rows.reduce(
     (sum, r) => sum + Number(r.price || 0) * Number(r.quantity || 0),
     0
@@ -1099,12 +1203,12 @@ export default function EstimatePDF({
                 </Text>
               </View>
               <View style={{ width: qtyHeaderWidth, textAlign: "right" }}>
-                <Text style={styles.cell}>{t(r.quantity)}</Text>
+                <Text style={styles.cell}>{t(qInt(r.quantity))}</Text>
               </View>
               {showPrices && (
                 <View style={{ width: amtHeaderWidth, textAlign: "right" }}>
                   <Text style={styles.cell}>
-                    {fmt(Number(r.price || 0) * Number(r.quantity || 0))}
+                    {fmt(Number(r.price || 0) * qInt(r.quantity))}
                   </Text>
                 </View>
               )}
