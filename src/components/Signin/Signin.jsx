@@ -22,11 +22,14 @@ export default function Signin({
     setIsSignInErrorVisible(false);
   }, []);
 
-  useEffect(() => {
+  /* This next line is commented out to prevent automatic sign-in due to stripe bypass bug storing jwt in localStorage without proper authentication */
+
+  /* useEffect(() => {
     if (localStorage.jwt) {
       navigator("/dashboard/projects");
     }
-  });
+  }); */
+
   function resetInputs() {
     setEmail("");
     setPassword("");

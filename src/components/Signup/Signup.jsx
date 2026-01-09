@@ -53,7 +53,7 @@ export default function Signup({ handleSignupContinue }) {
 
   return (
     <div className="signup">
-      <Link className="signup__logo-link" to="/esti-mate">
+      <Link className="signup__logo-link" to="/">
         <img src={logo} alt="signup logo" className="signup__logo" />
       </Link>
       <form onSubmit={handleSignup} className="signup__form">
