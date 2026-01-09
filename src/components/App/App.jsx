@@ -69,8 +69,9 @@ function App() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+  /* The following is commented out to temporarily disable auto-login because of stripe issue. cancelling out from the payment screen and signing back in bypasses the stripe check and allows access without a valid subscription. */
 
-  useEffect(() => {
+  /*  useEffect(() => {
     const token = localStorage.getItem("jwt");
     if (!token) {
       return;
@@ -92,7 +93,7 @@ function App() {
       .catch((err) => {
         console.error(err);
       });
-  }, []);
+  }, []) */
 
   function BillingCancelled() {
     return (
