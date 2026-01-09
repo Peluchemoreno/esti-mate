@@ -320,6 +320,11 @@ export default function SavedEstimatesPanel({
         overflow: "hidden",
         background: brand.bg,
         color: brand.fg,
+        // ✅ scalable sizing variables
+        "--panel-font": "clamp(11px, 2.8vw, 14px)",
+        "--panel-btn-font": "clamp(11px, 2.6vw, 13px)",
+        "--panel-btn-pad-y": "clamp(4px, 1.6vw, 6px)",
+        "--panel-btn-pad-x": "clamp(6px, 2vw, 10px)",
       }}
     >
       <div
@@ -332,7 +337,11 @@ export default function SavedEstimatesPanel({
           background: brand.panel,
         }}
       >
-        <h3 style={{ margin: 0, fontWeight: 700 }}>Saved Estimates</h3>
+        <h3
+          style={{ margin: 0, fontWeight: 700, fontSize: "var(--panel-font)" }}
+        >
+          Saved Estimates
+        </h3>
         <button
           onClick={fetchEstimates}
           style={{
@@ -341,8 +350,9 @@ export default function SavedEstimatesPanel({
             color: brand.fg,
             border: `1px solid ${brand.border}`,
             borderRadius: 6,
-            padding: "6px 10px",
             cursor: "pointer",
+            padding: "var(--panel-btn-pad-y) var(--panel-btn-pad-x)",
+            fontSize: "var(--panel-btn-font)",
           }}
         >
           Refresh
@@ -357,7 +367,8 @@ export default function SavedEstimatesPanel({
           gridTemplateColumns: "0.5fr 1fr 1fr 0.8fr 0.9fr",
           gap: 8,
           color: brand.muted,
-          fontSize: 13,
+          fontSize: "var(--panel-font)",
+
           background: brand.bg,
         }}
       >
@@ -405,7 +416,7 @@ export default function SavedEstimatesPanel({
                   currency: "USD",
                 })}
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "no-wrap" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   onClick={() => openViewer(est)}
                   style={{
@@ -413,7 +424,9 @@ export default function SavedEstimatesPanel({
                     color: brand.fg,
                     border: `1px solid ${brand.border}`,
                     borderRadius: 6,
-                    padding: "6px 10px",
+                    padding: "var(--panel-btn-pad-y) var(--panel-btn-pad-x)",
+                    fontSize: "var(--panel-btn-font)",
+
                     cursor: "pointer",
                   }}
                 >
@@ -430,10 +443,11 @@ export default function SavedEstimatesPanel({
                     color: "#fff",
                     textDecoration: "none",
                     borderRadius: 6,
-                    padding: "6px 10px",
                     display: "inline-block",
                     cursor: "pointer",
                     border: "none",
+                    padding: "var(--panel-btn-pad-y) var(--panel-btn-pad-x)",
+                    fontSize: "var(--panel-btn-font)",
                   }}
                 >
                   Download
@@ -446,8 +460,9 @@ export default function SavedEstimatesPanel({
                     color: brand.danger,
                     border: `1px solid ${brand.danger}`,
                     borderRadius: 6,
-                    padding: "6px 10px",
                     cursor: "pointer",
+                    padding: "var(--panel-btn-pad-y) var(--panel-btn-pad-x)",
+                    fontSize: "var(--panel-btn-font)",
                   }}
                 >
                   Delete

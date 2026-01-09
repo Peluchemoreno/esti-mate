@@ -96,8 +96,14 @@
 @media screen and (max-width: 650px) {
 
   .diagram {
-    height: 100svh;
-  }
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100svh;
+  width: 100vw;
+}
+
 
   .diagram__canvas {
     height: 100%;
@@ -117,3 +123,16 @@
   left: 5px;
   padding: 10px;
 }
+.diagram_visible {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100svh;
+    width: 100vw;
+  }
+
+  .diagram__canvas {
+    height: 100svh;
+    width: 100vw;
+  }

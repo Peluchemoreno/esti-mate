@@ -525,6 +525,37 @@ const Diagram = ({
     return hits; // top-most first
   }
 
+  // ---- FIX: always restore scrolling after closing the diagram on mobile ----
+  useEffect(() => {
+    const visible = [
+      "diagram",
+      "downspout",
+      "selectedLine",
+      "confirmDiagramOverwrite",
+      "note",
+    ].includes(activeModal);
+
+    // store previous values so we can restore exactly
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    if (visible) {
+      // lock background scroll while the full-screen diagram/modal is up
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    } else {
+      // ensure scroll is back when diagram closes
+      document.body.style.overflow = prevBodyOverflow || "";
+      document.documentElement.style.overflow = prevHtmlOverflow || "";
+    }
+
+    // cleanup on unmount / modal switches
+    return () => {
+      document.body.style.overflow = prevBodyOverflow || "";
+      document.documentElement.style.overflow = prevHtmlOverflow || "";
+    };
+  }, [activeModal]);
+
   useEffect(() => {
     if (activeModal === "diagram") {
       setCanvasSize();
@@ -3427,6 +3458,7 @@ const Diagram = ({
           clearCanvas();
         })
         .catch((err) => {
+          /* hide this from regular users */
           console.error("Failed to save diagram:", err);
         });
     }
@@ -3474,6 +3506,9 @@ const Diagram = ({
       >
         <img
           onClick={() => {
+            // hard unlock scroll (in case parent modal state is out of sync)
+            document.body.style.overflow = "";
+            document.documentElement.style.overflow = "";
             closeModal();
             setSelectedDiagram({});
             setLines([]);
