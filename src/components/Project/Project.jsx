@@ -165,6 +165,7 @@ export default function Project({
                   <button
                     onClick={() => {
                       editDiagram(selectedDiagram);
+                      window.scrollTo(0, 0);
                     }}
                     className="project__body-create-diagram-button create-button"
                   >
@@ -182,7 +183,10 @@ export default function Project({
               </>
             ) : (
               <button
-                onClick={openDiagramModal}
+                onClick={() => {
+                  openDiagramModal();
+                  window.scrollTo(0, 0);
+                }}
                 className="project__body-create-diagram-button create-button"
               >
                 Create Diagram
