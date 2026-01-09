@@ -38,6 +38,8 @@ export default function SignupPlans() {
             overflow: "hidden",
             zIndex: 10000,
             cursor: "pointer",
+            display: "none",
+            /* hide this from regular users */
           }}
           onClick={() => choose("test")}
         >
