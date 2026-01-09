@@ -470,6 +470,12 @@ const Diagram = ({
 
   // click-vs-drag detection for notes (like you already do for downspout box)
   const noteClickRef = useRef({ x: 0, y: 0, index: null });
+  // Scroll-lock state (must persist across renders)
+  const scrollLockRef = useRef({
+    locked: false,
+    prevBodyOverflow: "",
+    prevHtmlOverflow: "",
+  });
 
   const allProducts =
     pricingProducts && pricingProducts.length
@@ -535,24 +541,42 @@ const Diagram = ({
       "note",
     ].includes(activeModal);
 
-    // store previous values so we can restore exactly
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
+    // Lock (only once per open)
+    if (visible && !scrollLockRef.current.locked) {
+      scrollLockRef.current.locked = true;
 
-    if (visible) {
-      // lock background scroll while the full-screen diagram/modal is up
+      // capture whatever inline values existed BEFORE we overwrite them
+      scrollLockRef.current.prevBodyOverflow =
+        document.body.style.overflow || "";
+      scrollLockRef.current.prevHtmlOverflow =
+        document.documentElement.style.overflow || "";
+
       document.body.style.overflow = "hidden";
       document.documentElement.style.overflow = "hidden";
-    } else {
-      // ensure scroll is back when diagram closes
-      document.body.style.overflow = prevBodyOverflow || "";
-      document.documentElement.style.overflow = prevHtmlOverflow || "";
     }
 
-    // cleanup on unmount / modal switches
+    // Unlock (only if we previously locked)
+    if (!visible && scrollLockRef.current.locked) {
+      document.body.style.overflow = scrollLockRef.current.prevBodyOverflow;
+      document.documentElement.style.overflow =
+        scrollLockRef.current.prevHtmlOverflow;
+
+      scrollLockRef.current.locked = false;
+      scrollLockRef.current.prevBodyOverflow = "";
+      scrollLockRef.current.prevHtmlOverflow = "";
+    }
+
+    // Cleanup: if component unmounts while locked, unlock no matter what
     return () => {
-      document.body.style.overflow = prevBodyOverflow || "";
-      document.documentElement.style.overflow = prevHtmlOverflow || "";
+      if (scrollLockRef.current.locked) {
+        document.body.style.overflow = scrollLockRef.current.prevBodyOverflow;
+        document.documentElement.style.overflow =
+          scrollLockRef.current.prevHtmlOverflow;
+
+        scrollLockRef.current.locked = false;
+        scrollLockRef.current.prevBodyOverflow = "";
+        scrollLockRef.current.prevHtmlOverflow = "";
+      }
     };
   }, [activeModal]);
 
