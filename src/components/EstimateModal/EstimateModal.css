@@ -22,6 +22,7 @@
     background: #000;                 /* ensure header covers content while scrolling */
     padding-top: env(safe-area-inset-top, 0);
     border-bottom: 1px solid #222;
+    padding-bottom: 8px;
   }
 }
 

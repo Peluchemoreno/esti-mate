@@ -3,6 +3,7 @@ import Modal from "react-modal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { computeAccessoriesFromLines } from "../../utils/priceResolver";
 import { Svg, Line } from "@react-pdf/renderer";
+import { useToast } from "../Toast/Toast";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -615,6 +616,8 @@ const EstimateModal = ({
     [computedAccessories]
   );
 
+  const toast = useToast();
+
   // —— define BEFORE any hook that references it ——
   const buildSavableItems = useCallback(() => {
     const rows = [];
@@ -945,28 +948,45 @@ const EstimateModal = ({
   }, []);
 
   const headerBar = (
-    <div
-      className={isSmallScreen ? "estimate-modal__header" : undefined}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 12,
-        marginBottom: 12,
-      }}
-    >
-      <h2 style={{ margin: 0 }}>Estimate Preview</h2>
+    <div className={isSmallScreen ? "estimate-modal__header" : undefined}>
+      {/* Row 1: title (left) + close (right) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 8,
+        }}
+      >
+        <h2 style={{ margin: 0 }}>Estimate Preview</h2>
 
-      {/* Right-side controls */}
+        <button
+          onClick={handleCloseModal}
+          title="Close"
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid var(--white)",
+            background: "transparent",
+            color: "var(--white)",
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Row 2: controls */}
       <div
         style={{
           display: "flex",
           gap: 8,
-          flexWrap: "nowrap",
+          flexWrap: "wrap",
           alignItems: "center",
+          marginBottom: 12,
         }}
       >
-        {/* Show prices toggle (unchanged) */}
         <label
           style={{
             display: "inline-flex",
@@ -1014,29 +1034,9 @@ const EstimateModal = ({
         >
           Save & Close
         </button>
-
-        {/* NEW: mobile-friendly explicit Close button in the header */}
-        {isSmallScreen && (
-          <button
-            onClick={handleCloseModal}
-            title="Close"
-            style={{
-              marginLeft: 8,
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid var(--white)",
-              background: "transparent",
-              color: "var(--white)",
-              cursor: "pointer",
-            }}
-          >
-            ✕ Close
-          </button>
-        )}
       </div>
     </div>
   );
-
   // modal
   return (
     <Modal
@@ -1044,7 +1044,7 @@ const EstimateModal = ({
       onRequestClose={handleCloseModal}
       contentLabel="Estimate Preview"
       style={{
-        overlay: { backgroundColor: "rgba(0,0,0,0.5)" },
+        overlay: { backgroundColor: "rgba(0,0,0,0.5)", zIndex: 9999 },
         content: isSmallScreen
           ? {
               width: "100%",
@@ -1422,6 +1422,7 @@ const EstimateModal = ({
                   download={`Estimate-${
                     estimateData?.estimateNumber || ""
                   }.pdf`}
+                  onClick={() => toast.success("File downloaded")}
                   style={{
                     display: "inline-block",
                     padding: "8px 12px",

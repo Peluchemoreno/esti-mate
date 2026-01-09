@@ -1,6 +1,7 @@
 // src/components/Estimates/SavedEstimatesPanel.jsx
 import { useEffect, useState } from "react";
 import EstimateViewerModal from "../Estimates/EstimateViewerModal";
+import { useToast } from "../Toast/Toast";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -91,6 +92,8 @@ export default function SavedEstimatesPanel({
       setLoading(false);
     }
   };
+
+  const toast = useToast();
 
   // Fetch company logo as data URL (for PDF)
   useEffect(() => {
@@ -418,7 +421,10 @@ export default function SavedEstimatesPanel({
                 </button>
 
                 <button
-                  onClick={() => downloadPDF(est)}
+                  onClick={() => {
+                    downloadPDF(est);
+                    toast.success("File download started");
+                  }}
                   style={{
                     background: brand.accent,
                     color: "#fff",
