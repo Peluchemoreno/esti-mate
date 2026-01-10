@@ -258,7 +258,7 @@ const EstimateModal = ({
 
   // immutable meta (auto-only)
   const [estimateData, setEstimateData] = useState({
-    estimateNumber: estimate?.number || "001",
+    estimateNumber: estimate?.number || "",
     estimateDate: new Date().toISOString().split("T")[0],
     paymentDue: "Upon completion",
     notes: estimate?.notes || "",
@@ -1416,12 +1416,10 @@ const EstimateModal = ({
             </div>
 
             <div style={{ marginTop: 12 }}>
-              {pdfUrl ? (
+              {pdfUrl && estimateData?.estimateNumber ? (
                 <a
                   href={pdfUrl}
-                  download={`Estimate-${
-                    estimateData?.estimateNumber || ""
-                  }.pdf`}
+                  download={`Estimate-${estimateData.estimateNumber}.pdf`}
                   onClick={() => toast.success("File downloaded")}
                   style={{
                     display: "inline-block",
