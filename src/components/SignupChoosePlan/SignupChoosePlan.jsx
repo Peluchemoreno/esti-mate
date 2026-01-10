@@ -27,30 +27,29 @@ export default function SignupPlans() {
             <li>Email support</li>
           </ul>
         </div>
-        {/*  
-          <div
-            style={{
-              width: "10px",
-              height: "10px",
-              position: "absolute",
-              top: "0px",
-              left: "0px",
-              overflow: "hidden",
-              zIndex: 10000,
-              cursor: "pointer",
-              display: "none",
-            }}
-            onClick={() => choose("test")}
-          >
-            <h3>Test Estimate Package</h3>
-            <p>$0.01/month</p>
-            <ul>
-              <li>All Basic Plan features</li>
-              <li>Unlimited projects</li>
-              <li>Priority email support</li>
-            </ul>
-          </div>
-         */}
+
+        <div
+          style={{
+            width: "10px",
+            height: "10px",
+            position: "absolute",
+            top: "0px",
+            left: "0px",
+            overflow: "hidden",
+            zIndex: 10000,
+            cursor: "pointer",
+            display: "none",
+          }}
+          onClick={() => choose("test")}
+        >
+          <h3>Test Estimate Package</h3>
+          <p>$0.01/month</p>
+          <ul>
+            <li>All Basic Plan features</li>
+            <li>Unlimited projects</li>
+            <li>Priority email support</li>
+          </ul>
+        </div>
       </div>
       <BackButton />
     </div>
