@@ -50,22 +50,22 @@ export default function LandingPage() {
         <div className="grid grid--4">
           <div className="card">
             <div className="card__num">1</div>
-            <h3>Draw</h3>
+            <h3 style={{ color: "#111319" }}>Draw</h3>
             <p>Snap-to-grid gutters with automatic measurements.</p>
           </div>
           <div className="card">
             <div className="card__num">2</div>
-            <h3>Annotate</h3>
+            <h3 style={{ color: "#111319" }}>Annotate</h3>
             <p>Add downspouts, notes, splash guards, and free-line markup.</p>
           </div>
           <div className="card">
             <div className="card__num">3</div>
-            <h3>Price</h3>
+            <h3 style={{ color: "#111319" }}>Price</h3>
             <p>Live pricing from your catalog, including all accessories.</p>
           </div>
           <div className="card">
             <div className="card__num">4</div>
-            <h3>Export</h3>
+            <h3 style={{ color: "#111319" }}>Export</h3>
             <p>Generate a branded PDF with totals and a diagram snapshot.</p>
           </div>
         </div>
