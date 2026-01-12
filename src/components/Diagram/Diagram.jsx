@@ -54,10 +54,18 @@ function getCanonicalVisual(product) {
 }
 
 function renderStrokeColor(line, { isPreview = false } = {}) {
-  const prodColor = line?.currentProduct
-    ? getCanonicalVisual(line.currentProduct)
-    : null;
-  const base = prodColor || line?.color || "#000";
+  const isFree =
+    !!line?.isFreeMark || String(line?.kind || "").startsWith("free-");
+
+  // Free marks MUST use their own stored color (never inherit product color).
+  const prodColor =
+    !isFree && line?.currentProduct
+      ? getCanonicalVisual(line.currentProduct)
+      : null;
+
+  const base = isFree
+    ? line?.color || "#000"
+    : prodColor || line?.color || "#000";
 
   if (isPreview && (line?.isHorizontal || line?.isVertical)) {
     // alignment hint only while drawing
@@ -1732,9 +1740,20 @@ const Diagram = ({
 
   // ======= Tools =======
   function handleToolSelectChange(e) {
-    setTool(e.target.value);
+    const nextTool = e.target.value;
+    setTool(nextTool);
     setLines((prev) => prev.map((l) => ({ ...l, isSelected: false })));
     setSelectedIndex(null);
+
+    // If switching to Free Line, ensure we don't accidentally carry the last product.
+    if (nextTool === "freeLine") {
+      setCurrentLine((prev) => ({
+        ...prev,
+        currentProduct: null,
+        productId: null,
+        isGutter: false,
+      }));
+    }
   }
 
   function handleAddDownspout(downspoutData) {
@@ -2023,6 +2042,12 @@ const Diagram = ({
         ...currentLine,
         id: newId(),
         isFreeMark: true,
+
+        // Free marks must NOT carry product context.
+        currentProduct: null,
+        productId: null,
+        isGutter: false,
+
         color: currentLine.color || "#111111",
         dashed: !!currentLine.dashed,
         strokeWidth: currentLine.strokeWidth ?? 2,
@@ -2031,7 +2056,6 @@ const Diagram = ({
         fill: currentLine.fill,
         radius: currentLine.radius,
       };
-
       if (base.kind === "free-line") {
         // drag-to-draw line
         setCurrentLine({
@@ -2334,8 +2358,14 @@ const Diagram = ({
           dashed: !!c.dashed,
           color: c.color || "#111111",
           isFreeMark: true,
+
+          // Free marks must NOT carry product context.
+          currentProduct: null,
+          productId: null,
+          isGutter: false,
         },
       ]);
+
       setIsDrawing(false);
       setLineLength(0);
       return;
