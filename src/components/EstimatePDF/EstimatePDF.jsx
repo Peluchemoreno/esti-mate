@@ -60,9 +60,7 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
         (l.currentProduct?.name && String(l.currentProduct.name)) ||
         `${prettyDs(l.downspoutSize)} Downspout`;
       const label = prettifyLineItemName(rawLabel);
-      const color = normalizeColor(
-        l.color || findDownspoutProductColor(products, l)
-      );
+      const color = resolveDiagramLineColor(products, l);
 
       if (!uniq.has(label)) uniq.set(label, { label, color, shape: "square" });
       continue;
@@ -70,6 +68,7 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
 
     // Gutter run
     if (l.currentProduct) {
+      console.log(l);
       const raw = String(l.currentProduct.name);
       const label = prettyGutter(raw);
       const fallbackColor =
@@ -78,9 +77,7 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
         l.currentProduct?.color ||
         l.color;
 
-      const color = normalizeColor(
-        l.color || findGutterProductColor(products, raw, fallbackColor)
-      );
+      const color = resolveDiagramLineColor(products, l);
 
       if (!uniq.has(label)) uniq.set(label, { label, color, shape: "square" });
     }
@@ -92,6 +89,55 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
     color: normalizeColor(e.color || "#000"),
     shape: e.shape === "circle" ? "circle" : "square",
   }));
+}
+
+function resolveDiagramLineColor(products = [], l) {
+  if (!l || l.isNote) return "#000";
+
+  // Splash Guard
+  if (l.isSplashGuard) {
+    // If line has a product id/name, try that first
+    const hit = findCatalogProductForLine(products, l);
+    if (hit) return productColor(hit);
+
+    // Fallback: search catalog by "splash guard" name
+    const sg = (Array.isArray(products) ? products : []).find((p) =>
+      /splash\s*guard/i.test(String(p?.name || ""))
+    );
+    return normalizeColor(sg ? productColor(sg) : l.color || "#000");
+  }
+
+  // Downspouts
+  if (l.isDownspout) {
+    // ID-first if available
+    const hit = findCatalogProductForLine(products, l);
+    if (hit) return productColor(hit);
+
+    // fallback to your existing tokenizer matcher
+    return normalizeColor(findDownspoutProductColor(products, l));
+  }
+
+  // Gutters / priced lines
+  if (l.currentProduct?.name || l.currentProduct?._id || l.productId) {
+    // ID-first
+    const hit = findCatalogProductForLine(products, l);
+    if (hit) return productColor(hit);
+
+    // fallback: use your existing name-based matcher
+    const raw = String(l.currentProduct?.name || "");
+    const fallbackColor =
+      l.currentProduct?.colorCode ||
+      l.currentProduct?.visual ||
+      l.currentProduct?.color ||
+      l.gutterColor ||
+      l.color ||
+      "#000";
+
+    return normalizeColor(findGutterProductColor(products, raw, fallbackColor));
+  }
+
+  // Free marks / anything else uses stored color
+  return normalizeColor(l.color || "#000");
 }
 
 function normalizeColor(c) {
@@ -115,6 +161,12 @@ function normalizeColor(c) {
     return `#${toHex(m[1])}${toHex(m[2])}${toHex(m[3])}`;
   }
   return s; // named or other supported strings
+}
+
+function getVisualColor(p) {
+  return normalizeColor(
+    p?.visual ?? p?.colorCode ?? p?.color ?? p?.defaultColor ?? "#000"
+  );
 }
 
 const fmt = (n) =>
@@ -177,9 +229,53 @@ function prettyDs(raw = "") {
 }
 
 function productColor(p) {
-  return normalizeColor(
-    p?.colorCode ?? p?.visual ?? p?.color ?? p?.defaultColor ?? "#000"
-  );
+  return getVisualColor(p);
+}
+
+function findCatalogProductForLine(products = [], line) {
+  const list = Array.isArray(products) ? products : [];
+
+  // 1) ID match (most reliable)
+  const lineProdId =
+    line?.currentProduct?._id ||
+    line?.currentProduct?.id ||
+    line?.productId ||
+    line?.currentProductId;
+
+  if (lineProdId) {
+    const hitById = list.find(
+      (p) => String(p?._id || p?.id) === String(lineProdId)
+    );
+    if (hitById) return hitById;
+  }
+
+  // 2) Exact name match (case-insensitive)
+  const rawName =
+    line?.currentProduct?.name || line?.productName || line?.name || "";
+  const name = String(rawName).trim().toLowerCase();
+
+  if (name) {
+    const hitExact = list.find(
+      (p) =>
+        String(p?.name || "")
+          .trim()
+          .toLowerCase() === name
+    );
+    if (hitExact) return hitExact;
+
+    // 3) Loose "includes" match as a last resort (guarded)
+    if (name.length > 3) {
+      const hitLoose = list.find((p) => {
+        const pn = String(p?.name || "")
+          .trim()
+          .toLowerCase();
+        return pn && pn.includes(name);
+      });
+      if (hitLoose) return hitLoose;
+    }
+  }
+
+  return null;
 }
 
 function parseDownspoutTokens(line) {
@@ -402,7 +498,12 @@ const styles = StyleSheet.create({
 
 // ---------- vector diagram (crisp) ----------
 // ---------- vector diagram (crisp + fit-to-box) ----------
-function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
+function DiagramGraphic({
+  selectedDiagram,
+  products = [],
+  maxWidth,
+  maxHeight,
+}) {
   try {
     const dev =
       typeof import.meta !== "undefined" &&
@@ -579,15 +680,7 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
             const x2 = round(l.endX ?? l.startX) - offX;
             const y2 = round(l.endY ?? l.startY) - offY;
 
-            const color = normalizeColor(
-              l.color ||
-                l.gutterColor ||
-                l.currentProduct?.color ||
-                l.currentProduct?.colorCode ||
-                l.currentProduct?.defaultColor ||
-                l.meta?.color ||
-                "#000"
-            );
+            const color = resolveDiagramLineColor(products, l);
 
             const base = l.isDownspout ? 2 : 3;
             let sw = Math.max(1, Math.round(Number(l.lineWidth || base)));
@@ -695,7 +788,7 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
             // A) legacy explicit box coords: boxX/boxY/boxW/boxH (+ boxText etc)
             // B) elbow box: elbowSequence + elbowBoxAngle (radians) + elbowBoxRadius (px)
             if (l.isDownspout) {
-              const color = normalizeColor(l.color || "#000");
+              const color = resolveDiagramLineColor(products, l);
 
               // X marker size
               const d = grid / 2.75;
@@ -805,6 +898,7 @@ function DiagramGraphic({ selectedDiagram, maxWidth, maxHeight }) {
 
             // ---------- 3) NORMAL LINE ----------
             // ---------- 3) NORMAL LINE (including FreeMark dashed rendering) ----------
+            console.log(l);
             const isFreeLine =
               !!l.isFreeMark &&
               (l.kind === "free-line" || l.freeType === "line");
@@ -959,9 +1053,8 @@ export default function EstimatePDF({
       });
 
       if (!dsColorByLabel.has(label)) {
-        const col = normalizeColor(
-          l.color || findDownspoutProductColor(products, l)
-        );
+        const col = resolveDiagramLineColor(products, l);
+
         dsColorByLabel.set(label, col);
       }
     } else if (l.currentProduct) {
@@ -1241,6 +1334,7 @@ export default function EstimatePDF({
             <View style={styles.bigDiagramFrame} wrap={false}>
               <DiagramGraphic
                 selectedDiagram={selectedDiagram}
+                products={products}
                 // Letter page width = 612pt; you have 40pt padding left + 40pt right => ~532pt usable
                 maxWidth={532}
                 // Keep room for legend/notes under it
@@ -1254,6 +1348,7 @@ export default function EstimatePDF({
               <View wrap={false} style={{ marginBottom: 12 }}>
                 <DiagramGraphic
                   selectedDiagram={selectedDiagram}
+                  products={products}
                   style={styles.bigDiagram}
                 />
               </View>

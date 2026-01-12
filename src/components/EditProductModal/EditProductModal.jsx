@@ -4,11 +4,22 @@ import { updateProduct, deleteProduct } from "../../utils/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProductsCatalog } from "../../contexts/ProductsContext";
 
+function getCanonicalVisual(p) {
+  if (typeof p?.visual === "string" && p.visual.trim()) return p.visual.trim();
+  if (typeof p?.colorCode === "string" && p.colorCode.trim())
+    return p.colorCode.trim();
+  if (typeof p?.color === "string" && p.color.trim()) return p.color.trim(); // only if non-null string
+  if (typeof p?.defaultColor === "string" && p.defaultColor.trim())
+    return p.defaultColor.trim();
+  return "#000000";
+}
+
 export default function EditProductModal({
   activeModal,
   closeModal,
   product,
   refresh,
+  signalCatalogUpdated,
 }) {
   const [itemName, setItemName] = useState("");
   const [itemVisualColor, setItemVisualColor] = useState("#000000");
@@ -31,12 +42,9 @@ export default function EditProductModal({
     setItemName(product?.name || "defualt name");
 
     // Prefer whatever the server now stores (color), else fall back to legacy fields.
-    const seededColor =
-      product?.color ||
-      product?.colorCode ||
-      product?.defaultColor ||
-      product?.visual ||
-      "#000000";
+    const seededColor = getCanonicalVisual(product);
+    setItemVisualColor(seededColor);
+
     setItemVisualColor(seededColor);
 
     setQuantityUnit(product?.unit === "foot" ? "length-feet" : "unit/per");
@@ -121,7 +129,9 @@ export default function EditProductModal({
     const payload = {
       productId: product._id,
       name: itemName,
-      colorCode: itemVisualColor,
+      visual: itemVisualColor,
+      colorCode: itemVisualColor, // optional legacy; keep if other parts still read colorCode
+
       unit: quantityUnit === "length-feet" ? "foot" : "unit",
       price: Number(itemPrice),
       type: product?.type || "gutter",
@@ -137,35 +147,37 @@ export default function EditProductModal({
     };
 
     try {
-      await updateProduct(payload, token); // your api helper
-      // invalidate caches used by Products/Diagram/PDF
+      await updateProduct(payload, token);
+
+      // 1) invalidate caches used by Products/Diagram/PDF
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["gutterProducts"] });
       queryClient.invalidateQueries({ queryKey: ["downspoutProducts"] });
-      // tell other tabs/routes to refresh their local lists
-      window.dispatchEvent(new Event("products-updated"));
-      closeModal();
-      // ---- begin: instant catalog propagation ----
-      try {
-        // 1) refresh context (if provided by your app)
-        if (typeof reloadProductsCatalog === "function") {
-          await reloadProductsCatalog(); // make the context push new products to all subscribers
-        }
 
-        // 2) broadcast an in-tab event
-        window.dispatchEvent(
-          new CustomEvent("catalog:updated", { detail: { ts: Date.now() } })
-        );
-
-        // 3) bump a cross-tab version so other tabs/windows pick it up
-        localStorage.setItem("catalogVersion", String(Date.now()));
-      } catch (e) {
-        console.warn("catalog propagation warning:", e);
+      // 2) refresh the catalog in-context (ONE fetch)
+      if (typeof reloadProductsCatalog === "function") {
+        await reloadProductsCatalog();
       }
-      // ---- end: instant catalog propagation ----
+      if (typeof refresh === "function") {
+        // if Products.jsx passes reload as refresh, this keeps the Products table in sync
+        await refresh();
+      }
+
+      // 3) broadcast ONE canonical catalog update signal
+      if (typeof signalCatalogUpdated === "function") {
+        signalCatalogUpdated();
+      } else {
+        // fallback if you forgot to pass signalCatalogUpdated
+        localStorage.setItem("catalogVersion", String(Date.now()));
+        window.dispatchEvent(new Event("catalog:updated"));
+      }
+
+      // 4) now close
+      closeModal();
     } catch (err) {
       console.error("Update failed", err);
     }
+
     queryClient.setQueryData(["products"], (old = []) =>
       old.map((p) =>
         p._id === product._id
@@ -173,6 +185,7 @@ export default function EditProductModal({
               ...p,
               price: Number(itemPrice),
               colorCode: itemVisualColor,
+              visual: itemVisualColor,
               description,
               type: p.type || "gutter",
               listed: isListed,

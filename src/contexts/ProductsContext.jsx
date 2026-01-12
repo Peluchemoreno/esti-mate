@@ -21,12 +21,22 @@ export function ProductsProvider({ children }) {
         setProducts([]);
         return;
       }
-      const data = await getProducts(token); // keep your existing api signature
-      const list = Array.isArray(data) ? data : data?.products ?? [];
+      const list = await getProducts(token, "listed");
       setProducts(Array.isArray(list) ? list : []);
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ Call this ONLY after a successful product save (create/edit)
+  const signalCatalogUpdated = () => {
+    const next = Date.now();
+    try {
+      localStorage.setItem("catalogVersion", String(next));
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new Event("catalog:updated"));
   };
 
   useEffect(() => {
@@ -35,16 +45,22 @@ export function ProductsProvider({ children }) {
 
   useEffect(() => {
     const bump = async () => {
+      // important: bump should refetch + invalidate ONCE per signal
       await reload();
-      setVersion(Number(localStorage.getItem("catalogVersion")) || Date.now());
+      const v = Number(localStorage.getItem("catalogVersion")) || Date.now();
+      setVersion(v);
+
+      // invalidate react-query product queries
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["gutterProducts"] });
       queryClient.invalidateQueries({ queryKey: ["downspoutProducts"] });
     };
+
     const onCustom = () => bump();
     const onStorage = (e) => {
       if (e.key === "catalogVersion") bump();
     };
+
     window.addEventListener("catalog:updated", onCustom);
     window.addEventListener("storage", onStorage);
     return () => {
@@ -54,7 +70,7 @@ export function ProductsProvider({ children }) {
   }, [queryClient]);
 
   const value = useMemo(
-    () => ({ products, reload, loading, version }),
+    () => ({ products, reload, loading, version, signalCatalogUpdated }),
     [products, loading, version]
   );
 

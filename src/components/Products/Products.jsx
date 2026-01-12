@@ -13,7 +13,7 @@ import { useProductsListed } from "../../hooks/useProducts";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function Products({ activeModal, setActiveModal, closeModal }) {
-  const { refresh } = useProductsCatalog();
+  const { reload, signalCatalogUpdated } = useProductsCatalog();
   const { data: products = [] } = useProductsListed();
   const [tableRows, setTableRows] = useState([]);
   const [currentItem, setCurrentItem] = useState(null);
@@ -75,12 +75,11 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
           const isSplashGuard = params.row?.name === "Splash Guard";
           // prefer saved color, then template/defaults
           const color =
-            params.row?.color ??
-            params.row?.colorCode ??
             params.row?.visual ??
+            params.row?.colorCode ??
+            params.row?.color ??
             params.row?.defaultColor ??
             null;
-
           const showSwatch =
             (isGutter || isDownspout || isSplashGuard) && !!color;
 
@@ -177,9 +176,10 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
     };
     createProduct(payload, token).then((res) => {
       if (res?.data) {
-        // Prepend new row and let dedupe take care of repeats
+        // Prepend new row and let dedupe take care of repeats/
         setTableRows((prev) => [res.data, ...prev]);
         queryClient.invalidateQueries({ queryKey: ["products", "listed"] });
+        signalCatalogUpdated();
         closeModal();
       }
     });
@@ -271,7 +271,8 @@ export default function Products({ activeModal, setActiveModal, closeModal }) {
         activeModal={activeModal}
         closeModal={closeModal}
         product={currentItem}
-        refresh={refresh}
+        refresh={reload}
+        signalCatalogUpdated={signalCatalogUpdated}
       />
     </>
   );

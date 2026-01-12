@@ -154,14 +154,7 @@ export function updateProduct(productData, token) {
       authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(productData),
-  })
-    .then(processServerResponse)
-    .then((data) => {
-      // After product update succeeds:
-      window.dispatchEvent(new Event("products-updated"));
-
-      return data;
-    });
+  }).then(processServerResponse);
 }
 
 export function deleteProduct(productId, token) {

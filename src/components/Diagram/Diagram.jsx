@@ -34,8 +34,30 @@ const COMMON_COLORS = [
 // ------- small helpers -------
 // Use green only for the IN-PROGRESS preview when perfectly straight.
 // Never persist green into line.color.
+
+function getCanonicalVisual(product) {
+  if (!product) return null;
+
+  // Canonical: visual first
+  if (typeof product.visual === "string" && product.visual.trim())
+    return product.visual.trim();
+
+  // Back-compat
+  if (typeof product.colorCode === "string" && product.colorCode.trim())
+    return product.colorCode.trim();
+
+  // Legacy/inherit support: only use `color` if it's a non-null string
+  if (typeof product.color === "string" && product.color.trim())
+    return product.color.trim();
+
+  return null;
+}
+
 function renderStrokeColor(line, { isPreview = false } = {}) {
-  const base = line?.currentProduct?.color || line?.color || "#000";
+  const prodColor = line?.currentProduct
+    ? getCanonicalVisual(line.currentProduct)
+    : null;
+  const base = prodColor || line?.color || "#000";
 
   if (isPreview && (line?.isHorizontal || line?.isVertical)) {
     // alignment hint only while drawing
