@@ -8,20 +8,19 @@ import {
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
-const PUBLISHABLE_KEY =
-  import.meta.env.VITE_STRIPE_PUBLIC_KEY ||
-  "pk_test_51S84DVLogbJCypHWSEBTfmoGZ9eTFnynjeDlGlJK6bNoLOsye4w5Dr7hfVMCcYjfeloC2JA7q4dEYPRanGWn0YsY00NjXcKslE"; // testing mode
+const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY; /* ||
+  "pk_test_51S84DVLogbJCypHWSEBTfmoGZ9eTFnynjeDlGlJK6bNoLOsye4w5Dr7hfVMCcYjfeloC2JA7q4dEYPRanGWn0YsY00NjXcKslE"; */ // testing mode
 
 const stripePromise = loadStripe(PUBLISHABLE_KEY);
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000"; // testing mode
+const API_BASE = import.meta.env.VITE_API_URL; /* || "http://localhost:4000"; */ // testing mode
 
 const plankey = {
   // NOTE: the basic plan below is the live plan
   basic: "price_1S9FSOLV1NkgtKMpFGrODp7C",
 
   // NOTE: the plan below is the test plan
-  basic: "price_1S84vkLogbJCypHWKzhe2KJ4", // testing mode
+  // basic: "price_1S84vkLogbJCypHWKzhe2KJ4", // testing mode
 
   test: "price_1SAblmLV1NkgtKMp569jEsoF",
   pro: "price_PRO_PLACEHOLDER", // fill in if/when you have real ids
