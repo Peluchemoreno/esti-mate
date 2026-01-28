@@ -1,13 +1,31 @@
 // when testing the app on the network and not on local host run the second baseUrl
 
-export function processServerResponse(res) {
-  if (res.ok) {
-    return res.json();
-  } else {
-    return Promise.reject((error) => {
-      console.error(error);
-    });
-  }
+export async function processServerResponse(res) {
+  const contentType = res.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+
+  // Try to read a useful body either way
+  const body = isJson
+    ? await res.json().catch(() => null)
+    : await res.text().catch(() => "");
+
+  if (res.ok) return body;
+
+  // Normalize errors for the UI
+  const err = new Error(
+    typeof body === "string" && body
+      ? body
+      : body?.error || body?.message || `HTTP ${res.status}`
+  );
+
+  err.status = res.status;
+  err.body = body;
+
+  // Add a type your app can act on consistently
+  if (res.status === 401) err.type = "AUTH";
+  if (res.status === 402 || res.status === 403) err.type = "PAYWALL";
+
+  throw err;
 }
 
 /* ------------------------------------------------------------------------------------ */

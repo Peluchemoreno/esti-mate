@@ -16,17 +16,25 @@ export default function Projects({
 }) {
   const currentUser = useContext(CurrentUserContext);
   const [searchTerm, setSearchTerm] = useState("");
+  const [payWallBlocked, setPayWallBlocked] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
-    getProjects(token).then((data) => {
-      if (data.length === 0) {
-        setProjects([]);
-      } else {
-        const reverseOrderArray = data.projects.reverse();
-        setProjects(reverseOrderArray);
-      }
-    });
+    getProjects(token)
+      .then((data) => {
+        if (data.length === 0) {
+          setProjects([]);
+        } else {
+          const reverseOrderArray = data.projects.reverse();
+          setProjects(reverseOrderArray);
+        }
+      })
+      .catch((err) => {
+        console.log(err.type);
+        if (err.type === "PAYWALL") {
+          setPayWallBlocked(true);
+        }
+      });
   }, []);
 
   function openCreateProjectModal() {
@@ -47,9 +55,14 @@ export default function Projects({
       <header className="projects__header header">
         <button
           onClick={openCreateProjectModal}
-          className="header__create-project-button"
+          className={
+            payWallBlocked
+              ? "header__create-project-button--disabled"
+              : "header__create-project-button"
+          }
+          disabled={payWallBlocked}
         >
-          Create Project
+          {payWallBlocked ? "Upgrade to Create Project" : "Create Project"}
         </button>
         <label htmlFor="search-projects" className="search-projects-label">
           <input

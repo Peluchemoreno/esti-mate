@@ -1,6 +1,15 @@
 import { processServerResponse } from "./constants";
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+export function authedFetch(token, url, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    Authorization: `Bearer ${token}`,
+  };
+
+  return fetch(url, { ...options, headers }).then(processServerResponse);
+}
+
 export function signin(email, password) {
   return fetch(BASE_URL + "signin", {
     method: "POST",

@@ -19,6 +19,16 @@
   transition: background-color .2s ease;
 }
 
+.header__create-project-button--disabled {
+  background-color: rgb(81, 81, 81);
+  border: none;
+  padding: 10px;
+  color: var(--white);
+  border-radius: 5px;
+  font-size: 14px;
+  transition: background-color .2s ease;
+}
+
 .header__create-project-button:hover, .header__search-projects-button:hover {
   background-color: var(--blue-secondary);
 }

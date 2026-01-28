@@ -116,6 +116,7 @@ function App() {
 
   // App.jsx — handleLogin
   function handleLogin(email, password) {
+    console.log("logging in");
     setIsLoading(true);
     signin(email, password)
       .then((data) => {
@@ -127,7 +128,11 @@ function App() {
       .then((user) => {
         setCurrentUser(user);
         localStorage.setItem("currentUserId", user._id);
-        navigate("/dashboard/projects");
+        console.log("heres the user: ", user);
+        if (user.subscriptionPlan === "free") {
+          navigate("/signup/cont/stripe");
+          console.log(user);
+        } else navigate("/dashboard/projects");
       })
       .catch((err) => {
         setIsSignInErrorVisible(true);
