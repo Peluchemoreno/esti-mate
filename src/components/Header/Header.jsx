@@ -1,5 +1,5 @@
 import "./Header.css";
-import logo from "../../assets/estimate-transparent-blue.png";
+import logo from "../../assets/logo-blue-no-bg.png";
 import { Link } from "react-router-dom";
 
 export default function Header() {

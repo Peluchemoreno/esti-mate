@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 // local assets already in your repo
 import itemsIcon from "../../assets/icons/items.svg";
 import checkIcon from "../../assets/icons/check.svg";
-import heroGraphic from "../../assets/estimate-nobackground-blue.png";
+import heroGraphic from "../../assets/logo-blue-no-bg.png";
 
 export default function LandingPage() {
   return (
