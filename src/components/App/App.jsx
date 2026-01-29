@@ -129,10 +129,9 @@ function App() {
         setCurrentUser(user);
         localStorage.setItem("currentUserId", user._id);
         console.log("heres the user: ", user);
-        if (user.subscriptionPlan === "free") {
-          navigate("/signup/cont/stripe");
-          console.log(user);
-        } else navigate("/dashboard/projects");
+        if (user.stripeSubscriptionId && user.stripeCustomerId) {
+          navigate("/dashboard/projects");
+        } else navigate("/signup/cont/stripe");
       })
       .catch((err) => {
         setIsSignInErrorVisible(true);
@@ -169,12 +168,14 @@ function App() {
           msg.includes("exists") ||
           msg.includes("already");
         if (isDup) {
-          return doSignin(); // proceed by signing in
+          setIsSignInErrorVisible(true);
+          return;
         }
         throw err; // real error → surface it
       })
       .then(async (token) => {
         // upload logo if present (ignore errors)
+        if (!token) return;
         if (logo) {
           try {
             await uploadLogo(logo, token);
