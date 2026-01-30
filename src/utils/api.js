@@ -171,3 +171,41 @@ export function deleteProduct(productId, token) {
       return data;
     });
 }
+// ✅ Helper: normalize base once for new endpoints
+function normBase(base) {
+  if (!base) return "";
+  return base.endsWith("/") ? base : `${base}/`;
+}
+
+// GET /dashboard/projects/:projectId/photos
+export function getProjectPhotos(projectId, token) {
+  const base = normBase(BASE_URL);
+  return fetch(`${base}dashboard/projects/${projectId}/photos`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }).then(processServerResponse);
+}
+
+// POST /dashboard/projects/:projectId/photos  (multipart)
+export function uploadProjectPhoto(projectId, token, file) {
+  const base = normBase(BASE_URL);
+  const fd = new FormData();
+  fd.append("photo", file);
+
+  return fetch(`${base}dashboard/projects/${projectId}/photos`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // ❗ DON'T set Content-Type manually for FormData
+    },
+    body: fd,
+  }).then(processServerResponse);
+}
+
+// Helper: build the image URL (used by UI later)
+export function projectPhotoImageUrl(projectId, photoId, variant = "preview") {
+  const base = normBase(BASE_URL);
+  return `${base}dashboard/projects/${projectId}/photos/${photoId}/image?variant=${variant}`;
+}

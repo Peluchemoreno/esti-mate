@@ -11,9 +11,28 @@ import {
   G,
   Rect,
 } from "@react-pdf/renderer";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 // ---------- tiny helpers ----------
+
+async function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchImageAsDataUrl(url, jwt) {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+  if (!res.ok) throw new Error(`Image fetch failed: ${res.status}`);
+  const blob = await res.blob();
+  return blobToDataUrl(blob);
+}
+
 const t = (v) => (v == null ? "" : String(v)); // safe text for <Text>
 
 // Build legend entries with { label, color } from lines.
@@ -1035,7 +1054,22 @@ export default function EstimatePDF({
   showPrices = true,
   extraItems = [],
   items = [],
+  apiBaseUrl,
 }) {
+  // ✅ Works in Vite, still supports older env style as fallback
+  const resolvedApiBaseUrl =
+    apiBaseUrl ||
+    (typeof import.meta !== "undefined" && import.meta.env
+      ? import.meta.env.VITE_API_URL
+      : "") ||
+    (typeof process !== "undefined" && process.env
+      ? process.env.REACT_APP_API_URL
+      : "") ||
+    "";
+
+  const apiBase = resolvedApiBaseUrl.endsWith("/")
+    ? resolvedApiBaseUrl
+    : `${resolvedApiBaseUrl}/`;
   const lines = selectedDiagram?.lines || [];
   const baseRows = [];
 
@@ -1149,6 +1183,48 @@ export default function EstimatePDF({
       estimate?.projectSnapshot?.address ||
       project?.address
   );
+
+  const [includedPhotoDataUrls, setIncludedPhotoDataUrls] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const ids = selectedDiagram?.includedPhotoIds || [];
+        if (!ids.length) {
+          if (!cancelled) setIncludedPhotoDataUrls([]);
+          return;
+        }
+
+        // IMPORTANT: build URLs pointing at your existing streaming endpoint
+        // Use preview variant for PDF to keep size down.
+        const urls = ids.map(
+          (pid) =>
+            `${apiBase}dashboard/projects/${project._id}/photos/${pid}/image?variant=preview`
+        );
+        // You need your JWT accessible here (wherever you store it)
+        const jwt = localStorage.getItem("jwt"); // adjust if you store elsewhere
+
+        const dataUrls = [];
+        for (const u of urls) {
+          // fetch sequentially to avoid spiking memory
+          const dataUrl = await fetchImageAsDataUrl(u, jwt);
+          dataUrls.push(dataUrl);
+        }
+
+        if (!cancelled) setIncludedPhotoDataUrls(dataUrls);
+      } catch (e) {
+        // fail soft: PDF still generates even if photos fail
+        if (!cancelled) setIncludedPhotoDataUrls([]);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDiagram?._id, project?._id]);
 
   function DiagramPdf({ lines, meta, maxHeight = 300 }) {
     const width = meta?.canvasW || 1100;
@@ -1381,6 +1457,21 @@ export default function EstimatePDF({
         {estimateData?.notes ? (
           <View style={styles.page2Notes}>
             <Text>Notes: {t(estimateData.notes)}</Text>
+          </View>
+        ) : null}
+      </Page>
+      <Page>
+        {includedPhotoDataUrls.length ? (
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ fontSize: 12, marginBottom: 6 }}>Photos</Text>
+
+            {includedPhotoDataUrls.map((src, idx) => (
+              <Image
+                key={`p-${idx}`}
+                src={src}
+                style={{ width: "100%", height: 240, marginBottom: 10 }}
+              />
+            ))}
           </View>
         ) : null}
       </Page>
