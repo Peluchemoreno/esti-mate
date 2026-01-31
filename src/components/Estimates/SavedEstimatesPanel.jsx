@@ -264,6 +264,8 @@ export default function SavedEstimatesPanel({
 
       const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
 
+      const projectIdForPhotos = project?._id || doc?.projectId || projectId;
+
       const element = (
         <EstimatePDF
           selectedDiagram={{
@@ -282,6 +284,7 @@ export default function SavedEstimatesPanel({
             notes: doc.notes || "",
           }}
           project={{
+            _id: projectIdForPhotos,
             billingName:
               project?.billingName ?? doc?.projectSnapshot?.billingName ?? "",
             billingAddress:

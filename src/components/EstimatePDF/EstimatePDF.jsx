@@ -513,6 +513,12 @@ const styles = StyleSheet.create({
     borderColor: "#333",
   },
 
+  photo: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+  },
+
   bigDiagramWrap: { marginTop: 10, alignItems: "center" },
 
   // Border lives on a View wrapper; the <Svg> itself will be sized numerically
@@ -540,8 +546,8 @@ const styles = StyleSheet.create({
   },
   photoImage: {
     width: "100%",
-    height: 260, // big enough for clients
-    objectFit: "cover",
+    height: "100%", // big enough for clients
+    objectFit: "contain",
     borderRadius: 6,
   },
   photoCaption: {
@@ -1492,13 +1498,12 @@ export default function EstimatePDF({
             <Text>Notes: {t(estimateData.notes)}</Text>
           </View>
         ) : null}
-        {(selectedDiagram?.includedPhotoIds || []).length &&
-        !includedPhotoSources?.length ? (
-          <View style={{ marginTop: 8 }}>
-            <Text style={{ fontSize: 10, color: "#888" }}>
-              (Photos selected but failed to load for PDF.)
-            </Text>
-          </View>
+        {(selectedDiagram?.includedPhotoIds || []).length > 0 &&
+        includedPhotoSources.length === 0 &&
+        jwt ? ( // ✅ only show if we actually had auth available
+          <Text style={{ fontSize: 10, color: "#888" }}>
+            Photos selected but failed to load for PDF.
+          </Text>
         ) : null}
       </Page>
       {/* PHOTO PAGES (2x2 grid per page) */}
