@@ -231,6 +231,36 @@ async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
   }
 }
 
+// -------- Project Photo -> dataURL helpers (browser-only) --------
+async function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchAuthedImageAsDataUrl(url, jwt) {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    console.warn("[PDF photos] fetch failed", {
+      url,
+      status: res.status,
+      body: txt.slice(0, 200),
+      hasJwt: !!jwt,
+    });
+    throw new Error(`Image fetch failed: ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  return blobToDataUrl(blob);
+}
+
 // ——— component ———
 const EstimateModal = ({
   isOpen,
@@ -726,6 +756,8 @@ const EstimateModal = ({
     return Object.freeze(foldItems(rows));
   }, [selectedDiagram?.lines, mergedAccessories, adHocItems]);
 
+  const pdfRunIdRef = useRef(0);
+
   const previewItems = useMemo(() => buildSavableItems(), [buildSavableItems]);
 
   // define BEFORE handleSaveAndClose (it depends on this)
@@ -744,6 +776,12 @@ const EstimateModal = ({
     setNotesSaved(true);
   }, [notesDraft]);
 
+  // -------- Included Project Photo IDs signature (used to invalidate PDF) --------
+  const includedPhotoIdsSig = useMemo(() => {
+    const ids = selectedDiagram?.includedPhotoIds;
+    return Array.isArray(ids) ? ids.join(",") : "";
+  }, [selectedDiagram?.includedPhotoIds]);
+
   // ======= PDF preview via blob + <iframe> with debounce & guards =======
   const [pdfUrl, setPdfUrl] = useState(null);
   const [isRendering, setIsRendering] = useState(false);
@@ -751,7 +789,9 @@ const EstimateModal = ({
   const timerRef = useRef(0);
   // track which render attempt is the latest
   const genSeqRef = useRef(0);
+  const isRenderingRef = useRef(false);
 
+  // small, stable signature for rebuilds (avoid stringifying big objects)
   // small, stable signature for rebuilds (avoid stringifying big objects)
   const pdfKey = useMemo(() => {
     const d = selectedDiagram || {};
@@ -768,7 +808,11 @@ const EstimateModal = ({
     const date = estimateData?.estimateDate || "";
     const num = estimateData?.estimateNumber || "";
     const logo = logoUrl ? 1 : 0;
-    return [imgLen, linesN, accN, itemsN, show, date, num, logo].join("|");
+    const photoSig = includedPhotoIdsSig || "";
+
+    return [imgLen, linesN, accN, itemsN, show, date, num, logo, photoSig].join(
+      "|"
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     selectedDiagram?.imageData,
@@ -780,6 +824,7 @@ const EstimateModal = ({
     estimateData?.estimateDate,
     estimateData?.estimateNumber,
     logoUrl,
+    includedPhotoIdsSig,
   ]);
 
   // now it’s safe to define this: it references buildSavableItems + handleCloseModal
@@ -810,6 +855,11 @@ const EstimateModal = ({
         diagram: {
           imageData: diagramImage,
           lines: diagramLines,
+
+          // ✅ IMPORTANT: persist selected photos on the estimate
+          includedPhotoIds: Array.isArray(selectedDiagram?.includedPhotoIds)
+            ? selectedDiagram.includedPhotoIds
+            : [],
         },
         items,
         estimateDate: estimateData.estimateDate,
@@ -854,13 +904,15 @@ const EstimateModal = ({
 
     // schedule the work (you already had 300ms debounce)
     timerRef.current = window.setTimeout(async () => {
-      if (isRendering) return; // prevent overlap
+      if (isRenderingRef.current) return; // prevent overlap
 
       // mark this attempt
       const runId = ++genSeqRef.current;
 
       let revoke;
       abortRef.current.aborted = false;
+
+      isRenderingRef.current = true;
       setIsRendering(true);
       setPdfUrl(null); // show "Preparing..." immediately
 
@@ -892,6 +944,7 @@ const EstimateModal = ({
           products,
           showPrices,
           extraItems: adHocItems,
+          jwt: localStorage.getItem("jwt") || localStorage.jwt || "",
         };
 
         // optional downscale (unchanged)
@@ -924,6 +977,7 @@ const EstimateModal = ({
         // only clear the spinner if this attempt is still current
         if (!abortRef.current.aborted && runId === genSeqRef.current) {
           setIsRendering(false);
+          isRenderingRef.current = false;
         }
       }
     }, 300);

@@ -19,6 +19,22 @@ const brand = {
 // key: `${estimateId}|${updatedAt}` -> Blob
 const pdfBlobCache = new Map();
 
+async function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = reject;
+    r.onload = () => resolve(r.result);
+    r.readAsDataURL(blob);
+  });
+}
+
+async function fetchAuthedImageAsDataUrl(url, jwt) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${jwt}` } });
+  if (!res.ok) throw new Error(`photo fetch failed ${res.status}`);
+  const blob = await res.blob();
+  return blobToDataUrl(blob);
+}
+
 export default function SavedEstimatesPanel({
   projectId,
   currentUser,
@@ -201,6 +217,26 @@ export default function SavedEstimatesPanel({
       const doc = data?.estimate;
       if (!doc) throw new Error("No estimate data found.");
 
+      const ids = Array.isArray(doc?.diagram?.includedPhotoIds)
+        ? doc.diagram.includedPhotoIds
+        : [];
+
+      let includedPhotoDataUrls = [];
+      if (ids.length) {
+        const projectIdForPhotos = project?._id || doc?.projectId || projectId;
+        const base = BASE_URL?.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
+        const urls = ids.map(
+          (pid) =>
+            `${base}dashboard/projects/${projectIdForPhotos}/photos/${pid}/image?variant=preview`
+        );
+
+        // sequential to avoid memory spikes
+        for (const u of urls) {
+          const dataUrl = await fetchAuthedImageAsDataUrl(u, token);
+          includedPhotoDataUrls.push(dataUrl);
+        }
+      }
+
       // Lazy imports with timings
       pdfMark("PDF/Import @react-pdf:start");
       pdfMark("PDF/Import EstimatePDF:start");
@@ -234,7 +270,9 @@ export default function SavedEstimatesPanel({
             imageData: doc?.diagram?.imageData || null,
             lines: Array.isArray(doc?.diagram?.lines) ? doc.diagram.lines : [],
             accessories: doc?.accessories || undefined,
+            includedPhotoIds: ids,
           }}
+          includedPhotoDataUrls={includedPhotoDataUrls}
           currentUser={currentUser}
           logoUrl={logoUrl}
           estimateData={{
@@ -276,6 +314,7 @@ export default function SavedEstimatesPanel({
             quantity: Number(it.quantity || 0),
             price: Number(it.price || 0),
           }))}
+          jwt={token}
         />
       );
 

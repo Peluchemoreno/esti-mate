@@ -209,3 +209,40 @@ export function projectPhotoImageUrl(projectId, photoId, variant = "preview") {
   const base = normBase(BASE_URL);
   return `${base}dashboard/projects/${projectId}/photos/${photoId}/image?variant=${variant}`;
 }
+
+// --------------------
+// Project Photos (NEW)
+// --------------------
+
+export function deleteProjectPhoto(projectId, photoId, token) {
+  return fetch(BASE_URL + `dashboard/projects/${projectId}/photos/${photoId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then(processServerResponse)
+    .then((res) => res);
+}
+
+// Fetch image bytes with auth (for thumbnails / PDF preloading)
+export function fetchProjectPhotoBlob(
+  projectId,
+  photoId,
+  token,
+  variant = "preview"
+) {
+  return fetch(
+    BASE_URL +
+      `dashboard/projects/${projectId}/photos/${photoId}/image?variant=${variant}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  ).then(async (res) => {
+    if (!res.ok) throw new Error(`photo fetch failed: ${res.status}`);
+    return res.blob();
+  });
+}

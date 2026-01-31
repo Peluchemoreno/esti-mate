@@ -10,6 +10,10 @@ import {
   deleteDiagram,
   deleteProject,
   retrieveProjectDiagrams,
+  getProjectPhotos,
+  uploadProjectPhoto,
+  fetchProjectPhotoBlob,
+  updateDiagram,
 } from "../../utils/api";
 import EstimateModal from "../EstimateModal/EstimateModal";
 import { useProductsPricing } from "../../hooks/useProducts";
@@ -58,6 +62,9 @@ export default function Project({
     totalCost: 500,
   });
   const [diagramData, setDiagramData] = useState([]);
+  const [projectPhotos, setProjectPhotos] = useState([]);
+  const [photoThumbUrlById, setPhotoThumbUrlById] = useState({});
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
 
   let project = projects.filter((item) => {
     return item._id === projectId;
@@ -74,6 +81,61 @@ export default function Project({
   useEffect(() => {
     setCurrentProjectId(projectId);
   }, [activeModal]);
+
+  useEffect(() => {
+    if (!project?._id) return;
+
+    let cancelled = false;
+
+    async function loadPhotos() {
+      try {
+        setIsLoadingPhotos(true);
+        const token = localStorage.getItem("jwt");
+
+        const res = await getProjectPhotos(project._id, token);
+        const photos = res?.photos || [];
+
+        if (cancelled) return;
+        setProjectPhotos(photos);
+
+        // Build object URLs for thumbnails (because <img src> cannot send Authorization)
+        const newMap = {};
+        for (const p of photos) {
+          try {
+            const blob = await fetchProjectPhotoBlob(
+              project._id,
+              p.id,
+              token,
+              "preview"
+            );
+            newMap[p.id] = URL.createObjectURL(blob);
+          } catch (e) {
+            // fail soft: skip thumb if it fails
+          }
+        }
+
+        if (!cancelled) {
+          // Clean up old object URLs
+          setPhotoThumbUrlById((prev) => {
+            Object.values(prev).forEach((u) => {
+              try {
+                URL.revokeObjectURL(u);
+              } catch {}
+            });
+            return newMap;
+          });
+        }
+      } finally {
+        if (!cancelled) setIsLoadingPhotos(false);
+      }
+    }
+
+    loadPhotos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project?._id]);
 
   const navigator = useNavigate();
 
@@ -112,6 +174,40 @@ export default function Project({
       }
     }
     setSelectedDiagram(diagram);
+  }
+
+  async function toggleIncludePhoto(photoId) {
+    if (!selectedDiagram?._id) return;
+
+    const current = Array.isArray(selectedDiagram.includedPhotoIds)
+      ? selectedDiagram.includedPhotoIds
+      : [];
+
+    const next = current.includes(photoId)
+      ? current.filter((id) => id !== photoId)
+      : [...current, photoId];
+
+    // Update local selected diagram immediately (fast UI)
+    const updatedLocal = { ...selectedDiagram, includedPhotoIds: next };
+    setSelectedDiagram(updatedLocal);
+
+    // Also update diagrams list state so selection sticks visually
+    setDiagrams((prev) =>
+      (prev || []).map((d) => (d._id === updatedLocal._id ? updatedLocal : d))
+    );
+
+    // Persist to DB using existing updateDiagram endpoint
+    // IMPORTANT: send full diagram payload to avoid accidentally overwriting fields
+    try {
+      const token = localStorage.getItem("jwt");
+      await updateDiagram(project._id, selectedDiagram._id, token, {
+        ...selectedDiagram,
+        includedPhotoIds: next,
+      });
+    } catch (e) {
+      // fail soft: keep UI state, you can re-save on Generate Estimate if needed
+      console.warn("Failed to persist includedPhotoIds:", e);
+    }
   }
 
   return (
@@ -192,6 +288,106 @@ export default function Project({
                 Create Diagram
               </button>
             )}
+            {selectedDiagram?._id ? (
+              <div style={{ marginTop: "12px" }}>
+                <h3 style={{ margin: "8px 0" }}>Photos for this diagram</h3>
+
+                {/* upload */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const token = localStorage.getItem("jwt");
+                      await uploadProjectPhoto(project._id, token, file);
+
+                      // Reload photo list + thumbs
+                      // simplest: force effect by calling load again
+                      // (quick hack) just reload page photos by re-running effect dependency:
+                      // You can also extract loadPhotos into a function if you prefer.
+                      window.location.reload();
+                    } catch (err) {
+                      alert("Upload failed");
+                    } finally {
+                      e.target.value = "";
+                    }
+                  }}
+                />
+
+                {isLoadingPhotos ? (
+                  <p>Loading photos...</p>
+                ) : projectPhotos.length === 0 ? (
+                  <p>No photos yet</p>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "10px",
+                      marginTop: "10px",
+                    }}
+                  >
+                    {projectPhotos.map((p) => {
+                      const checked = (
+                        selectedDiagram.includedPhotoIds || []
+                      ).includes(p.id);
+                      const thumbSrc = photoThumbUrlById[p.id];
+
+                      return (
+                        <label
+                          key={p.id}
+                          style={{
+                            width: 120,
+                            border: checked
+                              ? "2px solid #2a7"
+                              : "1px solid #444",
+                            padding: 6,
+                            borderRadius: 6,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleIncludePhoto(p.id)}
+                            style={{ marginBottom: 6 }}
+                          />
+                          <div
+                            style={{
+                              width: 108,
+                              height: 80,
+                              background: "#111",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              overflow: "hidden",
+                              borderRadius: 4,
+                            }}
+                          >
+                            {thumbSrc ? (
+                              <img
+                                src={thumbSrc}
+                                alt={p.originalMeta?.filename || "photo"}
+                                style={{ width: "100%" }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: 12 }}>no preview</span>
+                            )}
+                          </div>
+                          <div
+                            style={{ fontSize: 11, marginTop: 6, opacity: 0.8 }}
+                          >
+                            {p.originalMeta?.filename || p.id}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
           <div className="project__diagram-container">
             {diagramData.length > 0 ? (

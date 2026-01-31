@@ -6,6 +6,36 @@ import EstimatePDF from "../EstimatePDF/EstimatePDF";
 const BASE_URL = import.meta.env.VITE_API_URL;
 Modal.setAppElement("#root");
 
+function getIncludedPhotoIdsFromAny(doc) {
+  if (!doc) return [];
+  const direct =
+    doc?.diagram?.includedPhotoIds ??
+    doc?.selectedDiagram?.includedPhotoIds ??
+    doc?.includedPhotoIds;
+
+  if (Array.isArray(direct)) return direct;
+
+  if (Array.isArray(doc?.diagrams)) {
+    for (const d of doc.diagrams) {
+      if (Array.isArray(d?.includedPhotoIds) && d.includedPhotoIds.length) {
+        return d.includedPhotoIds;
+      }
+    }
+  }
+  return [];
+}
+
+function pickProjectId(doc, selectedProject) {
+  return (
+    selectedProject?._id ||
+    doc?.projectId ||
+    doc?.project?._id ||
+    doc?.projectSnapshot?.projectId ||
+    doc?.projectSnapshot?._id ||
+    ""
+  );
+}
+
 const brand = {
   bg: "#000000",
   fg: "var(--white)",
@@ -59,7 +89,11 @@ export default function EstimateViewerModal({
   }
 
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
+    typeof window !== "undefined"
+      ? localStorage.getItem("jwt") ||
+        localStorage.jwt ||
+        localStorage.getItem("token")
+      : null;
 
   const [doc, setDoc] = useState(() => fallbackEstimate || null);
   const [logoUrl, setLogoUrl] = useState(null);
@@ -86,26 +120,76 @@ export default function EstimateViewerModal({
   }, [__DEV__, isOpen, canInlinePDF, doc]);
 
   // fetch the estimate by id when opened
+  // Fetch estimate by id when opened (viewer needs full doc: diagram, items, includedPhotoIds)
   useEffect(() => {
     if (!isOpen) return;
-    if (!estimateId || !token) {
-      setDoc(fallbackEstimate || null);
-      return;
-    }
 
+    // show whatever we already have immediately (thin list row), then hydrate with full doc
+    setDoc(fallbackEstimate || null);
+
+    if (!estimateId || !token) return;
+
+    let cancelled = false;
     setLoading(true);
+
     fetch(`${BASE_URL}api/estimates/${estimateId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((data) => setDoc(data?.estimate || null))
-      .catch((e) => {
-        console.error("Failed to fetch estimate:", e);
-        setDoc(fallbackEstimate || null);
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data) => {
+        if (cancelled) return;
+
+        const fetched = data?.estimate || null;
+        const fallback = fallbackEstimate || null;
+
+        if (!fetched) {
+          setDoc(fallback || null);
+          return;
+        }
+
+        const fetchedIds = getIncludedPhotoIdsFromAny(fetched);
+        const fallbackIds = getIncludedPhotoIdsFromAny(fallback);
+
+        // ✅ If fetched doc doesn't include includedPhotoIds, preserve from fallback.
+        if (!fetchedIds.length && fallbackIds.length) {
+          const merged = { ...fetched };
+
+          if (merged.diagram) {
+            merged.diagram = {
+              ...merged.diagram,
+              includedPhotoIds: fallbackIds,
+            };
+          } else if (merged.selectedDiagram) {
+            merged.selectedDiagram = {
+              ...merged.selectedDiagram,
+              includedPhotoIds: fallbackIds,
+            };
+          } else {
+            merged.diagram = { includedPhotoIds: fallbackIds };
+          }
+
+          setDoc(merged);
+          return;
+        }
+
+        setDoc(fetched);
       })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, estimateId, token]);
+
+      .catch((err) => {
+        console.warn(
+          "[EstimateViewerModal] Failed to load full estimate:",
+          err
+        );
+        if (!cancelled) setDoc(fallbackEstimate || null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, estimateId, token, fallbackEstimate]);
 
   // company logo as base64 (so @react-pdf can embed it)
   useEffect(() => {
@@ -181,6 +265,8 @@ export default function EstimateViewerModal({
 
     // Number padded like preview
     const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
+    const includedPhotoIds = getIncludedPhotoIdsFromAny(doc);
+    const projectId = pickProjectId(doc, selectedProject);
 
     // BILL TO — EXACT fields from live project first, then snapshot
     const billingName = proj.billingName ?? snap.billingName ?? "";
@@ -196,10 +282,23 @@ export default function EstimateViewerModal({
     return {
       // Diagram / lines (prefer saved doc)
       selectedDiagram: {
-        imageData: doc?.diagram?.imageData || null,
-        lines: Array.isArray(doc?.diagram?.lines) ? doc.diagram.lines : [],
+        imageData:
+          doc?.diagram?.imageData || doc?.selectedDiagram?.imageData || null,
+
+        lines: Array.isArray(doc?.diagram?.lines)
+          ? doc.diagram.lines
+          : Array.isArray(doc?.selectedDiagram?.lines)
+          ? doc.selectedDiagram.lines
+          : [],
+
         accessories: doc?.accessories || undefined,
+
+        // ✅ FIX: pull includedPhotoIds from the actual saved shape
+        includedPhotoIds,
       },
+
+      // ✅ FIX: EstimatePDF expects jwt at TOP LEVEL (not inside estimateData)
+      jwt: token,
 
       // Identity / header info
       currentUser,
@@ -211,13 +310,16 @@ export default function EstimateViewerModal({
         notes: doc.notes || "",
       },
 
-      // PROJECT passed exactly as preview expects
+      // ✅ FIX: ensure project._id exists so EstimatePDF can build photo URLs
       project: {
+        _id: projectId,
+
         billingName,
         billingAddress,
         billingPrimaryPhone,
         projectName,
         projectAddress,
+
         // keep legacy fields too in case EstimatePDF reads name/address:
         name: projectName,
         address: projectAddress,
@@ -239,7 +341,7 @@ export default function EstimateViewerModal({
       estimate: doc, // let PDF fall back to snapshot if ever needed
       extraItems: [], // not used for saved docs
     };
-  }, [doc, selectedProject, currentUser, logoUrl, products]);
+  }, [doc, selectedProject, currentUser, logoUrl, products, token]);
 
   const modalStyle = {
     overlay: { backgroundColor: "rgba(0,0,0,0.5)" },

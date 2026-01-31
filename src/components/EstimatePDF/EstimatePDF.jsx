@@ -11,8 +11,7 @@ import {
   G,
   Rect,
 } from "@react-pdf/renderer";
-import { useEffect, useState } from "react";
-
+import { useMemo, useEffect } from "react";
 // ---------- tiny helpers ----------
 
 async function blobToDataUrl(blob) {
@@ -31,6 +30,17 @@ async function fetchImageAsDataUrl(url, jwt) {
   if (!res.ok) throw new Error(`Image fetch failed: ${res.status}`);
   const blob = await res.blob();
   return blobToDataUrl(blob);
+}
+
+function normBase(base) {
+  if (!base) return "";
+  return base.endsWith("/") ? base : `${base}/`;
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
 
 const t = (v) => (v == null ? "" : String(v)); // safe text for <Text>
@@ -513,6 +523,32 @@ const styles = StyleSheet.create({
   },
 
   page2Notes: { marginTop: 10, fontSize: 10 },
+  photoPageTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  photoGrid: {
+    display: "flex",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  photoCell: {
+    width: "48%",
+    marginBottom: 12,
+  },
+  photoImage: {
+    width: "100%",
+    height: 260, // big enough for clients
+    objectFit: "cover",
+    borderRadius: 6,
+  },
+  photoCaption: {
+    fontSize: 10,
+    marginTop: 4,
+    color: "#444",
+  },
 });
 
 // ---------- vector diagram (crisp) ----------
@@ -1055,6 +1091,8 @@ export default function EstimatePDF({
   extraItems = [],
   items = [],
   apiBaseUrl,
+  includedPhotoDataUrls: includedPhotoDataUrlsProp = [],
+  jwt,
 }) {
   // ✅ Works in Vite, still supports older env style as fallback
   const resolvedApiBaseUrl =
@@ -1184,47 +1222,42 @@ export default function EstimatePDF({
       project?.address
   );
 
-  const [includedPhotoDataUrls, setIncludedPhotoDataUrls] = useState([]);
+  // Photo data-urls must be prepared in the browser. When this component is rendered
+  // via `pdf(<EstimatePDF />).toBlob()`, the React-PDF renderer does NOT have DOM APIs
+  // like FileReader/localStorage, so we accept pre-fetched data URLs from the caller.
+  // ✅ Build photo sources for <Image> using uri + headers (no base64, no FileReader)
+  const includedPhotoSources = useMemo(() => {
+    const ids = Array.isArray(selectedDiagram?.includedPhotoIds)
+      ? selectedDiagram.includedPhotoIds
+      : [];
 
-  useEffect(() => {
-    let cancelled = false;
+    if (!ids.length) return [];
 
-    async function run() {
-      try {
-        const ids = selectedDiagram?.includedPhotoIds || [];
-        if (!ids.length) {
-          if (!cancelled) setIncludedPhotoDataUrls([]);
-          return;
-        }
+    const projectId = project?._id || project?.id;
+    if (!projectId) return [];
 
-        // IMPORTANT: build URLs pointing at your existing streaming endpoint
-        // Use preview variant for PDF to keep size down.
-        const urls = ids.map(
-          (pid) =>
-            `${apiBase}dashboard/projects/${project._id}/photos/${pid}/image?variant=preview`
-        );
-        // You need your JWT accessible here (wherever you store it)
-        const jwt = localStorage.getItem("jwt"); // adjust if you store elsewhere
+    // prefer passed jwt; fallback to localStorage if available
+    const token =
+      jwt ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("jwt") || localStorage.jwt || ""
+        : "");
 
-        const dataUrls = [];
-        for (const u of urls) {
-          // fetch sequentially to avoid spiking memory
-          const dataUrl = await fetchImageAsDataUrl(u, jwt);
-          dataUrls.push(dataUrl);
-        }
+    if (!token) return [];
 
-        if (!cancelled) setIncludedPhotoDataUrls(dataUrls);
-      } catch (e) {
-        // fail soft: PDF still generates even if photos fail
-        if (!cancelled) setIncludedPhotoDataUrls([]);
-      }
-    }
+    const sources = ids.map((pid) => ({
+      uri: `${apiBase}dashboard/projects/${projectId}/photos/${pid}/image?variant=preview`,
+      headers: { Authorization: `Bearer ${token}` },
+    }));
 
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedDiagram?._id, project?._id]);
+    return sources;
+  }, [
+    apiBase,
+    jwt,
+    project?._id,
+    project?.id,
+    selectedDiagram?.includedPhotoIds,
+  ]);
 
   function DiagramPdf({ lines, meta, maxHeight = 300 }) {
     const width = meta?.canvasW || 1100;
@@ -1459,22 +1492,40 @@ export default function EstimatePDF({
             <Text>Notes: {t(estimateData.notes)}</Text>
           </View>
         ) : null}
-      </Page>
-      <Page>
-        {includedPhotoDataUrls.length ? (
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 12, marginBottom: 6 }}>Photos</Text>
-
-            {includedPhotoDataUrls.map((src, idx) => (
-              <Image
-                key={`p-${idx}`}
-                src={src}
-                style={{ width: "100%", height: 240, marginBottom: 10 }}
-              />
-            ))}
+        {(selectedDiagram?.includedPhotoIds || []).length &&
+        !includedPhotoSources?.length ? (
+          <View style={{ marginTop: 8 }}>
+            <Text style={{ fontSize: 10, color: "#888" }}>
+              (Photos selected but failed to load for PDF.)
+            </Text>
           </View>
         ) : null}
       </Page>
+      {/* PHOTO PAGES (2x2 grid per page) */}
+      {includedPhotoSources?.length
+        ? chunk(includedPhotoSources, 4).map((pagePhotos, pageIdx) => (
+            <Page key={`photos-${pageIdx}`} size="LETTER" style={styles.page}>
+              <View style={styles.headerRow}>
+                <Text style={styles.photoPageTitle}>
+                  Photos (Page {pageIdx + 1})
+                </Text>
+                {logoUrl ? <Image src={logoUrl} style={styles.logo} /> : null}
+              </View>
+
+              <View style={styles.photoGrid}>
+                {pagePhotos.map((src, idx) => (
+                  <View key={`ph-${pageIdx}-${idx}`} style={styles.photoCell}>
+                    <Image src={src} style={styles.photoImage} />
+                    <Text style={styles.photoCaption}>
+                      Photo {pageIdx * 4 + idx + 1}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </Page>
+          ))
+        : null}
+
       {/* add a page for the installer diagram here*/}
       {/* add more pages as needed */}
     </Document>
