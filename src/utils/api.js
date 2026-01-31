@@ -188,6 +188,27 @@ export function getProjectPhotos(projectId, token) {
   }).then(processServerResponse);
 }
 
+// src/utils/api.js
+
+// POST /dashboard/projects/:projectId/photos/bulk  (multipart)
+// field name: "photos" (up to 10)
+export function uploadProjectPhotosBulk(projectId, token, files) {
+  const base = normBase(BASE_URL);
+  const fd = new FormData();
+
+  const arr = Array.isArray(files) ? files : [];
+  arr.forEach((f) => fd.append("photos", f));
+
+  return fetch(`${base}dashboard/projects/${projectId}/photos/bulk`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // ❗ DON'T set Content-Type manually for FormData
+    },
+    body: fd,
+  }).then(processServerResponse);
+}
+
 // POST /dashboard/projects/:projectId/photos  (multipart)
 export function uploadProjectPhoto(projectId, token, file) {
   const base = normBase(BASE_URL);

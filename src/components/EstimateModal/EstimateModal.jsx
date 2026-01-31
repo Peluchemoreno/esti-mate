@@ -947,6 +947,48 @@ const EstimateModal = ({
           jwt: localStorage.getItem("jwt") || localStorage.jwt || "",
         };
 
+        // src/components/EstimateModal/EstimateModal.jsx
+        // inside the preview-render useEffect, right after `const prepared = { ... }`
+
+        // ✅ Mobile safety: prefetch selected photos as data URLs (more reliable than headers during pdf().toBlob on some phones)
+        const isMobileUA =
+          typeof navigator !== "undefined" &&
+          /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+
+        const projectIdForPhotos = project?._id || project?.id;
+        const photoIds = Array.isArray(
+          prepared?.selectedDiagram?.includedPhotoIds
+        )
+          ? prepared.selectedDiagram.includedPhotoIds
+          : [];
+
+        if (
+          isMobileUA &&
+          projectIdForPhotos &&
+          prepared.jwt &&
+          photoIds.length
+        ) {
+          const base = BASE_URL.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
+
+          try {
+            const dataUrls = await Promise.all(
+              photoIds.map((photoId) =>
+                fetchAuthedImageAsDataUrl(
+                  `${base}dashboard/projects/${projectIdForPhotos}/photos/${photoId}/image?variant=preview`,
+                  prepared.jwt
+                ).catch(() => null)
+              )
+            );
+
+            // if we got at least one, pass through (EstimatePDF will validate)
+            if (abortRef.current.aborted || runId !== genSeqRef.current) return;
+            prepared.includedPhotoDataUrls = dataUrls;
+          } catch (e) {
+            // keep going; EstimatePDF will fall back to { uri, headers }
+            console.warn("[PDF photos] mobile prefetch failed", e);
+          }
+        }
+
         // optional downscale (unchanged)
         if (prepared.selectedDiagram?.imageData) {
           const downsized = await maybeDownscaleDataUrl(

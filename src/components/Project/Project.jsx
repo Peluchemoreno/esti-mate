@@ -13,10 +13,13 @@ import {
   getProjectPhotos,
   uploadProjectPhoto,
   fetchProjectPhotoBlob,
+  uploadProjectPhotosBulk,
   updateDiagram,
+  deleteProjectPhoto,
 } from "../../utils/api";
 import EstimateModal from "../EstimateModal/EstimateModal";
 import { useProductsPricing } from "../../hooks/useProducts";
+import { red } from "@mui/material/colors";
 
 export default function Project({
   projects,
@@ -296,21 +299,54 @@ export default function Project({
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
+                    const picked = Array.from(e.target.files || []);
+                    if (!picked.length) return;
+
+                    // enforce max 10 client-side (server also enforces)
+                    const files = picked.slice(0, 10);
+
                     try {
                       const token = localStorage.getItem("jwt");
-                      await uploadProjectPhoto(project._id, token, file);
 
-                      // Reload photo list + thumbs
-                      // simplest: force effect by calling load again
-                      // (quick hack) just reload page photos by re-running effect dependency:
-                      // You can also extract loadPhotos into a function if you prefer.
+                      if (files.length === 1) {
+                        // keep your single-file path working
+                        await uploadProjectPhoto(project._id, token, files[0]);
+                      } else {
+                        const res = await uploadProjectPhotosBulk(
+                          project._id,
+                          token,
+                          files
+                        );
+
+                        // Minimal UX: show failures without breaking flow
+                        const failed = (res?.results || []).filter(
+                          (r) => !r.ok
+                        );
+                        if (failed.length) {
+                          alert(
+                            `Uploaded ${files.length - failed.length}/${
+                              files.length
+                            } photos.\n\nFailed:\n` +
+                              failed
+                                .map(
+                                  (f) =>
+                                    `- ${f.filename}: ${f.error || "failed"}`
+                                )
+                                .join("\n")
+                          );
+                        }
+                      }
+
+                      // reset input so re-selecting same files works
+                      e.target.value = "";
+
+                      // simplest: reload so your existing load logic refreshes
                       window.location.reload();
                     } catch (err) {
-                      alert("Upload failed");
-                    } finally {
+                      console.error(err);
+                      alert(err?.message || "Upload failed");
                       e.target.value = "";
                     }
                   }}
@@ -330,6 +366,8 @@ export default function Project({
                     }}
                   >
                     {projectPhotos.map((p) => {
+                      const photoId = p?._id || p?.id || p?.photoId;
+
                       const checked = (
                         selectedDiagram.includedPhotoIds || []
                       ).includes(p.id);
@@ -348,12 +386,64 @@ export default function Project({
                             cursor: "pointer",
                           }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleIncludePhoto(p.id)}
-                            style={{ marginBottom: 6 }}
-                          />
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleIncludePhoto(p.id)}
+                              style={{ marginBottom: 6 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                if (!photoId) {
+                                  alert("Cannot delete photo: missing id");
+                                  return;
+                                }
+
+                                const ok = window.confirm(
+                                  "Delete this photo?\n\nThis cannot be undone."
+                                );
+                                if (!ok) return;
+
+                                try {
+                                  const token = localStorage.getItem("jwt");
+                                  await deleteProjectPhoto(
+                                    project._id,
+                                    photoId,
+                                    token
+                                  );
+                                  window.location.reload();
+                                } catch (err) {
+                                  console.error(err);
+                                  alert(
+                                    err?.message || "Failed to delete photo"
+                                  );
+                                }
+                              }}
+                              style={{
+                                borderRadius: 999,
+                                padding: "2px 4px",
+                                backgroundColor: "red",
+                                marginBottom: 5,
+                                border: "1px solid white",
+                                color: "white",
+                                cursor: "pointer",
+                              }}
+                              aria-label="Delete photo"
+                              title="Delete photo"
+                            >
+                              🗑
+                            </button>
+                          </div>
                           <div
                             style={{
                               width: 108,

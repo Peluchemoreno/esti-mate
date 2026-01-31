@@ -1232,6 +1232,8 @@ export default function EstimatePDF({
   // via `pdf(<EstimatePDF />).toBlob()`, the React-PDF renderer does NOT have DOM APIs
   // like FileReader/localStorage, so we accept pre-fetched data URLs from the caller.
   // ✅ Build photo sources for <Image> using uri + headers (no base64, no FileReader)
+  // src/components/EstimatePDF/EstimatePDF.jsx
+
   const includedPhotoSources = useMemo(() => {
     const ids = Array.isArray(selectedDiagram?.includedPhotoIds)
       ? selectedDiagram.includedPhotoIds
@@ -1239,10 +1241,30 @@ export default function EstimatePDF({
 
     if (!ids.length) return [];
 
+    // ✅ Prefer data URLs if the caller provided them (most reliable for mobile blob renders)
+    // Supports:
+    //  - array aligned with includedPhotoIds (same order/length)
+    //  - object map keyed by photoId -> dataUrl
+    const dataUrls = includedPhotoDataUrlsProp;
+    if (Array.isArray(dataUrls) && dataUrls.length === ids.length) {
+      const allOk = dataUrls.every(
+        (u) => typeof u === "string" && u.startsWith("data:")
+      );
+      if (allOk) return dataUrls.map((u) => ({ uri: u }));
+    } else if (
+      dataUrls &&
+      typeof dataUrls === "object" &&
+      !Array.isArray(dataUrls)
+    ) {
+      const mapped = ids
+        .map((pid) => dataUrls[pid])
+        .filter((u) => typeof u === "string" && u.startsWith("data:"));
+      if (mapped.length === ids.length) return mapped.map((u) => ({ uri: u }));
+    }
+
     const projectId = project?._id || project?.id;
     if (!projectId) return [];
 
-    // prefer passed jwt; fallback to localStorage if available
     const token =
       jwt ||
       (typeof window !== "undefined"
@@ -1251,18 +1273,17 @@ export default function EstimatePDF({
 
     if (!token) return [];
 
-    const sources = ids.map((pid) => ({
+    return ids.map((pid) => ({
       uri: `${apiBase}dashboard/projects/${projectId}/photos/${pid}/image?variant=preview`,
       headers: { Authorization: `Bearer ${token}` },
     }));
-
-    return sources;
   }, [
     apiBase,
     jwt,
     project?._id,
     project?.id,
     selectedDiagram?.includedPhotoIds,
+    includedPhotoDataUrlsProp,
   ]);
 
   function DiagramPdf({ lines, meta, maxHeight = 300 }) {
