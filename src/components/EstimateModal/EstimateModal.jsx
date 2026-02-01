@@ -45,11 +45,28 @@ function pdfReportAndClear() {
 }
 
 // ——— helpers ———
+async function fetchProjectPhotoMeta(projectId, photoId, jwt) {
+  const base = BASE_URL.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
+  const res = await fetch(
+    `${base}dashboard/projects/${projectId}/photos/${photoId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+      },
+    },
+  );
+
+  if (!res.ok) return null;
+
+  const json = await res.json();
+  return json?.photo || null; // backend returns { photo: {...} }
+}
+
 const prettyDsName = (raw = "") =>
   String(raw)
     .replace(
       /(\d+\s*x\s*\d+)\s*corrugated/i,
-      (_m, size) => `${size.replace(/\s*/g, "")} Corrugated`
+      (_m, size) => `${size.replace(/\s*/g, "")} Corrugated`,
     )
     .replace(/\s+/g, " ")
     .trim();
@@ -146,7 +163,7 @@ async function importEstimatePDF() {
     pdfMeasure(
       "PDF/Import EstimatePDF",
       "PDF/Import EstimatePDF:start",
-      "PDF/Import EstimatePDF:end"
+      "PDF/Import EstimatePDF:end",
     );
     EstimatePDFMod = m.default || m;
   }
@@ -163,7 +180,7 @@ async function renderEstimateToBlob(EstimatePDF, props) {
   pdfMeasure(
     "PDF/Import @react-pdf",
     "PDF/Import @react-pdf:start",
-    "PDF/Import @react-pdf:end"
+    "PDF/Import @react-pdf:end",
   );
 
   const element = <EstimatePDF {...props} />;
@@ -174,7 +191,7 @@ async function renderEstimateToBlob(EstimatePDF, props) {
   pdfMeasure(
     "PDF/Render-to-Blob",
     "PDF/Render-to-Blob:start",
-    "PDF/Render-to-Blob:end"
+    "PDF/Render-to-Blob:end",
   );
 
   if (__DEV__) {
@@ -201,7 +218,7 @@ async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
       pdfMeasure(
         "PDF/Downscale image",
         "PDF/Downscale image:start",
-        "PDF/Downscale image:end"
+        "PDF/Downscale image:end",
       );
       return out;
     }
@@ -217,7 +234,7 @@ async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
     pdfMeasure(
       "PDF/Downscale image",
       "PDF/Downscale image:start",
-      "PDF/Downscale image:end"
+      "PDF/Downscale image:end",
     );
     return out;
   } catch {
@@ -225,7 +242,7 @@ async function maybeDownscaleDataUrl(dataUrl, maxSize = 1200) {
     pdfMeasure(
       "PDF/Downscale image (error)",
       "PDF/Downscale image:start",
-      "PDF/Downscale image:end"
+      "PDF/Downscale image:end",
     );
     return dataUrl;
   }
@@ -378,11 +395,11 @@ const EstimateModal = ({
               r.onloadend = () => resolve(r.result);
               r.onerror = reject;
               r.readAsDataURL(blob);
-            })
+            }),
         )
         .then((b64) => setLogoUrl(b64))
         .catch((err) =>
-          console.error("Failed to fetch and convert logo:", err)
+          console.error("Failed to fetch and convert logo:", err),
         );
     }
   }, [BASE_URL, activeModal, currentUser?._id]);
@@ -405,7 +422,7 @@ const EstimateModal = ({
       } catch (e) {
         console.warn(
           "pricing catalog fetch failed; falling back to visible products only:",
-          e?.message || e
+          e?.message || e,
         );
         if (!cancelled) setPricingCatalog(null);
       }
@@ -498,7 +515,7 @@ const EstimateModal = ({
     }
 
     const rawProfile = String(
-      line.profileKey || line.profile || ""
+      line.profileKey || line.profile || "",
     ).toLowerCase();
     const rawSizeTok = String(line.sizeInches || "").replace(/\s+/g, "");
 
@@ -515,8 +532,8 @@ const EstimateModal = ({
     const sizeNeedle = /\d+"/.test(rawSizeTok)
       ? rawSizeTok
       : rawSizeTok.replace(/[^0-9]/g, "")
-      ? rawSizeTok.replace(/[^0-9]/g, "") + '"'
-      : null;
+        ? rawSizeTok.replace(/[^0-9]/g, "") + '"'
+        : null;
 
     // STRICT match: name must include size + profile tokens
     const strictHit = list.find((p) => {
@@ -631,7 +648,7 @@ const EstimateModal = ({
     const eo = computeAccessoriesFromLines(
       selectedDiagram?.lines || [],
       catalogForPricing || [],
-      {}
+      {},
     );
     const me = itemsFromAccessoryData(selectedDiagram?.accessoryData || []);
     return [...eo, ...me];
@@ -643,7 +660,7 @@ const EstimateModal = ({
 
   const mergedAccessories = useMemo(
     () => computedAccessories,
-    [computedAccessories]
+    [computedAccessories],
   );
 
   const toast = useToast();
@@ -725,11 +742,11 @@ const EstimateModal = ({
       ) {
         rows.push({
           name: prettifyLineItemName(
-            (l.currentProduct || resolveGutterProductForLine(l)).name
+            (l.currentProduct || resolveGutterProductForLine(l)).name,
           ),
           quantity: Number((l.runFeet ?? l.measurement) || 0),
           price: Number(
-            (l.currentProduct || resolveGutterProductForLine(l))?.price || 0
+            (l.currentProduct || resolveGutterProductForLine(l))?.price || 0,
           ),
         });
       }
@@ -811,7 +828,7 @@ const EstimateModal = ({
     const photoSig = includedPhotoIdsSig || "";
 
     return [imgLen, linesN, accN, itemsN, show, date, num, logo, photoSig].join(
-      "|"
+      "|",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -926,7 +943,7 @@ const EstimateModal = ({
         const normalizedLines = (selectedDiagram?.lines || []).map((l) =>
           l.isDownspout
             ? { ...l, downspoutSize: prettyDsName(l.downspoutSize) }
-            : l
+            : l,
         );
 
         const prepared = {
@@ -957,7 +974,7 @@ const EstimateModal = ({
 
         const projectIdForPhotos = project?._id || project?.id;
         const photoIds = Array.isArray(
-          prepared?.selectedDiagram?.includedPhotoIds
+          prepared?.selectedDiagram?.includedPhotoIds,
         )
           ? prepared.selectedDiagram.includedPhotoIds
           : [];
@@ -975,9 +992,9 @@ const EstimateModal = ({
               photoIds.map((photoId) =>
                 fetchAuthedImageAsDataUrl(
                   `${base}dashboard/projects/${projectIdForPhotos}/photos/${photoId}/image?variant=preview`,
-                  prepared.jwt
-                ).catch(() => null)
-              )
+                  prepared.jwt,
+                ).catch(() => null),
+              ),
             );
 
             // if we got at least one, pass through (EstimatePDF will validate)
@@ -992,13 +1009,42 @@ const EstimateModal = ({
         // optional downscale (unchanged)
         if (prepared.selectedDiagram?.imageData) {
           const downsized = await maybeDownscaleDataUrl(
-            prepared.selectedDiagram.imageData
+            prepared.selectedDiagram.imageData,
           );
           if (abortRef.current.aborted || runId !== genSeqRef.current) return;
           prepared.selectedDiagram.imageData = downsized;
         }
 
         if (abortRef.current.aborted || runId !== genSeqRef.current) return;
+
+        // ✅ Fetch included photo annotations so preview+download PDFs match viewer modal
+        if (projectIdForPhotos && prepared.jwt && photoIds.length) {
+          try {
+            const metas = await Promise.all(
+              photoIds.map((photoId) =>
+                fetchProjectPhotoMeta(
+                  projectIdForPhotos,
+                  photoId,
+                  prepared.jwt,
+                ).catch(() => null),
+              ),
+            );
+
+            if (abortRef.current.aborted || runId !== genSeqRef.current) return;
+
+            const map = {};
+            metas.forEach((m, idx) => {
+              const id = photoIds[idx];
+              const ann = m?.annotations;
+              if (ann?.items?.length) map[id] = ann;
+            });
+
+            prepared.includedPhotoAnnotationsById = map;
+          } catch (e) {
+            // non-fatal; PDF will just render without annotations
+            console.warn("[PDF photos] annotations fetch failed", e);
+          }
+        }
 
         const blob = await renderEstimateToBlob(Doc, prepared);
         if (abortRef.current.aborted || runId !== genSeqRef.current) return;
@@ -1421,7 +1467,7 @@ const EstimateModal = ({
                                   s +
                                   Number(it.price || 0) *
                                     Number(it.quantity || 0),
-                                0
+                                0,
                               )
                               .toFixed(2)
                           : "0.00")
@@ -1437,7 +1483,7 @@ const EstimateModal = ({
                   <img
                     alt="Diagram"
                     src={`data:image/svg+xml;utf8,${encodeURIComponent(
-                      selectedDiagram.svg
+                      selectedDiagram.svg,
                     )}`}
                     style={{
                       width: "100%",

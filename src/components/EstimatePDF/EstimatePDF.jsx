@@ -20,7 +20,7 @@ function renderPhotoAnnotations(photoId, includedPhotoAnnotationsById) {
     includedPhotoAnnotationsById?.[photoId] ||
     [];
 
-  if (!items.length) return null;
+  if (!Array.isArray(items) || items.length === 0) return null;
 
   return (
     <Svg
@@ -131,8 +131,8 @@ function renderPhotoAnnotationsForPdf(photoId, includedPhotoAnnotationsById) {
   const items = Array.isArray(entry?.items)
     ? entry.items
     : Array.isArray(entry)
-    ? entry
-    : [];
+      ? entry
+      : [];
 
   if (!items.length) return null;
 
@@ -335,14 +335,14 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
           l.currentProduct?.colorCode ||
           // fallback: try to find the Splash Guard product by name
           ((Array.isArray(products) ? products : []).find((p) =>
-            /splash\s*guard/i.test(String(p?.name || ""))
+            /splash\s*guard/i.test(String(p?.name || "")),
           ) &&
             productColor(
               (products || []).find((p) =>
-                /splash\s*guard/i.test(String(p?.name || ""))
-              )
+                /splash\s*guard/i.test(String(p?.name || "")),
+              ),
             )) ||
-          "#111"
+          "#111",
       );
 
       if (!uniq.has(label))
@@ -398,7 +398,7 @@ function resolveDiagramLineColor(products = [], l) {
 
     // Fallback: search catalog by "splash guard" name
     const sg = (Array.isArray(products) ? products : []).find((p) =>
-      /splash\s*guard/i.test(String(p?.name || ""))
+      /splash\s*guard/i.test(String(p?.name || "")),
     );
     return normalizeColor(sg ? productColor(sg) : l.color || "#000");
   }
@@ -461,7 +461,7 @@ function normalizeColor(c) {
 
 function getVisualColor(p) {
   return normalizeColor(
-    p?.visual ?? p?.colorCode ?? p?.color ?? p?.defaultColor ?? "#000"
+    p?.visual ?? p?.colorCode ?? p?.color ?? p?.defaultColor ?? "#000",
   );
 }
 
@@ -512,13 +512,13 @@ function prettyDs(raw = "") {
   // 1) collapse duplicated style tokens like "corrugated corrugated"
   label = label.replace(
     /\b(corrugated|smooth|box|round)\b\s+\1\b/gi,
-    (_, w) => w
+    (_, w) => w,
   );
 
   // 2) Title-case the single style word
   label = label.replace(
     STYLE_RX,
-    (m) => m[0].toUpperCase() + m.slice(1).toLowerCase()
+    (m) => m[0].toUpperCase() + m.slice(1).toLowerCase(),
   );
 
   return label.replace(/\s{2,}/g, " ").trim();
@@ -540,7 +540,7 @@ function findCatalogProductForLine(products = [], line) {
 
   if (lineProdId) {
     const hitById = list.find(
-      (p) => String(p?._id || p?.id) === String(lineProdId)
+      (p) => String(p?._id || p?.id) === String(lineProdId),
     );
     if (hitById) return hitById;
   }
@@ -555,7 +555,7 @@ function findCatalogProductForLine(products = [], line) {
       (p) =>
         String(p?.name || "")
           .trim()
-          .toLowerCase() === name
+          .toLowerCase() === name,
     );
     if (hitExact) return hitExact;
 
@@ -607,20 +607,20 @@ function findDownspoutProductColor(products = [], line) {
       const s = n;
       const hasSize = /^\d+x\d+$/i.test(sizeKey)
         ? new RegExp(`\\b${sizeKey.replace("x", "\\s*[xX]\\s*")}\\b`, "i").test(
-            n
+            n,
           )
         : sizeKey.endsWith(`"`)
-        ? s.includes(`${sizeKey}`)
-        : true;
+          ? s.includes(`${sizeKey}`)
+          : true;
 
       const profOk =
         profileKey === "round"
           ? /round/.test(n)
           : profileKey === "smooth"
-          ? /smooth/.test(n)
-          : profileKey === "box"
-          ? /box/.test(n)
-          : /corrug/.test(n);
+            ? /smooth/.test(n)
+            : profileKey === "box"
+              ? /box/.test(n)
+              : /corrug/.test(n);
 
       return hasSize && profOk;
     }) ||
@@ -703,7 +703,7 @@ const styles = StyleSheet.create({
   photoImageWrapper: {
     position: "relative",
     width: "100%",
-    height: "100%",
+    backgroundColor: "#111",
   },
   photoOverlay: {
     position: "absolute",
@@ -862,7 +862,7 @@ function DiagramGraphic({
       console.info(
         `[PDF] DiagramGraphic: lines=${lines?.length || 0}, meta=${
           meta ? "yes" : "no"
-        }, rawSVG=${svgStr ? "yes" : "no"}, max=${maxWidth}x${maxHeight}`
+        }, rawSVG=${svgStr ? "yes" : "no"}, max=${maxWidth}x${maxHeight}`,
       );
     }
 
@@ -1000,8 +1000,8 @@ function DiagramGraphic({
       if (dev) {
         console.info(
           `[PDF] VECTOR fit: canvas=${W}x${H} box=${boxW}x${boxH} -> out=${outW}x${outH} scale=${scale.toFixed(
-            4
-          )}`
+            4,
+          )}`,
         );
       }
 
@@ -1096,10 +1096,10 @@ function DiagramGraphic({
               // ---- Circle ----
               if (l.kind === "free-circle") {
                 const cx = Math.round(
-                  Number(l.centerX ?? l.startX ?? 0) - offX
+                  Number(l.centerX ?? l.startX ?? 0) - offX,
                 );
                 const cy = Math.round(
-                  Number(l.centerY ?? l.startY ?? 0) - offY
+                  Number(l.centerY ?? l.startY ?? 0) - offY,
                 );
 
                 // radius is stored on the object (you set defaults in Diagram.jsx)
@@ -1271,10 +1271,10 @@ function DiagramGraphic({
               l.measurement != null
                 ? l.measurement
                 : l.runFeet != null
-                ? l.runFeet
-                : l.totalFeet != null
-                ? l.totalFeet
-                : null;
+                  ? l.runFeet
+                  : l.totalFeet != null
+                    ? l.totalFeet
+                    : null;
 
             // only label real measured segments (gutters & DS runs), skip misc marks
             const showMeasure =
@@ -1380,6 +1380,7 @@ export default function EstimatePDF({
   includedPhotoDataUrls: includedPhotoDataUrlsProp = [],
   includedPhotoAnnotationsById, // { [photoId]: { items: [...] } } OR { [photoId]: [...] }
   jwt,
+  includedPhotoMetaById,
 }) {
   // ✅ Works in Vite, still supports older env style as fallback
   const resolvedApiBaseUrl =
@@ -1436,8 +1437,8 @@ export default function EstimatePDF({
               name,
               l.currentProduct?.colorCode ||
                 l.currentProduct?.visual ||
-                l.currentProduct?.color
-            )
+                l.currentProduct?.color,
+            ),
         );
         gutterColorByLabel.set(gLabel, col);
       }
@@ -1472,8 +1473,8 @@ export default function EstimatePDF({
     Array.isArray(items) && items.length
       ? items
       : Array.isArray(extraItems) && extraItems.length
-      ? extraItems
-      : [];
+        ? extraItems
+        : [];
 
   // Normalize quantities to whole numbers (display + math)
   const rows = (rowsRaw || []).map((r) => ({
@@ -1483,7 +1484,7 @@ export default function EstimatePDF({
 
   const total = rows.reduce(
     (sum, r) => sum + Number(r.price || 0) * Number(r.quantity || 0),
-    0
+    0,
   );
 
   const diagramImage =
@@ -1501,12 +1502,12 @@ export default function EstimatePDF({
   const billToPhone = t(project?.billingPrimaryPhone);
 
   const jobName = t(
-    project?.projectName || estimate?.projectSnapshot?.name || project?.name
+    project?.projectName || estimate?.projectSnapshot?.name || project?.name,
   );
   const jobAddress = t(
     project?.projectAddress ||
       estimate?.projectSnapshot?.address ||
-      project?.address
+      project?.address,
   );
 
   // Photo data-urls must be prepared in the browser. When this component is rendered
@@ -1530,7 +1531,7 @@ export default function EstimatePDF({
 
     if (Array.isArray(dataUrls) && dataUrls.length === ids.length) {
       const allOk = dataUrls.every(
-        (u) => typeof u === "string" && u.startsWith("data:")
+        (u) => typeof u === "string" && u.startsWith("data:"),
       );
       if (allOk)
         return dataUrls.map((u, i) => ({
@@ -1544,7 +1545,7 @@ export default function EstimatePDF({
     ) {
       const mapped = ids.map((pid) => dataUrls[pid]);
       const allOk = mapped.every(
-        (u) => typeof u === "string" && u.startsWith("data:")
+        (u) => typeof u === "string" && u.startsWith("data:"),
       );
       if (allOk)
         return ids.map((pid) => ({
@@ -1831,21 +1832,35 @@ export default function EstimatePDF({
               </View>
 
               <View style={styles.photoGrid}>
-                {pagePhotos.map((ph, idx) => (
-                  <View key={`ph-${pageIdx}-${idx}`} style={styles.photoCell}>
-                    <View style={styles.photoImageWrapper}>
-                      <Image src={ph} style={styles.photoImage} />
-                      {renderPhotoAnnotationsForPdf(
-                        ph?.photoId,
-                        includedPhotoAnnotationsById
-                      )}
-                    </View>
+                {pagePhotos.map((ph, idx) => {
+                  const meta = includedPhotoMetaById?.[ph?.photoId];
+                  const aspect =
+                    meta && meta.width && meta.height
+                      ? meta.width / meta.height
+                      : 4 / 3;
 
-                    <Text style={styles.photoCaption}>
-                      Photo {pageIdx * 4 + idx + 1}
-                    </Text>
-                  </View>
-                ))}
+                  return (
+                    <View key={`ph-${pageIdx}-${idx}`} style={styles.photoCell}>
+                      {/* Force the wrapper to match the image aspect ratio so contain introduces NO padding */}
+                      <View
+                        style={[
+                          styles.photoImageWrapper,
+                          { aspectRatio: aspect },
+                        ]}
+                      >
+                        <Image src={ph} style={styles.photoImage} />
+                        {renderPhotoAnnotationsForPdf(
+                          ph?.photoId,
+                          includedPhotoAnnotationsById,
+                        )}
+                      </View>
+
+                      <Text style={styles.photoCaption}>
+                        Photo {pageIdx * 4 + idx + 1}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             </Page>
           ))

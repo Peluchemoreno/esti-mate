@@ -54,8 +54,22 @@ export default function Project({
       .replace(",", ""); // "09/09/2025 21:07:23"
   };
 
+  async function fetchPhotoAnnotations(projectId, photoId, token) {
+    console.log(projectId, photoId);
+    const res = await fetch(
+      `${
+        import.meta.env.VITE_API_URL
+      }dashboard/projects/${projectId}/photos/${photoId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.photo?.annotations || null;
+  }
+
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
   const [annotatorPhotoId, setAnnotatorPhotoId] = useState(null);
+  const [photoAnnotationsById, setPhotoAnnotationsById] = useState({});
 
   function openAnnotator(photoId) {
     if (!photoId) return;
@@ -89,6 +103,10 @@ export default function Project({
   })[0];
 
   useEffect(() => {
+    console.log(photoAnnotationsById);
+  }, [photoAnnotationsById]);
+
+  useEffect(() => {
     const token = localStorage.getItem("jwt");
 
     retrieveProjectDiagrams(projectId, token).then((diagrams) => {
@@ -113,6 +131,22 @@ export default function Project({
         const res = await getProjectPhotos(project._id, token);
         const photos = res?.photos || [];
 
+        const annotationsMap = {};
+
+        await Promise.all(
+          photos.map(async (p) => {
+            console.log("fetching annotations for photo", p.id, projectId);
+            const ann = await fetchPhotoAnnotations(projectId, p.id, token);
+            if (ann?.items?.length) {
+              annotationsMap[p.id] = ann;
+            }
+          }),
+
+          console.log(annotationsMap),
+        );
+
+        setPhotoAnnotationsById(annotationsMap);
+
         if (cancelled) return;
         setProjectPhotos(photos);
 
@@ -124,7 +158,7 @@ export default function Project({
               project._id,
               p.id,
               token,
-              "preview"
+              "preview",
             );
             newMap[p.id] = URL.createObjectURL(blob);
           } catch (e) {
@@ -211,7 +245,7 @@ export default function Project({
 
     // Also update diagrams list state so selection sticks visually
     setDiagrams((prev) =>
-      (prev || []).map((d) => (d._id === updatedLocal._id ? updatedLocal : d))
+      (prev || []).map((d) => (d._id === updatedLocal._id ? updatedLocal : d)),
     );
 
     // Persist to DB using existing updateDiagram endpoint
@@ -332,12 +366,12 @@ export default function Project({
                         const res = await uploadProjectPhotosBulk(
                           project._id,
                           token,
-                          files
+                          files,
                         );
 
                         // Minimal UX: show failures without breaking flow
                         const failed = (res?.results || []).filter(
-                          (r) => !r.ok
+                          (r) => !r.ok,
                         );
                         if (failed.length) {
                           alert(
@@ -347,9 +381,9 @@ export default function Project({
                               failed
                                 .map(
                                   (f) =>
-                                    `- ${f.filename}: ${f.error || "failed"}`
+                                    `- ${f.filename}: ${f.error || "failed"}`,
                                 )
-                                .join("\n")
+                                .join("\n"),
                           );
                         }
                       }
@@ -385,12 +419,12 @@ export default function Project({
 
                       const checked = (
                         selectedDiagram.includedPhotoIds || []
-                      ).includes(p.id);
-                      const thumbSrc = photoThumbUrlById[p.id];
+                      ).includes(photoId);
+                      const thumbSrc = photoThumbUrlById[photoId];
 
                       return (
                         <label
-                          key={p.id}
+                          key={photoId}
                           style={{
                             width: 120,
                             border: checked
@@ -410,9 +444,10 @@ export default function Project({
                             <input
                               type="checkbox"
                               checked={checked}
-                              onChange={() => toggleIncludePhoto(p.id)}
+                              onChange={() => toggleIncludePhoto(photoId)}
                               style={{ marginBottom: 6 }}
                             />
+
                             <button
                               type="button"
                               onClick={async (e) => {
@@ -425,7 +460,7 @@ export default function Project({
                                 }
 
                                 const ok = window.confirm(
-                                  "Delete this photo?\n\nThis cannot be undone."
+                                  "Delete this photo?\n\nThis cannot be undone.",
                                 );
                                 if (!ok) return;
 
@@ -434,13 +469,13 @@ export default function Project({
                                   await deleteProjectPhoto(
                                     project._id,
                                     photoId,
-                                    token
+                                    token,
                                   );
                                   window.location.reload();
                                 } catch (err) {
                                   console.error(err);
                                   alert(
-                                    err?.message || "Failed to delete photo"
+                                    err?.message || "Failed to delete photo",
                                   );
                                 }
                               }}
@@ -459,12 +494,13 @@ export default function Project({
                               🗑
                             </button>
                           </div>
+
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              openAnnotator(p.id);
+                              openAnnotator(photoId); // ✅ FIX: use real id
                             }}
                             style={{
                               width: 108,
@@ -489,7 +525,9 @@ export default function Project({
                                 style={{
                                   width: "100%",
                                   height: "100%",
-                                  objectFit: "cover",
+                                  objectFit: "contain", // ✅ keeps it unzoomed
+                                  objectPosition: "center",
+                                  background: "#111",
                                 }}
                               />
                             ) : (

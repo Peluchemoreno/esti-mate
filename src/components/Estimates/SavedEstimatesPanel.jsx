@@ -28,6 +28,19 @@ async function blobToDataUrl(blob) {
   });
 }
 
+async function fetchProjectPhotoMeta(projectId, photoId, jwt) {
+  const base = BASE_URL?.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
+  const res = await fetch(
+    `${base}dashboard/projects/${projectId}/photos/${photoId}`,
+    {
+      headers: { Authorization: `Bearer ${jwt}` },
+    },
+  );
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json?.photo || null; // { photo: { originalMeta, annotations, ... } }
+}
+
 async function fetchAuthedImageAsDataUrl(url, jwt) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${jwt}` } });
   if (!res.ok) throw new Error(`photo fetch failed ${res.status}`);
@@ -93,7 +106,7 @@ export default function SavedEstimatesPanel({
     try {
       const res = await fetch(
         `${BASE_URL}api/estimates?projectId=${encodeURIComponent(projectId)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -128,13 +141,13 @@ export default function SavedEstimatesPanel({
             r.onloadend = () => resolve(r.result); // base64 data URL
             r.onerror = reject;
             r.readAsDataURL(blob);
-          })
+          }),
       )
       .then((b64) => setLogoUrl(b64))
       .catch((err) => {
         console.warn(
           "No logo available or failed to load:",
-          err?.message || err
+          err?.message || err,
         );
         setLogoUrl(null);
       });
@@ -184,6 +197,7 @@ export default function SavedEstimatesPanel({
   };
 
   async function downloadPDF(est) {
+    const projectIdForPhotos = project?._id || doc?.projectId || projectId;
     if (!est?._id) return;
 
     const key = `${est._id}|${est.updatedAt || ""}`;
@@ -195,7 +209,7 @@ export default function SavedEstimatesPanel({
       a.href = url;
       a.download = `Estimate-${String(est.estimateNumber || 0).padStart(
         3,
-        "0"
+        "0",
       )}.pdf`;
       document.body.appendChild(a);
       a.click();
@@ -227,13 +241,40 @@ export default function SavedEstimatesPanel({
         const base = BASE_URL?.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
         const urls = ids.map(
           (pid) =>
-            `${base}dashboard/projects/${projectIdForPhotos}/photos/${pid}/image?variant=preview`
+            `${base}dashboard/projects/${projectIdForPhotos}/photos/${pid}/image?variant=preview`,
         );
 
         // sequential to avoid memory spikes
         for (const u of urls) {
           const dataUrl = await fetchAuthedImageAsDataUrl(u, token);
           includedPhotoDataUrls.push(dataUrl);
+        }
+      }
+
+      // ✅ Fetch annotation + originalMeta for included photos
+      const includedPhotoAnnotationsById = {};
+      const includedPhotoMetaById = {};
+
+      if (ids.length) {
+        for (const pid of ids) {
+          const meta = await fetchProjectPhotoMeta(
+            projectIdForPhotos,
+            pid,
+            token,
+          ).catch(() => null);
+          if (meta?.annotations?.items?.length) {
+            includedPhotoAnnotationsById[pid] = meta.annotations;
+          }
+          const w = meta?.originalMeta?.width;
+          const h = meta?.originalMeta?.height;
+          if (
+            typeof w === "number" &&
+            typeof h === "number" &&
+            w > 0 &&
+            h > 0
+          ) {
+            includedPhotoMetaById[pid] = { width: w, height: h };
+          }
         }
       }
 
@@ -247,7 +288,7 @@ export default function SavedEstimatesPanel({
           pdfMeasure(
             "PDF/Import @react-pdf",
             "PDF/Import @react-pdf:start",
-            "PDF/Import @react-pdf:end"
+            "PDF/Import @react-pdf:end",
           );
           return m;
         }),
@@ -256,15 +297,13 @@ export default function SavedEstimatesPanel({
           pdfMeasure(
             "PDF/Import EstimatePDF",
             "PDF/Import EstimatePDF:start",
-            "PDF/Import EstimatePDF:end"
+            "PDF/Import EstimatePDF:end",
           );
           return m;
         }),
       ]);
 
       const paddedNum = String(doc.estimateNumber || 0).padStart(3, "0");
-
-      const projectIdForPhotos = project?._id || doc?.projectId || projectId;
 
       const element = (
         <EstimatePDF
@@ -275,6 +314,8 @@ export default function SavedEstimatesPanel({
             includedPhotoIds: ids,
           }}
           includedPhotoDataUrls={includedPhotoDataUrls}
+          includedPhotoAnnotationsById={includedPhotoAnnotationsById}
+          includedPhotoMetaById={includedPhotoMetaById}
           currentUser={currentUser}
           logoUrl={logoUrl}
           estimateData={{
@@ -328,7 +369,7 @@ export default function SavedEstimatesPanel({
       pdfMeasure(
         "PDF/Render-to-Blob",
         "PDF/Render-to-Blob:start",
-        "PDF/Render-to-Blob:end"
+        "PDF/Render-to-Blob:end",
       );
 
       pdfBlobCache.set(key, blob);

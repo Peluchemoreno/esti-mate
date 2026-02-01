@@ -46,7 +46,7 @@ const brand = {
 async function fetchProjectPhotoMeta(projectId, photoId, token) {
   const res = await fetch(
     `${BASE_URL}dashboard/projects/${projectId}/photos/${photoId}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+    { headers: { Authorization: `Bearer ${token}` } },
   );
 
   // If backend sends HTML error pages, this avoids crashing JSON.parse
@@ -122,6 +122,7 @@ export default function EstimateViewerModal({
 
   const [includedPhotoAnnotationsById, setIncludedPhotoAnnotationsById] =
     useState({});
+  const [includedPhotoMetaById, setIncludedPhotoMetaById] = useState({});
 
   // Measure the preview render time once we have a doc and can inline
   useEffect(() => {
@@ -136,7 +137,7 @@ export default function EstimateViewerModal({
         pdfMeasure(
           "PDF/Preview render",
           "PDF/Preview render:start",
-          "PDF/Preview render:end"
+          "PDF/Preview render:end",
         );
         pdfReportAndClear();
       }, 0);
@@ -202,7 +203,7 @@ export default function EstimateViewerModal({
       .catch((err) => {
         console.warn(
           "[EstimateViewerModal] Failed to load full estimate:",
-          err
+          err,
         );
         if (!cancelled) setDoc(fallbackEstimate || null);
       })
@@ -232,13 +233,14 @@ export default function EstimateViewerModal({
       try {
         const results = await Promise.all(
           includedPhotoIds.map((pid) =>
-            fetchProjectPhotoMeta(projectId, pid, token).catch(() => null)
-          )
+            fetchProjectPhotoMeta(projectId, pid, token).catch(() => null),
+          ),
         );
 
         if (cancelled) return;
 
         const map = {};
+
         for (let i = 0; i < includedPhotoIds.length; i++) {
           const pid = includedPhotoIds[i];
           const data = results[i];
@@ -254,7 +256,7 @@ export default function EstimateViewerModal({
       } catch (e) {
         console.warn(
           "[EstimateViewerModal] Failed to load photo annotations",
-          e
+          e,
         );
         if (!cancelled) setIncludedPhotoAnnotationsById({});
       }
@@ -264,6 +266,57 @@ export default function EstimateViewerModal({
       cancelled = true;
     };
   }, [isOpen, doc, selectedProject, token]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const token = localStorage.getItem("jwt");
+    const photoIds = getIncludedPhotoIdsFromAny(
+      fallbackEstimate || selectedProject,
+    );
+
+    if (!photoIds.length) return;
+
+    let cancelled = false;
+
+    async function loadAnnotations() {
+      const map = {};
+      const metaMap = {};
+      for (const photoId of photoIds) {
+        try {
+          const res = await fetchProjectPhotoMeta(
+            pickProjectId(fallbackEstimate, selectedProject),
+            photoId,
+            token,
+          );
+          const ann = res?.photo?.annotations;
+          const w = res?.photo?.originalMeta?.width;
+          const h = res?.photo?.originalMeta?.height;
+          if (
+            typeof w === "number" &&
+            typeof h === "number" &&
+            w > 0 &&
+            h > 0
+          ) {
+            metaMap[photoId] = { width: w, height: h };
+          }
+
+          if (ann?.items?.length) {
+            map[photoId] = ann;
+          }
+        } catch {}
+      }
+
+      if (!cancelled) setIncludedPhotoAnnotationsById(map);
+    }
+
+    loadAnnotations();
+    setIncludedPhotoMetaById(metaMap);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, fallbackEstimate, selectedProject]);
 
   // company logo as base64 (so @react-pdf can embed it)
   useEffect(() => {
@@ -279,7 +332,7 @@ export default function EstimateViewerModal({
             r.onloadend = () => resolve(r.result);
             r.onerror = reject;
             r.readAsDataURL(blob);
-          })
+          }),
       )
       .then((b64) => setLogoUrl(b64))
       .catch((err) => {
@@ -362,8 +415,8 @@ export default function EstimateViewerModal({
         lines: Array.isArray(doc?.diagram?.lines)
           ? doc.diagram.lines
           : Array.isArray(doc?.selectedDiagram?.lines)
-          ? doc.selectedDiagram.lines
-          : [],
+            ? doc.selectedDiagram.lines
+            : [],
 
         accessories: doc?.accessories || undefined,
 
@@ -378,6 +431,8 @@ export default function EstimateViewerModal({
       currentUser,
       includedPhotoAnnotationsById,
       logoUrl,
+      includedPhotoMetaById,
+
       estimateData: {
         estimateNumber: paddedNum,
         estimateDate: doc.estimateDate || "",
@@ -412,6 +467,7 @@ export default function EstimateViewerModal({
 
       // Pass-throughs
       products,
+      includedPhotoAnnotationsById,
       showPrices: doc.showPrices ?? true,
       estimate: doc, // let PDF fall back to snapshot if ever needed
       extraItems: [], // not used for saved docs
