@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 // at top with other imports
 import SavedEstimatesPanel from "../Estimates/SavedEstimatesPanel";
+import FullscreenPhotoAnnotatorModal from "./FullscreenPhotoAnnotatorModal";
 
 import {
   deleteDiagram,
@@ -52,6 +53,20 @@ export default function Project({
       })
       .replace(",", ""); // "09/09/2025 21:07:23"
   };
+
+  const [annotatorOpen, setAnnotatorOpen] = useState(false);
+  const [annotatorPhotoId, setAnnotatorPhotoId] = useState(null);
+
+  function openAnnotator(photoId) {
+    if (!photoId) return;
+    setAnnotatorPhotoId(photoId);
+    setAnnotatorOpen(true);
+  }
+
+  function closeAnnotator() {
+    setAnnotatorOpen(false);
+    setAnnotatorPhotoId(null);
+  }
 
   const { data: allProducts = [] } = useProductsPricing();
   const allUnfilteredProducts = allProducts;
@@ -444,7 +459,13 @@ export default function Project({
                               🗑
                             </button>
                           </div>
-                          <div
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openAnnotator(p.id);
+                            }}
                             style={{
                               width: 108,
                               height: 80,
@@ -454,23 +475,27 @@ export default function Project({
                               justifyContent: "center",
                               overflow: "hidden",
                               borderRadius: 4,
+                              border: "1px solid rgba(255,255,255,0.15)",
+                              padding: 0,
+                              cursor: "pointer",
                             }}
+                            aria-label="Open fullscreen annotator"
+                            title="Open annotator"
                           >
                             {thumbSrc ? (
                               <img
                                 src={thumbSrc}
                                 alt={p.originalMeta?.filename || "photo"}
-                                style={{ width: "100%" }}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
                               />
                             ) : (
                               <span style={{ fontSize: 12 }}>no preview</span>
                             )}
-                          </div>
-                          <div
-                            style={{ fontSize: 11, marginTop: 6, opacity: 0.8 }}
-                          >
-                            {p.originalMeta?.filename || p.id}
-                          </div>
+                          </button>
                         </label>
                       );
                     })}
@@ -529,6 +554,17 @@ export default function Project({
         activeModal={activeModal}
         currentUser={currentUser}
         products={allUnfilteredProducts}
+      />
+      <FullscreenPhotoAnnotatorModal
+        isOpen={annotatorOpen}
+        onClose={closeAnnotator}
+        projectId={project?._id}
+        photoId={annotatorPhotoId}
+        token={localStorage.getItem("jwt")}
+        onSaved={() => {
+          // simplest + safest: reload to refresh thumbs + hasAnnotations flags
+          window.location.reload();
+        }}
       />
     </>
   );

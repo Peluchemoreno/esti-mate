@@ -267,3 +267,38 @@ export function fetchProjectPhotoBlob(
     return res.blob();
   });
 }
+
+// --------------------
+// Project Photos - annotations/meta (NEW, additive)
+// --------------------
+
+// GET /dashboard/projects/:projectId/photos/:photoId
+export function getProjectPhotoMeta(projectId, photoId, token) {
+  const base = normBase(BASE_URL);
+  return fetch(`${base}dashboard/projects/${projectId}/photos/${photoId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }).then(processServerResponse);
+}
+
+// PATCH /dashboard/projects/:projectId/photos/:photoId
+// backend accepts either { items } OR { annotations: { items } }.
+// We'll send { items } to match your controller's first-choice shape. :contentReference[oaicite:2]{index=2}
+export function updateProjectPhotoAnnotations(
+  projectId,
+  photoId,
+  token,
+  items
+) {
+  const base = normBase(BASE_URL);
+  return fetch(`${base}dashboard/projects/${projectId}/photos/${photoId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ items: Array.isArray(items) ? items : [] }),
+  }).then(processServerResponse);
+}
