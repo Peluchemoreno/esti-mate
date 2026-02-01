@@ -8,6 +8,34 @@ import {
 
 Modal.setAppElement("#root");
 
+// ADD these helpers somewhere near the top (below Modal.setAppElement is fine)
+function normalizeItemsFromBackend(rawItems) {
+  const arr = Array.isArray(rawItems) ? rawItems : [];
+  return arr
+    .filter(Boolean)
+    .map((it) => {
+      if (!it || typeof it !== "object") return it;
+      // backend likely stores "type", your UI uses "kind"
+      const type = it.type || it.kind;
+      const kind = it.kind || it.type;
+      return { ...it, type, kind };
+    })
+    .filter((it) => it && typeof it === "object" && (it.type || it.kind));
+}
+
+function normalizeItemsForBackend(rawItems) {
+  const arr = Array.isArray(rawItems) ? rawItems : [];
+  return arr
+    .filter(Boolean)
+    .map((it) => {
+      if (!it || typeof it !== "object") return it;
+      const type = it.type || it.kind; // ✅ REQUIRED by mongoose schema
+      const kind = it.kind || it.type; // keep UI-friendly too
+      return { ...it, type, kind };
+    })
+    .filter((it) => it && typeof it === "object" && it.type);
+}
+
 function clamp01(n) {
   return Math.max(0, Math.min(1, n));
 }
@@ -43,23 +71,25 @@ function isRecognizedItem(it) {
   );
 }
 
+// Replace isRecognizedServerItem with this:
 function isRecognizedServerItem(it) {
-  const t = (it && it.type) || "";
+  const t = (it && (it.type || it.kind)) || "";
   return (
     t === "line" || t === "rect" || t === "circle" || t === "x" || t === "text"
   );
 }
 
-// Convert server schema -> INTERNAL render schema
+// Replace fromServerItem with this (only small changes: type + a/b fallback):
 function fromServerItem(it) {
-  const type = it?.type;
+  const type = it?.type || it?.kind;
   const stroke = it?.stroke || "#00ff66";
   const strokeWidth = Number(it?.strokeWidth || 3);
 
-  // Prefer p1/p2 (normalized); fallback to x/y/w/h or cx/cy/r
-  let a = it?.p1;
-  let b = it?.p2;
+  // Prefer p1/p2 (server); fallback to a/b (older/buggy-saved)
+  let a = it?.p1 || it?.a;
+  let b = it?.p2 || it?.b;
 
+  // Fallbacks for alternate server formats
   if ((!a || !b) && type === "rect" && it && typeof it.x === "number") {
     a = { x: it.x, y: it.y };
     b = { x: (it.x || 0) + (it.w || 0), y: (it.y || 0) + (it.h || 0) };
@@ -444,26 +474,32 @@ export default function FullscreenPhotoAnnotatorModal({
   async function handleSave() {
     setSaving(true);
     try {
-      // Save SERVER schema (type required) + keep unknown items unchanged
-      const payloadItems = [
-        ...(unknownServerItemsRef.current || []),
-        ...(Array.isArray(items) ? items.map(toServerItem) : []),
-      ];
+      // Convert INTERNAL items -> SERVER schema (type + p1/p2)
+      const serverKnown = (Array.isArray(items) ? items : [])
+        .filter(isRecognizedItem)
+        .map(toServerItem);
+
+      // Preserve server items we don't recognize (don’t delete user data)
+      const unknownServer = Array.isArray(unknownServerItemsRef.current)
+        ? unknownServerItemsRef.current
+        : [];
+
+      const mergedServerItems = [...unknownServer, ...serverKnown];
 
       await updateProjectPhotoAnnotations(
         projectId,
         photoId,
         token,
-        payloadItems
+        mergedServerItems
       );
 
-      // Update initial snapshots so close doesn't revert after saving
+      // ✅ after a successful save, update the “initial snapshot” in INTERNAL shape
       initialItemsRef.current = deepClone(items);
       initialUnknownServerItemsRef.current = deepClone(
-        unknownServerItemsRef.current || []
+        unknownServerItemsRef.current
       );
 
-      if (typeof onSaved === "function") onSaved();
+      if (typeof onSaved === "function") onSaved(mergedServerItems);
       onClose();
     } catch (e) {
       console.error(e);
@@ -499,7 +535,14 @@ export default function FullscreenPhotoAnnotatorModal({
 
         setPhotoMeta(photo);
 
-        const serverItems = photo?.annotations?.items || [];
+        const rawItems =
+          photo?.annotations?.items ||
+          metaRes?.annotations?.items ||
+          metaRes?.photo?.annotations?.items ||
+          [];
+
+        const serverItems = normalizeItemsFromBackend(rawItems);
+
         const unknown = serverItems.filter((it) => !isRecognizedServerItem(it));
         const knownInternal = serverItems
           .filter((it) => isRecognizedServerItem(it))

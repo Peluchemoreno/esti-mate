@@ -13,6 +13,273 @@ import {
 } from "@react-pdf/renderer";
 import { useMemo, useEffect } from "react";
 // ---------- tiny helpers ----------
+//
+function renderPhotoAnnotations(photoId, includedPhotoAnnotationsById) {
+  const items =
+    includedPhotoAnnotationsById?.[photoId]?.items ||
+    includedPhotoAnnotationsById?.[photoId] ||
+    [];
+
+  if (!items.length) return null;
+
+  return (
+    <Svg
+      viewBox="0 0 1 1"
+      preserveAspectRatio="none"
+      style={styles.photoOverlay}
+    >
+      <G>
+        {items.map((it, idx) => {
+          const type = it.type || it.kind;
+          const stroke = it.stroke || "#00cc55";
+          const fill = it.fill || "transparent";
+          const sw = 0.006;
+
+          const a = it.a || it.p1;
+          const b = it.b || it.p2;
+
+          if (!a || !b) return null;
+
+          if (type === "line") {
+            return (
+              <Line
+                key={idx}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke={stroke}
+                strokeWidth={sw}
+              />
+            );
+          }
+
+          if (type === "rect") {
+            const x = Math.min(a.x, b.x);
+            const y = Math.min(a.y, b.y);
+            const w = Math.abs(b.x - a.x);
+            const h = Math.abs(b.y - a.y);
+            return (
+              <Rect
+                key={idx}
+                x={x}
+                y={y}
+                width={w}
+                height={h}
+                stroke={stroke}
+                fill={fill}
+                strokeWidth={sw}
+              />
+            );
+          }
+
+          if (type === "circle") {
+            const cx = (a.x + b.x) / 2;
+            const cy = (a.y + b.y) / 2;
+            const r = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / 2;
+            return (
+              <Circle
+                key={idx}
+                cx={cx}
+                cy={cy}
+                r={r}
+                stroke={stroke}
+                fill={fill}
+                strokeWidth={sw}
+              />
+            );
+          }
+
+          if (type === "x") {
+            const x = Math.min(a.x, b.x);
+            const y = Math.min(a.y, b.y);
+            const w = Math.abs(b.x - a.x);
+            const h = Math.abs(b.y - a.y);
+            return (
+              <G key={idx}>
+                <Line
+                  x1={x}
+                  y1={y}
+                  x2={x + w}
+                  y2={y + h}
+                  stroke={stroke}
+                  strokeWidth={sw}
+                />
+                <Line
+                  x1={x + w}
+                  y1={y}
+                  x2={x}
+                  y2={y + h}
+                  stroke={stroke}
+                  strokeWidth={sw}
+                />
+              </G>
+            );
+          }
+
+          return null;
+        })}
+      </G>
+    </Svg>
+  );
+}
+
+function renderPhotoAnnotationsForPdf(photoId, includedPhotoAnnotationsById) {
+  if (!photoId || !includedPhotoAnnotationsById) return null;
+
+  const entry = includedPhotoAnnotationsById[photoId];
+  const items = Array.isArray(entry?.items)
+    ? entry.items
+    : Array.isArray(entry)
+    ? entry
+    : [];
+
+  if (!items.length) return null;
+
+  // Draw in normalized 0..1 space
+  return (
+    <Svg
+      viewBox="0 0 1 1"
+      preserveAspectRatio="xMidYMid meet"
+      style={styles.photoOverlay}
+    >
+      <G>
+        {items.map((it, idx) => {
+          const type = it?.type || it?.kind;
+          const stroke = it?.stroke || "#00cc55";
+          const fill = it?.fill ? it.fill : "transparent";
+          const sw = 0.006; // normalized-ish stroke width that looks OK in PDF
+
+          // Most of your frontend items are a/b. Backend may store p1/p2.
+          const a = it?.a || it?.p1;
+          const b = it?.b || it?.p2;
+
+          if (type === "line" && a && b) {
+            return (
+              <Line
+                key={idx}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke={stroke}
+                strokeWidth={sw}
+              />
+            );
+          }
+
+          if (type === "x" && a && b) {
+            const x = Math.min(a.x, b.x);
+            const y = Math.min(a.y, b.y);
+            const w = Math.abs(b.x - a.x);
+            const h = Math.abs(b.y - a.y);
+            return (
+              <G key={idx}>
+                <Line
+                  x1={x}
+                  y1={y}
+                  x2={x + w}
+                  y2={y + h}
+                  stroke={stroke}
+                  strokeWidth={sw}
+                />
+                <Line
+                  x1={x + w}
+                  y1={y}
+                  x2={x}
+                  y2={y + h}
+                  stroke={stroke}
+                  strokeWidth={sw}
+                />
+              </G>
+            );
+          }
+
+          if (type === "rect") {
+            // support either a/b or x/y/w/h
+            if (a && b) {
+              const x = Math.min(a.x, b.x);
+              const y = Math.min(a.y, b.y);
+              const w = Math.abs(b.x - a.x);
+              const h = Math.abs(b.y - a.y);
+              return (
+                <Rect
+                  key={idx}
+                  x={x}
+                  y={y}
+                  width={w}
+                  height={h}
+                  stroke={stroke}
+                  fill={fill}
+                  strokeWidth={sw}
+                />
+              );
+            }
+            if (
+              typeof it?.x === "number" &&
+              typeof it?.y === "number" &&
+              typeof it?.w === "number" &&
+              typeof it?.h === "number"
+            ) {
+              return (
+                <Rect
+                  key={idx}
+                  x={it.x}
+                  y={it.y}
+                  width={it.w}
+                  height={it.h}
+                  stroke={stroke}
+                  fill={fill}
+                  strokeWidth={sw}
+                />
+              );
+            }
+          }
+
+          if (type === "circle") {
+            // support either a/b (bounding) or cx/cy/r
+            if (
+              typeof it?.cx === "number" &&
+              typeof it?.cy === "number" &&
+              typeof it?.r === "number"
+            ) {
+              return (
+                <Circle
+                  key={idx}
+                  cx={it.cx}
+                  cy={it.cy}
+                  r={it.r}
+                  stroke={stroke}
+                  fill={fill}
+                  strokeWidth={sw}
+                />
+              );
+            }
+            if (a && b) {
+              const cx = (a.x + b.x) / 2;
+              const cy = (a.y + b.y) / 2;
+              const r = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / 2;
+              return (
+                <Circle
+                  key={idx}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  stroke={stroke}
+                  fill={fill}
+                  strokeWidth={sw}
+                />
+              );
+            }
+          }
+
+          // NOTE: Text in @react-pdf/renderer SVG is limited; keep it safe for now.
+          return null;
+        })}
+      </G>
+    </Svg>
+  );
+}
 
 async function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
@@ -433,6 +700,19 @@ const KeySwatch = ({ color = "#111", size = 10, shape = "square" }) => {
 
 // ---------- styles (React-PDF friendly; no CSS shorthands) ----------
 const styles = StyleSheet.create({
+  photoImageWrapper: {
+    position: "relative",
+    width: "100%",
+    height: "100%",
+  },
+  photoOverlay: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: "100%",
+    height: "100%",
+  },
+
   page: {
     fontFamily: "Helvetica",
     fontSize: 11,
@@ -1098,6 +1378,7 @@ export default function EstimatePDF({
   items = [],
   apiBaseUrl,
   includedPhotoDataUrls: includedPhotoDataUrlsProp = [],
+  includedPhotoAnnotationsById, // { [photoId]: { items: [...] } } OR { [photoId]: [...] }
   jwt,
 }) {
   // ✅ Works in Vite, still supports older env style as fallback
@@ -1246,20 +1527,30 @@ export default function EstimatePDF({
     //  - array aligned with includedPhotoIds (same order/length)
     //  - object map keyed by photoId -> dataUrl
     const dataUrls = includedPhotoDataUrlsProp;
+
     if (Array.isArray(dataUrls) && dataUrls.length === ids.length) {
       const allOk = dataUrls.every(
         (u) => typeof u === "string" && u.startsWith("data:")
       );
-      if (allOk) return dataUrls.map((u) => ({ uri: u }));
+      if (allOk)
+        return dataUrls.map((u, i) => ({
+          uri: u,
+          photoId: ids[i], // ✅ keep id so we can overlay annotations
+        }));
     } else if (
       dataUrls &&
       typeof dataUrls === "object" &&
       !Array.isArray(dataUrls)
     ) {
-      const mapped = ids
-        .map((pid) => dataUrls[pid])
-        .filter((u) => typeof u === "string" && u.startsWith("data:"));
-      if (mapped.length === ids.length) return mapped.map((u) => ({ uri: u }));
+      const mapped = ids.map((pid) => dataUrls[pid]);
+      const allOk = mapped.every(
+        (u) => typeof u === "string" && u.startsWith("data:")
+      );
+      if (allOk)
+        return ids.map((pid) => ({
+          uri: dataUrls[pid],
+          photoId: pid,
+        }));
     }
 
     const projectId = project?._id || project?.id;
@@ -1276,6 +1567,7 @@ export default function EstimatePDF({
     return ids.map((pid) => ({
       uri: `${apiBase}dashboard/projects/${projectId}/photos/${pid}/image?variant=preview`,
       headers: { Authorization: `Bearer ${token}` },
+      photoId: pid, // ✅ keep id so we can overlay annotations
     }));
   }, [
     apiBase,
@@ -1539,9 +1831,16 @@ export default function EstimatePDF({
               </View>
 
               <View style={styles.photoGrid}>
-                {pagePhotos.map((src, idx) => (
+                {pagePhotos.map((ph, idx) => (
                   <View key={`ph-${pageIdx}-${idx}`} style={styles.photoCell}>
-                    <Image src={src} style={styles.photoImage} />
+                    <View style={styles.photoImageWrapper}>
+                      <Image src={ph} style={styles.photoImage} />
+                      {renderPhotoAnnotationsForPdf(
+                        ph?.photoId,
+                        includedPhotoAnnotationsById
+                      )}
+                    </View>
+
                     <Text style={styles.photoCaption}>
                       Photo {pageIdx * 4 + idx + 1}
                     </Text>

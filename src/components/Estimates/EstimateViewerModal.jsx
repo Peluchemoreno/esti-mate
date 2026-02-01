@@ -42,6 +42,27 @@ const brand = {
   border: "var(--white)",
 };
 
+// Fetch single photo meta (includes annotations if your backend returns them on this endpoint)
+async function fetchProjectPhotoMeta(projectId, photoId, token) {
+  const res = await fetch(
+    `${BASE_URL}dashboard/projects/${projectId}/photos/${photoId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  // If backend sends HTML error pages, this avoids crashing JSON.parse
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(text || `Photo meta fetch failed: ${res.status}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    // backend might already send json but text parsing failed; surface raw
+    throw new Error(text || "Photo meta response was not JSON");
+  }
+}
+
 export default function EstimateViewerModal({
   isOpen,
   onClose,
@@ -98,6 +119,9 @@ export default function EstimateViewerModal({
   const [doc, setDoc] = useState(() => fallbackEstimate || null);
   const [logoUrl, setLogoUrl] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [includedPhotoAnnotationsById, setIncludedPhotoAnnotationsById] =
+    useState({});
 
   // Measure the preview render time once we have a doc and can inline
   useEffect(() => {
@@ -190,6 +214,56 @@ export default function EstimateViewerModal({
       cancelled = true;
     };
   }, [isOpen, estimateId, token, fallbackEstimate]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const includedPhotoIds = getIncludedPhotoIdsFromAny(doc);
+    const projectId = pickProjectId(doc, selectedProject);
+
+    if (!token || !projectId || !includedPhotoIds.length) {
+      setIncludedPhotoAnnotationsById({});
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const results = await Promise.all(
+          includedPhotoIds.map((pid) =>
+            fetchProjectPhotoMeta(projectId, pid, token).catch(() => null)
+          )
+        );
+
+        if (cancelled) return;
+
+        const map = {};
+        for (let i = 0; i < includedPhotoIds.length; i++) {
+          const pid = includedPhotoIds[i];
+          const data = results[i];
+          const photo = data?.photo || data || null;
+          const items = photo?.annotations?.items;
+
+          map[pid] = {
+            items: Array.isArray(items) ? items : [],
+          };
+        }
+
+        setIncludedPhotoAnnotationsById(map);
+      } catch (e) {
+        console.warn(
+          "[EstimateViewerModal] Failed to load photo annotations",
+          e
+        );
+        if (!cancelled) setIncludedPhotoAnnotationsById({});
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, doc, selectedProject, token]);
 
   // company logo as base64 (so @react-pdf can embed it)
   useEffect(() => {
@@ -302,6 +376,7 @@ export default function EstimateViewerModal({
 
       // Identity / header info
       currentUser,
+      includedPhotoAnnotationsById,
       logoUrl,
       estimateData: {
         estimateNumber: paddedNum,
@@ -341,7 +416,15 @@ export default function EstimateViewerModal({
       estimate: doc, // let PDF fall back to snapshot if ever needed
       extraItems: [], // not used for saved docs
     };
-  }, [doc, selectedProject, currentUser, logoUrl, products, token]);
+  }, [
+    doc,
+    selectedProject,
+    currentUser,
+    logoUrl,
+    products,
+    token,
+    includedPhotoAnnotationsById,
+  ]);
 
   const modalStyle = {
     overlay: { backgroundColor: "rgba(0,0,0,0.5)" },
