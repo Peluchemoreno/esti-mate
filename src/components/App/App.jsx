@@ -141,8 +141,6 @@ function App() {
   }
 
   // App.jsx — handleSignUp
-  // App.jsx — replace handleSignUp with this version
-  // App.jsx — replace handleSignUp with this version
   function handleSignUp(userData, logo) {
     setIsLoading(true);
     const { email, password } = userData;
@@ -168,6 +166,7 @@ function App() {
           msg.includes("exists") ||
           msg.includes("already");
         if (isDup) {
+          console.log("Duplicate email on signup");
           setIsSignInErrorVisible(true);
           return;
         }
@@ -326,6 +325,7 @@ function App() {
                     setTempUserData={setTempUserData}
                     setTempLogo={setTempLogo}
                     isLoading={isLoading}
+                    isSignInErrorVisible={isSignInErrorVisible}
                   />
                 }
               />

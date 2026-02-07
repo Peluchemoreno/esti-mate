@@ -51,7 +51,7 @@
 }
 
 .signup__form-back-button {
-  margin-bottom: 0;
+  margin-bottom: 10px;
   border: 1px solid var(--white);
   background-color: transparent;
 }

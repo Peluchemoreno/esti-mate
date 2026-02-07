@@ -91,12 +91,24 @@ export default function Signin({
             {isLoading ? <Loader /> : "Login"}
           </button>
         </form>
-        <p className="signin__signup-or-forgot-password">
+        <p
+          className="signin__signup-or-forgot-password"
+          style={{ marginBottom: 10 }}
+        >
           Don&apos;t have an account?{" "}
           <Link className="signup-link" to="/signup">
             Sign up.
           </Link>
         </p>
+        {/*         <p className="signin__signup-or-forgot-password">
+          {" "}
+          Forgot password? Contact support at contact.esti.mate@gmail.com{" "}
+        </p> */}
+        Forgot password?
+        <a href="mailto:contact.esti.mate@gmail.com">
+          {" "}
+          Contact us at contact.esti.mate@gmail.com
+        </a>
         {/* <Link className="forgotpw-link" to="/esti-mate">
           Forgot password?
         </Link> */}

@@ -10,6 +10,7 @@ export default function SignupContinued({
   handleSignUp,
   setTempLogo,
   isLoading,
+  isSignInErrorVisible,
 }) {
   const [companyName, setCompanyName] = useState("");
   const [logo, setLogo] = useState(null);
@@ -96,6 +97,31 @@ export default function SignupContinued({
             onChange={handleFileChange}
           />
         </label>
+
+        {isSignInErrorVisible ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginTop: 10,
+            }}
+          >
+            <p className="signup__form-error-message">
+              Email already exists. Please sign in instead.
+            </p>
+            <Link to="/signin">
+              <button
+                type="button"
+                className="signup__form-go-to-sign-in-button"
+              >
+                Go to Sign In
+              </button>
+            </Link>
+          </div>
+        ) : (
+          ""
+        )}
 
         <button type="submit" className="signin__button signin-cont__button">
           {isLoading ? <Loader /> : "Sign Up"}

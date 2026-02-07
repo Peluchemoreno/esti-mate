@@ -21,3 +21,17 @@
 .signin-cont__button {
   margin-bottom: 20px;
 }
+
+.signup__form-error-message {
+  color: var(--delete-red);
+  margin-top: 10px;
+  height: 20px; /* reserve space for the error message */
+}
+
+.signup__form-go-to-sign-in-button {
+  color: var(--white);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
