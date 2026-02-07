@@ -65,7 +65,7 @@ export default function Stripe({ token }) {
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       throw new Error(
-        `Failed to create session: ${res.status} ${j.error || ""}`
+        `Failed to create session: ${res.status} ${j.error || ""}`,
       );
     }
     const { client_secret } = await res.json();
@@ -93,7 +93,7 @@ export default function Stripe({ token }) {
 
   const options = useMemo(
     () => (clientSecret ? { clientSecret } : null),
-    [clientSecret]
+    [clientSecret],
   );
 
   if (!authToken) {

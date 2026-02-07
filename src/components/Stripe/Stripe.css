@@ -1,6 +1,7 @@
 .stripe-container {
-  height: 100vh;
+  /* height: 100vh; */ /* this fixes the scrolling bug on the payment page */
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 15px;
 }
