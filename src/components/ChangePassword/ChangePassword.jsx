@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { changePassword } from "../../utils/api";
+import { getUser } from "../../utils/auth";
 
-export default function ChangePassword({ setLoggedIn }) {
+export default function ChangePassword({ setLoggedIn, setCurrentUser }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -111,6 +112,7 @@ const styles = {
     marginBottom: "10px",
     fontSize: "22px",
     fontWeight: "600",
+    color: "#333",
   },
   subtitle: {
     marginBottom: "25px",
@@ -127,6 +129,7 @@ const styles = {
     borderRadius: "8px",
     border: "1px solid #d1d5db",
     fontSize: "14px",
+    color: "#666",
   },
   button: {
     padding: "12px",
