@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { computeAccessoriesFromLines } from "../../utils/priceResolver";
 import { Svg, Line } from "@react-pdf/renderer";
 import { useToast } from "../Toast/Toast";
+import PhotoThumbWithAnnotations from "../Photos/PhotoThumbWithAnnotations";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -294,11 +295,17 @@ const EstimateModal = ({
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 768px)").matches;
 
+  const isMobileUA =
+    typeof navigator !== "undefined" &&
+    /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+
+  // ✅ Use iframe PDF preview only on desktop.
+  // Mobile browsers can render blob iframes as blank, so we keep mobile on HTML fallback.
   const canInlinePDF =
     typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
     window.matchMedia("(min-width: 769px)").matches &&
-    !/iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
-
+    !isMobileUA;
   const [logoUrl, setLogoUrl] = useState(null);
   const [notesSaved, setNotesSaved] = useState(false);
   const [pricingCatalog, setPricingCatalog] = useState(null);
@@ -373,6 +380,10 @@ const EstimateModal = ({
     }));
 
   const [showPrices, setShowPrices] = useState(true);
+  // Used by the HTML fallback preview (mobile-safe)
+  const [fallbackPhotoUrlsById, setFallbackPhotoUrlsById] = useState({});
+  const [fallbackPhotoAnnotationsById, setFallbackPhotoAnnotationsById] =
+    useState({});
 
   useEffect(() => {
     if (!isOpen) {
@@ -497,6 +508,81 @@ const EstimateModal = ({
       cancelled = true;
     };
   }, [BASE_URL, isOpen, currentUser?._id]);
+  useEffect(() => {
+    const token = localStorage.getItem("jwt");
+    const projectId = project?._id || project?.id || "";
+    const ids = Array.isArray(selectedDiagram?.includedPhotoIds)
+      ? selectedDiagram.includedPhotoIds
+      : [];
+
+    if (!token || !projectId || !ids.length) {
+      setFallbackPhotoUrlsById({});
+      setFallbackPhotoAnnotationsById({});
+      return;
+    }
+
+    let cancelled = false;
+    const urlsToRevoke = [];
+
+    (async () => {
+      try {
+        const base = BASE_URL.endsWith("/") ? BASE_URL : `${BASE_URL}/`;
+
+        // 1) fetch photo meta so we have annotations
+        const metas = await Promise.all(
+          ids.map((photoId) =>
+            fetchProjectPhotoMeta(projectId, photoId, token).catch(() => null),
+          ),
+        );
+
+        if (cancelled) return;
+
+        const annMap = {};
+        metas.forEach((m, idx) => {
+          const photoId = ids[idx];
+          const items = m?.annotations?.items;
+          if (Array.isArray(items) && items.length) {
+            annMap[photoId] = { items };
+          } else {
+            annMap[photoId] = { items: [] };
+          }
+        });
+
+        setFallbackPhotoAnnotationsById(annMap);
+
+        // 2) fetch preview image blobs for <img> URLs
+        const nextUrls = {};
+        for (const photoId of ids) {
+          const res = await fetch(
+            `${base}dashboard/projects/${projectId}/photos/${photoId}/image?variant=preview`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (!res.ok) continue;
+
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          urlsToRevoke.push(url);
+          nextUrls[photoId] = url;
+        }
+
+        if (!cancelled) setFallbackPhotoUrlsById(nextUrls);
+      } catch (e) {
+        if (!cancelled) {
+          setFallbackPhotoUrlsById({});
+          setFallbackPhotoAnnotationsById({});
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      urlsToRevoke.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {}
+      });
+    };
+  }, [project?._id, project?.id, selectedDiagram?.includedPhotoIds]);
 
   // Choose catalog for pricing — prefer full pricing catalog if loaded
   const catalogForPricing = pricingCatalog || products;
@@ -1032,14 +1118,32 @@ const EstimateModal = ({
 
             if (abortRef.current.aborted || runId !== genSeqRef.current) return;
 
-            const map = {};
+            const annMap = {};
+            const metaMap = {};
+
             metas.forEach((m, idx) => {
               const id = photoIds[idx];
+              if (!m) return;
+
+              // annotations
               const ann = m?.annotations;
-              if (ann?.items?.length) map[id] = ann;
+              if (ann?.items?.length) annMap[id] = ann;
+
+              // meta (prevents aspectRatio fallback -> prevents drift)
+              const w = m?.originalMeta?.width;
+              const h = m?.originalMeta?.height;
+              if (
+                typeof w === "number" &&
+                typeof h === "number" &&
+                w > 0 &&
+                h > 0
+              ) {
+                metaMap[id] = { width: w, height: h };
+              }
             });
 
-            prepared.includedPhotoAnnotationsById = map;
+            prepared.includedPhotoAnnotationsById = annMap;
+            prepared.includedPhotoMetaById = metaMap;
           } catch (e) {
             // non-fatal; PDF will just render without annotations
             console.warn("[PDF photos] annotations fetch failed", e);
@@ -1437,6 +1541,7 @@ const EstimateModal = ({
           >
             {/* Lightweight HTML fallback preview */}
             <h3 style={{ marginTop: 0 }}>Estimate Preview</h3>
+
             <div
               style={{ border: "1px solid #333", padding: 8, borderRadius: 8 }}
             >
@@ -1556,7 +1661,65 @@ const EstimateModal = ({
                 </div>
               ) : null}
             </div>
+            {/* Photos (annotated) - HTML fallback */}
+            {Array.isArray(selectedDiagram?.includedPhotoIds) &&
+            selectedDiagram.includedPhotoIds.length ? (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+                  Photos
+                </div>
 
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 10,
+                  }}
+                >
+                  {selectedDiagram.includedPhotoIds.map((photoId) => {
+                    const src = fallbackPhotoUrlsById?.[photoId];
+                    const ann = fallbackPhotoAnnotationsById?.[photoId];
+
+                    return (
+                      <div
+                        key={photoId}
+                        style={{
+                          width: "100%",
+                          aspectRatio: "4 / 3",
+                          borderRadius: 8,
+                          overflow: "hidden",
+                          border: "1px solid #333",
+                          background: "#111",
+                        }}
+                      >
+                        {src ? (
+                          <PhotoThumbWithAnnotations
+                            src={src}
+                            alt="Project photo"
+                            annotations={ann}
+                            style={{ width: "100%", height: "100%" }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              opacity: 0.7,
+                              fontSize: 12,
+                            }}
+                          >
+                            Loading…
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             <div style={{ marginTop: 12 }}>
               {pdfUrl && estimateData?.estimateNumber ? (
                 <a

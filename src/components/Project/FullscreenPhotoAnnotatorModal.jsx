@@ -5,6 +5,7 @@ import {
   getProjectPhotoMeta,
   updateProjectPhotoAnnotations,
 } from "../../utils/api";
+import { computeContainRect } from "../../utils/computeContainRect";
 
 Modal.setAppElement("#root");
 
@@ -343,47 +344,38 @@ export default function FullscreenPhotoAnnotatorModal({
     const canvas = canvasRef.current;
     if (!container || !img || !canvas) return;
 
-    const containerBox = container.getBoundingClientRect();
+    // Use clientWidth/Height for stable "layout pixels" (avoid subpixel drift).
+    const boxW = container.clientWidth || 0;
+    const boxH = container.clientHeight || 0;
+
+    // Still need page offsets for clientX/clientY mapping.
+    const boxRect = container.getBoundingClientRect();
 
     // canvas = full container in device pixels
     const dpr = window.devicePixelRatio || 1;
-    canvas.style.width = `${containerBox.width}px`;
-    canvas.style.height = `${containerBox.height}px`;
-    canvas.width = Math.max(1, Math.floor(containerBox.width * dpr));
-    canvas.height = Math.max(1, Math.floor(containerBox.height * dpr));
+    canvas.style.width = `${boxW}px`;
+    canvas.style.height = `${boxH}px`;
+    canvas.width = Math.max(1, Math.floor(boxW * dpr));
+    canvas.height = Math.max(1, Math.floor(boxH * dpr));
 
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // objectFit: contain math
     const iw = img.naturalWidth || 1;
     const ih = img.naturalHeight || 1;
-    const cw = containerBox.width;
-    const ch = containerBox.height;
 
-    const imgAspect = iw / ih;
-    const boxAspect = cw / ch;
-
-    let drawW, drawH, left, top;
-    if (imgAspect > boxAspect) {
-      drawW = cw;
-      drawH = cw / imgAspect;
-      left = containerBox.left;
-      top = containerBox.top + (ch - drawH) / 2;
-    } else {
-      drawH = ch;
-      drawW = ch * imgAspect;
-      left = containerBox.left + (cw - drawW) / 2;
-      top = containerBox.top;
-    }
+    const rLocal = computeContainRect(boxW, boxH, iw, ih);
 
     imgRectRef.current = {
-      clientLeft: left,
-      clientTop: top,
-      left: left - containerBox.left, // LOCAL
-      top: top - containerBox.top, // LOCAL
-      width: drawW,
-      height: drawH,
+      // PAGE coords (for pointer events)
+      clientLeft: boxRect.left + rLocal.left,
+      clientTop: boxRect.top + rLocal.top,
+
+      // LOCAL coords (for drawing onto canvas in CSS pixels)
+      left: rLocal.left,
+      top: rLocal.top,
+      width: rLocal.width,
+      height: rLocal.height,
     };
 
     draw();
@@ -490,13 +482,13 @@ export default function FullscreenPhotoAnnotatorModal({
         projectId,
         photoId,
         token,
-        mergedServerItems
+        mergedServerItems,
       );
 
       // ✅ after a successful save, update the “initial snapshot” in INTERNAL shape
       initialItemsRef.current = deepClone(items);
       initialUnknownServerItemsRef.current = deepClone(
-        unknownServerItemsRef.current
+        unknownServerItemsRef.current,
       );
 
       if (typeof onSaved === "function") onSaved(mergedServerItems);
@@ -512,7 +504,7 @@ export default function FullscreenPhotoAnnotatorModal({
   function handleCloseNoSave() {
     setItems(deepClone(initialItemsRef.current || []));
     unknownServerItemsRef.current = deepClone(
-      initialUnknownServerItemsRef.current || []
+      initialUnknownServerItemsRef.current || [],
     );
     undoStackRef.current = [];
     redoStackRef.current = [];
@@ -560,7 +552,7 @@ export default function FullscreenPhotoAnnotatorModal({
           projectId,
           photoId,
           token,
-          "original"
+          "original",
         );
         if (cancelled) return;
 

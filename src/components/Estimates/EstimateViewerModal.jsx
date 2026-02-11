@@ -3,6 +3,8 @@ import Modal from "react-modal";
 import { useEffect, useMemo, useState } from "react";
 import { PDFViewer } from "@react-pdf/renderer";
 import EstimatePDF from "../EstimatePDF/EstimatePDF";
+import PhotoThumbWithAnnotations from "../Photos/PhotoThumbWithAnnotations";
+
 const BASE_URL = import.meta.env.VITE_API_URL;
 Modal.setAppElement("#root");
 
@@ -72,10 +74,16 @@ export default function EstimateViewerModal({
   selectedProject, // <-- live project (has billingName, etc.)
   products,
 }) {
+  const isMobileUA =
+    typeof navigator !== "undefined" &&
+    /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+
   const canInlinePDF =
     typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
     window.matchMedia("(min-width: 769px)").matches &&
-    !/iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+    !isMobileUA;
+
   const __DEV__ = true;
   function pdfMark(n) {
     if (!__DEV__) return;
@@ -119,6 +127,179 @@ export default function EstimateViewerModal({
   const [doc, setDoc] = useState(() => fallbackEstimate || null);
   const [logoUrl, setLogoUrl] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [mobilePhotoUrlsById, setMobilePhotoUrlsById] = useState({});
+  useEffect(() => {
+    if (!isOpen) return;
+    if (canInlinePDF) return; // only needed for mobile preview UI
+    if (!token) return;
+
+    const includedPhotoIds = getIncludedPhotoIdsFromAny(doc);
+    const projectId = pickProjectId(doc, selectedProject);
+
+    if (!projectId || !includedPhotoIds.length) {
+      setMobilePhotoUrlsById({});
+      return;
+    }
+
+    let cancelled = false;
+    const urlsToRevoke = [];
+
+    (async () => {
+      try {
+        const next = {};
+
+        for (const photoId of includedPhotoIds) {
+          const res = await fetch(
+            `${BASE_URL}dashboard/projects/${projectId}/photos/${photoId}/image?variant=preview`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (!res.ok) continue;
+
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          urlsToRevoke.push(url);
+          next[photoId] = url;
+        }
+
+        if (!cancelled) setMobilePhotoUrlsById(next);
+      } catch {
+        if (!cancelled) setMobilePhotoUrlsById({});
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      urlsToRevoke.forEach((u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {}
+      });
+    };
+  }, [isOpen, canInlinePDF, token, doc, selectedProject]);
+
+  function renderMobilePhotoOverlay(items) {
+    const arr = Array.isArray(items) ? items : [];
+    if (!arr.length) return null;
+
+    // DOM overlay in normalized 0..1 space
+    return (
+      <svg
+        viewBox="0 0 1 1"
+        preserveAspectRatio="none"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+        }}
+      >
+        {arr.map((it, idx) => {
+          const type = it?.type || it?.kind;
+          const stroke = it?.stroke || "#00cc55";
+          const fill = it?.fill || "transparent";
+          const sw = 0.006;
+
+          const a = it?.a || it?.p1;
+          const b = it?.b || it?.p2;
+
+          if (
+            (type === "line" ||
+              type === "x" ||
+              type === "rect" ||
+              type === "circle") &&
+            (!a || !b)
+          ) {
+            return null;
+          }
+
+          if (type === "line") {
+            return (
+              <line
+                key={idx}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke={stroke}
+                strokeWidth={sw}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          }
+
+          if (type === "rect") {
+            const x = Math.min(a.x, b.x);
+            const y = Math.min(a.y, b.y);
+            const w = Math.abs(b.x - a.x);
+            const h = Math.abs(b.y - a.y);
+            return (
+              <rect
+                key={idx}
+                x={x}
+                y={y}
+                width={w}
+                height={h}
+                stroke={stroke}
+                fill={fill}
+                strokeWidth={sw}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          }
+
+          if (type === "circle") {
+            const cx = (a.x + b.x) / 2;
+            const cy = (a.y + b.y) / 2;
+            const r = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / 2;
+            return (
+              <circle
+                key={idx}
+                cx={cx}
+                cy={cy}
+                r={r}
+                stroke={stroke}
+                fill={fill}
+                strokeWidth={sw}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          }
+
+          if (type === "x") {
+            const x = Math.min(a.x, b.x);
+            const y = Math.min(a.y, b.y);
+            const w = Math.abs(b.x - a.x);
+            const h = Math.abs(b.y - a.y);
+            return (
+              <g key={idx}>
+                <line
+                  x1={x}
+                  y1={y}
+                  x2={x + w}
+                  y2={y + h}
+                  stroke={stroke}
+                  strokeWidth={sw}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <line
+                  x1={x + w}
+                  y1={y}
+                  x2={x}
+                  y2={y + h}
+                  stroke={stroke}
+                  strokeWidth={sw}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
+            );
+          }
+
+          return null;
+        })}
+      </svg>
+    );
+  }
 
   const [includedPhotoAnnotationsById, setIncludedPhotoAnnotationsById] =
     useState({});
@@ -215,7 +396,6 @@ export default function EstimateViewerModal({
       cancelled = true;
     };
   }, [isOpen, estimateId, token, fallbackEstimate]);
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -224,6 +404,7 @@ export default function EstimateViewerModal({
 
     if (!token || !projectId || !includedPhotoIds.length) {
       setIncludedPhotoAnnotationsById({});
+      setIncludedPhotoMetaById({});
       return;
     }
 
@@ -239,26 +420,42 @@ export default function EstimateViewerModal({
 
         if (cancelled) return;
 
-        const map = {};
+        const annMap = {};
+        const metaMap = {};
 
         for (let i = 0; i < includedPhotoIds.length; i++) {
           const pid = includedPhotoIds[i];
           const data = results[i];
           const photo = data?.photo || data || null;
-          const items = photo?.annotations?.items;
 
-          map[pid] = {
+          const items = photo?.annotations?.items;
+          annMap[pid] = {
             items: Array.isArray(items) ? items : [],
           };
+
+          const w = photo?.originalMeta?.width;
+          const h = photo?.originalMeta?.height;
+          if (
+            typeof w === "number" &&
+            typeof h === "number" &&
+            w > 0 &&
+            h > 0
+          ) {
+            metaMap[pid] = { width: w, height: h };
+          }
         }
 
-        setIncludedPhotoAnnotationsById(map);
+        setIncludedPhotoAnnotationsById(annMap);
+        setIncludedPhotoMetaById(metaMap);
       } catch (e) {
         console.warn(
-          "[EstimateViewerModal] Failed to load photo annotations",
+          "[EstimateViewerModal] Failed to load photo annotations/meta",
           e,
         );
-        if (!cancelled) setIncludedPhotoAnnotationsById({});
+        if (!cancelled) {
+          setIncludedPhotoAnnotationsById({});
+          setIncludedPhotoMetaById({});
+        }
       }
     })();
 
@@ -266,57 +463,6 @@ export default function EstimateViewerModal({
       cancelled = true;
     };
   }, [isOpen, doc, selectedProject, token]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const token = localStorage.getItem("jwt");
-    const photoIds = getIncludedPhotoIdsFromAny(
-      fallbackEstimate || selectedProject,
-    );
-
-    if (!photoIds.length) return;
-
-    let cancelled = false;
-
-    async function loadAnnotations() {
-      const map = {};
-      const metaMap = {};
-      for (const photoId of photoIds) {
-        try {
-          const res = await fetchProjectPhotoMeta(
-            pickProjectId(fallbackEstimate, selectedProject),
-            photoId,
-            token,
-          );
-          const ann = res?.photo?.annotations;
-          const w = res?.photo?.originalMeta?.width;
-          const h = res?.photo?.originalMeta?.height;
-          if (
-            typeof w === "number" &&
-            typeof h === "number" &&
-            w > 0 &&
-            h > 0
-          ) {
-            metaMap[photoId] = { width: w, height: h };
-          }
-
-          if (ann?.items?.length) {
-            map[photoId] = ann;
-          }
-        } catch {}
-      }
-
-      if (!cancelled) setIncludedPhotoAnnotationsById(map);
-    }
-
-    loadAnnotations();
-    setIncludedPhotoMetaById(metaMap);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, fallbackEstimate, selectedProject]);
 
   // company logo as base64 (so @react-pdf can embed it)
   useEffect(() => {
@@ -649,6 +795,88 @@ export default function EstimateViewerModal({
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              ) : null}
+              {/* Selected Photos (with annotations) */}
+              {(pdfProps?.selectedDiagram?.includedPhotoIds || []).length ? (
+                <div
+                  style={{
+                    marginTop: 12,
+                    border: "1px solid #333",
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
+                  <div style={{ fontWeight: "bold", marginBottom: 6 }}>
+                    Photos
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 10,
+                    }}
+                  >
+                    {pdfProps.selectedDiagram.includedPhotoIds.map(
+                      (photoId) => {
+                        const url = mobilePhotoUrlsById?.[photoId];
+                        const meta = includedPhotoMetaById?.[photoId];
+                        const aspect =
+                          meta && meta.width && meta.height
+                            ? meta.width / meta.height
+                            : 4 / 3;
+
+                        const items =
+                          includedPhotoAnnotationsById?.[photoId]?.items ||
+                          includedPhotoAnnotationsById?.[photoId] ||
+                          [];
+
+                        return (
+                          <div key={photoId}>
+                            <div
+                              style={{
+                                position: "relative",
+                                width: "100%",
+                                aspectRatio: aspect,
+                                background: "#111",
+                                borderRadius: 8,
+                                overflow: "hidden",
+                                border: "1px solid #333",
+                              }}
+                            >
+                              {url ? (
+                                <PhotoThumbWithAnnotations
+                                  src={url}
+                                  alt="Project photo"
+                                  annotations={
+                                    includedPhotoAnnotationsById?.[photoId]
+                                  }
+                                  style={{ width: "100%", height: "100%" }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 12,
+                                    opacity: 0.7,
+                                  }}
+                                >
+                                  Loading…
+                                </div>
+                              )}
+
+                              {renderMobilePhotoOverlay(items)}
+                            </div>
+                          </div>
+                        );
+                      },
+                    )}
                   </div>
                 </div>
               ) : null}

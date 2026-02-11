@@ -1,11 +1,12 @@
+// src/components/Photos/Project.jsx
 import "./Project.css";
 import { useParams } from "react-router-dom";
 import backIcon from "../../assets/icons/back.svg";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-// at top with other imports
+import { useEffect, useRef, useState } from "react";
 import SavedEstimatesPanel from "../Estimates/SavedEstimatesPanel";
 import FullscreenPhotoAnnotatorModal from "./FullscreenPhotoAnnotatorModal";
+import PhotoThumbWithAnnotations from "../Photos/PhotoThumbWithAnnotations";
 
 import {
   deleteDiagram,
@@ -20,7 +21,6 @@ import {
 } from "../../utils/api";
 import EstimateModal from "../EstimateModal/EstimateModal";
 import { useProductsPricing } from "../../hooks/useProducts";
-import { red } from "@mui/material/colors";
 
 export default function Project({
   projects,
@@ -51,20 +51,26 @@ export default function Project({
         second: "2-digit",
         hour12: true,
       })
-      .replace(",", ""); // "09/09/2025 21:07:23"
+      .replace(",", "");
   };
 
   async function fetchPhotoAnnotations(projectId, photoId, token) {
-    console.log(projectId, photoId);
     const res = await fetch(
-      `${
-        import.meta.env.VITE_API_URL
-      }dashboard/projects/${projectId}/photos/${photoId}`,
+      `${import.meta.env.VITE_API_URL}dashboard/projects/${projectId}/photos/${photoId}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!res.ok) return null;
     const json = await res.json();
     return json?.photo?.annotations || null;
+  }
+
+  // local-only temp id generator for optimistic uploads
+  function makeTempId() {
+    try {
+      return `temp_${crypto.randomUUID()}`;
+    } catch {
+      return `temp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    }
   }
 
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
@@ -86,6 +92,7 @@ export default function Project({
   const allUnfilteredProducts = allProducts;
   const params = useParams();
   const projectId = params.projectId;
+
   const [testData, setTestData] = useState({
     customerName: "John Doe",
     address: "123 Main St, City, State",
@@ -93,22 +100,19 @@ export default function Project({
     length: 50,
     totalCost: 500,
   });
+
   const [diagramData, setDiagramData] = useState([]);
   const [projectPhotos, setProjectPhotos] = useState([]);
   const [photoThumbUrlById, setPhotoThumbUrlById] = useState({});
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
 
-  let project = projects.filter((item) => {
-    return item._id === projectId;
-  })[0];
+  // track which photos are "optimistic local temps"
+  const optimisticTempIdsRef = useRef(new Set());
 
-  useEffect(() => {
-    console.log(photoAnnotationsById);
-  }, [photoAnnotationsById]);
+  let project = projects.filter((item) => item._id === projectId)[0];
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
-
     retrieveProjectDiagrams(projectId, token).then((diagrams) => {
       setDiagramData(diagrams);
     });
@@ -118,12 +122,135 @@ export default function Project({
     setCurrentProjectId(projectId);
   }, [activeModal]);
 
+  /**
+   * Refresh photos from API (NO reload).
+   * - preserves existing object URLs when possible to avoid flicker
+   * - fetches missing thumbs as needed
+   * - fetches annotations for photos we don't already have
+   */
+  async function refreshPhotosFromApi(projectIdArg) {
+    if (!projectIdArg) return;
+
+    let cancelled = false;
+    setIsLoadingPhotos(true);
+
+    try {
+      const token = localStorage.getItem("jwt");
+      const res = await getProjectPhotos(projectIdArg, token);
+      const serverPhotos = res?.photos || [];
+
+      // 1) update photo list
+      setProjectPhotos(serverPhotos);
+
+      // 2) update annotations map for any photo we haven't loaded yet
+      setPhotoAnnotationsById((prev) => {
+        // keep what we have; we will fill missing below async, then set again
+        return prev || {};
+      });
+
+      const annotationsMapUpdates = {};
+      await Promise.all(
+        serverPhotos.map(async (p) => {
+          const photoId = p?.id || p?._id || p?.photoId;
+          if (!photoId) return;
+          // if we already have annotations (or know it's empty), skip
+          // NOTE: if you want to force refresh all annotations, remove this guard
+          if (photoAnnotationsById?.[photoId]) return;
+
+          const ann = await fetchPhotoAnnotations(projectIdArg, photoId, token);
+          if (ann?.items?.length) annotationsMapUpdates[photoId] = ann;
+        }),
+      );
+
+      if (!cancelled && Object.keys(annotationsMapUpdates).length) {
+        setPhotoAnnotationsById((prev) => ({
+          ...(prev || {}),
+          ...annotationsMapUpdates,
+        }));
+      }
+
+      // 3) thumbnails: preserve existing urls when possible, fetch missing
+      setPhotoThumbUrlById((prev) => {
+        const prevMap = prev || {};
+        const nextMap = {};
+
+        const serverIds = new Set();
+        for (const p of serverPhotos) {
+          const pid = p?.id || p?._id || p?.photoId;
+          if (!pid) continue;
+          serverIds.add(pid);
+          if (prevMap[pid]) nextMap[pid] = prevMap[pid];
+        }
+
+        // revoke urls for ids no longer present AND any optimistic temp ids
+        Object.entries(prevMap).forEach(([id, url]) => {
+          const isTemp = optimisticTempIdsRef.current.has(id);
+          const stillOnServer = serverIds.has(id);
+          if (!stillOnServer || isTemp) {
+            try {
+              URL.revokeObjectURL(url);
+            } catch {}
+          }
+        });
+
+        return nextMap;
+      });
+
+      // fetch missing thumbs (async) and add them
+      for (const p of serverPhotos) {
+        const pid = p?.id || p?._id || p?.photoId;
+        if (!pid) continue;
+
+        // already have thumb
+        if (photoThumbUrlById?.[pid]) continue;
+
+        try {
+          const blob = await fetchProjectPhotoBlob(
+            projectIdArg,
+            pid,
+            token,
+            "preview",
+          );
+          const url = URL.createObjectURL(blob);
+
+          if (!cancelled) {
+            setPhotoThumbUrlById((prev) => {
+              // if we already got set, don’t replace
+              if (prev?.[pid]) {
+                try {
+                  URL.revokeObjectURL(url);
+                } catch {}
+                return prev;
+              }
+              return { ...(prev || {}), [pid]: url };
+            });
+          } else {
+            try {
+              URL.revokeObjectURL(url);
+            } catch {}
+          }
+        } catch {
+          // fail soft
+        }
+      }
+
+      // after a successful server refresh, clear temp ids tracking
+      optimisticTempIdsRef.current.clear();
+    } finally {
+      if (!cancelled) setIsLoadingPhotos(false);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }
+
   useEffect(() => {
     if (!project?._id) return;
 
     let cancelled = false;
 
-    async function loadPhotos() {
+    async function loadInitialPhotos() {
       try {
         setIsLoadingPhotos(true);
         const token = localStorage.getItem("jwt");
@@ -135,34 +262,35 @@ export default function Project({
 
         await Promise.all(
           photos.map(async (p) => {
-            console.log("fetching annotations for photo", p.id, projectId);
-            const ann = await fetchPhotoAnnotations(projectId, p.id, token);
+            const photoId = p?.id || p?._id || p?.photoId;
+            if (!photoId) return;
+            const ann = await fetchPhotoAnnotations(projectId, photoId, token);
             if (ann?.items?.length) {
-              annotationsMap[p.id] = ann;
+              annotationsMap[photoId] = ann;
             }
           }),
-
-          console.log(annotationsMap),
         );
 
-        setPhotoAnnotationsById(annotationsMap);
-
         if (cancelled) return;
+        setPhotoAnnotationsById(annotationsMap);
         setProjectPhotos(photos);
 
         // Build object URLs for thumbnails (because <img src> cannot send Authorization)
         const newMap = {};
         for (const p of photos) {
+          const photoId = p?.id || p?._id || p?.photoId;
+          if (!photoId) continue;
+
           try {
             const blob = await fetchProjectPhotoBlob(
               project._id,
-              p.id,
+              photoId,
               token,
               "preview",
             );
-            newMap[p.id] = URL.createObjectURL(blob);
-          } catch (e) {
-            // fail soft: skip thumb if it fails
+            newMap[photoId] = URL.createObjectURL(blob);
+          } catch {
+            // fail soft
           }
         }
 
@@ -182,7 +310,7 @@ export default function Project({
       }
     }
 
-    loadPhotos();
+    loadInitialPhotos();
 
     return () => {
       cancelled = true;
@@ -239,17 +367,13 @@ export default function Project({
       ? current.filter((id) => id !== photoId)
       : [...current, photoId];
 
-    // Update local selected diagram immediately (fast UI)
     const updatedLocal = { ...selectedDiagram, includedPhotoIds: next };
     setSelectedDiagram(updatedLocal);
 
-    // Also update diagrams list state so selection sticks visually
     setDiagrams((prev) =>
       (prev || []).map((d) => (d._id === updatedLocal._id ? updatedLocal : d)),
     );
 
-    // Persist to DB using existing updateDiagram endpoint
-    // IMPORTANT: send full diagram payload to avoid accidentally overwriting fields
     try {
       const token = localStorage.getItem("jwt");
       await updateDiagram(project._id, selectedDiagram._id, token, {
@@ -257,8 +381,97 @@ export default function Project({
         includedPhotoIds: next,
       });
     } catch (e) {
-      // fail soft: keep UI state, you can re-save on Generate Estimate if needed
       console.warn("Failed to persist includedPhotoIds:", e);
+    }
+  }
+
+  // Optimistically add selected files as thumbnails immediately
+  function addOptimisticUploads(files) {
+    const tempPhotos = files.map((f) => {
+      const tempId = makeTempId();
+      optimisticTempIdsRef.current.add(tempId);
+
+      return {
+        id: tempId,
+        _id: tempId,
+        originalMeta: { filename: f?.name || "upload" },
+        __optimistic: true,
+      };
+    });
+
+    // create object URLs immediately
+    const tempThumbs = {};
+    files.forEach((f, idx) => {
+      const tempId = tempPhotos[idx]?._id;
+      if (!tempId) return;
+      try {
+        tempThumbs[tempId] = URL.createObjectURL(f);
+      } catch {}
+    });
+
+    // prepend to list so user sees them instantly
+    setProjectPhotos((prev) => [...tempPhotos, ...(prev || [])]);
+    setPhotoThumbUrlById((prev) => ({ ...(prev || {}), ...tempThumbs }));
+  }
+
+  async function deletePhotoOptimistic(photoId) {
+    if (!photoId) return;
+
+    // remove from UI immediately
+    setProjectPhotos((prev) =>
+      (prev || []).filter((p) => {
+        const pid = p?._id || p?.id || p?.photoId;
+        return pid !== photoId;
+      }),
+    );
+
+    // if this photo was included in selected diagram, remove it immediately
+    if (selectedDiagram?._id) {
+      const cur = Array.isArray(selectedDiagram.includedPhotoIds)
+        ? selectedDiagram.includedPhotoIds
+        : [];
+      if (cur.includes(photoId)) {
+        const next = cur.filter((id) => id !== photoId);
+        const updatedLocal = { ...selectedDiagram, includedPhotoIds: next };
+        setSelectedDiagram(updatedLocal);
+        setDiagrams((prev) =>
+          (prev || []).map((d) =>
+            d._id === updatedLocal._id ? updatedLocal : d,
+          ),
+        );
+      }
+    }
+
+    // remove thumb url immediately
+    setPhotoThumbUrlById((prev) => {
+      const next = { ...(prev || {}) };
+      const url = next[photoId];
+      delete next[photoId];
+      if (url) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      }
+      return next;
+    });
+
+    // remove annotations overlay immediately
+    setPhotoAnnotationsById((prev) => {
+      const next = { ...(prev || {}) };
+      delete next[photoId];
+      return next;
+    });
+
+    // then call API
+    try {
+      const token = localStorage.getItem("jwt");
+      await deleteProjectPhoto(project._id, photoId, token);
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || "Failed to delete photo");
+
+      // safest recovery: re-sync from server (still no page reload)
+      await refreshPhotosFromApi(project._id);
     }
   }
 
@@ -340,6 +553,7 @@ export default function Project({
                 Create Diagram
               </button>
             )}
+
             {selectedDiagram?._id ? (
               <div style={{ marginTop: "12px" }}>
                 <h3 style={{ margin: "8px 0" }}>Photos for this diagram</h3>
@@ -353,14 +567,15 @@ export default function Project({
                     const picked = Array.from(e.target.files || []);
                     if (!picked.length) return;
 
-                    // enforce max 10 client-side (server also enforces)
                     const files = picked.slice(0, 10);
+
+                    // ✅ show thumbnails immediately (optimistic)
+                    addOptimisticUploads(files);
 
                     try {
                       const token = localStorage.getItem("jwt");
 
                       if (files.length === 1) {
-                        // keep your single-file path working
                         await uploadProjectPhoto(project._id, token, files[0]);
                       } else {
                         const res = await uploadProjectPhotosBulk(
@@ -369,15 +584,12 @@ export default function Project({
                           files,
                         );
 
-                        // Minimal UX: show failures without breaking flow
                         const failed = (res?.results || []).filter(
                           (r) => !r.ok,
                         );
                         if (failed.length) {
                           alert(
-                            `Uploaded ${files.length - failed.length}/${
-                              files.length
-                            } photos.\n\nFailed:\n` +
+                            `Uploaded ${files.length - failed.length}/${files.length} photos.\n\nFailed:\n` +
                               failed
                                 .map(
                                   (f) =>
@@ -391,12 +603,15 @@ export default function Project({
                       // reset input so re-selecting same files works
                       e.target.value = "";
 
-                      // simplest: reload so your existing load logic refreshes
-                      window.location.reload();
+                      // ✅ reconcile with server list (NO reload)
+                      await refreshPhotosFromApi(project._id);
                     } catch (err) {
                       console.error(err);
                       alert(err?.message || "Upload failed");
                       e.target.value = "";
+
+                      // safest recovery: re-sync from server (still no page reload)
+                      await refreshPhotosFromApi(project._id);
                     }
                   }}
                 />
@@ -416,7 +631,6 @@ export default function Project({
                   >
                     {projectPhotos.map((p) => {
                       const photoId = p?._id || p?.id || p?.photoId;
-
                       const checked = (
                         selectedDiagram.includedPhotoIds || []
                       ).includes(photoId);
@@ -433,6 +647,7 @@ export default function Project({
                             padding: 6,
                             borderRadius: 6,
                             cursor: "pointer",
+                            opacity: p?.__optimistic ? 0.75 : 1,
                           }}
                         >
                           <div
@@ -464,20 +679,7 @@ export default function Project({
                                 );
                                 if (!ok) return;
 
-                                try {
-                                  const token = localStorage.getItem("jwt");
-                                  await deleteProjectPhoto(
-                                    project._id,
-                                    photoId,
-                                    token,
-                                  );
-                                  window.location.reload();
-                                } catch (err) {
-                                  console.error(err);
-                                  alert(
-                                    err?.message || "Failed to delete photo",
-                                  );
-                                }
+                                await deletePhotoOptimistic(photoId);
                               }}
                               style={{
                                 borderRadius: 999,
@@ -500,7 +702,7 @@ export default function Project({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              openAnnotator(photoId); // ✅ FIX: use real id
+                              openAnnotator(photoId);
                             }}
                             style={{
                               width: 108,
@@ -519,16 +721,10 @@ export default function Project({
                             title="Open annotator"
                           >
                             {thumbSrc ? (
-                              <img
+                              <PhotoThumbWithAnnotations
                                 src={thumbSrc}
                                 alt={p.originalMeta?.filename || "photo"}
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "contain", // ✅ keeps it unzoomed
-                                  objectPosition: "center",
-                                  background: "#111",
-                                }}
+                                annotations={photoAnnotationsById?.[photoId]}
                               />
                             ) : (
                               <span style={{ fontSize: 12 }}>no preview</span>
@@ -542,6 +738,7 @@ export default function Project({
               </div>
             ) : null}
           </div>
+
           <div className="project__diagram-container">
             {diagramData.length > 0 ? (
               diagramData.map((diagram) => (
@@ -574,6 +771,7 @@ export default function Project({
           </div>
         </div>
       </div>
+
       <EstimateModal
         isOpen={activeModal === "estimate-modal"}
         onClose={closeModal}
@@ -593,15 +791,47 @@ export default function Project({
         currentUser={currentUser}
         products={allUnfilteredProducts}
       />
+
       <FullscreenPhotoAnnotatorModal
         isOpen={annotatorOpen}
         onClose={closeAnnotator}
         projectId={project?._id}
         photoId={annotatorPhotoId}
         token={localStorage.getItem("jwt")}
-        onSaved={() => {
-          // simplest + safest: reload to refresh thumbs + hasAnnotations flags
-          window.location.reload();
+        onSaved={async (mergedServerItems) => {
+          // ✅ instant overlay update in thumbnails
+          if (annotatorPhotoId) {
+            setPhotoAnnotationsById((prev) => ({
+              ...(prev || {}),
+              [annotatorPhotoId]: { items: mergedServerItems },
+            }));
+
+            // ✅ refresh ONLY this photo thumb preview blob so previews match ASAP
+            try {
+              const token = localStorage.getItem("jwt");
+              const blob = await fetchProjectPhotoBlob(
+                project._id,
+                annotatorPhotoId,
+                token,
+                "preview",
+              );
+              const url = URL.createObjectURL(blob);
+
+              setPhotoThumbUrlById((prev) => {
+                const next = { ...(prev || {}) };
+                const old = next[annotatorPhotoId];
+                next[annotatorPhotoId] = url;
+                if (old) {
+                  try {
+                    URL.revokeObjectURL(old);
+                  } catch {}
+                }
+                return next;
+              });
+            } catch {
+              // fail soft
+            }
+          }
         }}
       />
     </>

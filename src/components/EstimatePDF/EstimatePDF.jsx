@@ -14,115 +14,6 @@ import {
 import { useMemo, useEffect } from "react";
 // ---------- tiny helpers ----------
 //
-function renderPhotoAnnotations(photoId, includedPhotoAnnotationsById) {
-  const items =
-    includedPhotoAnnotationsById?.[photoId]?.items ||
-    includedPhotoAnnotationsById?.[photoId] ||
-    [];
-
-  if (!Array.isArray(items) || items.length === 0) return null;
-
-  return (
-    <Svg
-      viewBox="0 0 1 1"
-      preserveAspectRatio="none"
-      style={styles.photoOverlay}
-    >
-      <G>
-        {items.map((it, idx) => {
-          const type = it.type || it.kind;
-          const stroke = it.stroke || "#00cc55";
-          const fill = it.fill || "transparent";
-          const sw = 0.006;
-
-          const a = it.a || it.p1;
-          const b = it.b || it.p2;
-
-          if (!a || !b) return null;
-
-          if (type === "line") {
-            return (
-              <Line
-                key={idx}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={stroke}
-                strokeWidth={sw}
-              />
-            );
-          }
-
-          if (type === "rect") {
-            const x = Math.min(a.x, b.x);
-            const y = Math.min(a.y, b.y);
-            const w = Math.abs(b.x - a.x);
-            const h = Math.abs(b.y - a.y);
-            return (
-              <Rect
-                key={idx}
-                x={x}
-                y={y}
-                width={w}
-                height={h}
-                stroke={stroke}
-                fill={fill}
-                strokeWidth={sw}
-              />
-            );
-          }
-
-          if (type === "circle") {
-            const cx = (a.x + b.x) / 2;
-            const cy = (a.y + b.y) / 2;
-            const r = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / 2;
-            return (
-              <Circle
-                key={idx}
-                cx={cx}
-                cy={cy}
-                r={r}
-                stroke={stroke}
-                fill={fill}
-                strokeWidth={sw}
-              />
-            );
-          }
-
-          if (type === "x") {
-            const x = Math.min(a.x, b.x);
-            const y = Math.min(a.y, b.y);
-            const w = Math.abs(b.x - a.x);
-            const h = Math.abs(b.y - a.y);
-            return (
-              <G key={idx}>
-                <Line
-                  x1={x}
-                  y1={y}
-                  x2={x + w}
-                  y2={y + h}
-                  stroke={stroke}
-                  strokeWidth={sw}
-                />
-                <Line
-                  x1={x + w}
-                  y1={y}
-                  x2={x}
-                  y2={y + h}
-                  stroke={stroke}
-                  strokeWidth={sw}
-                />
-              </G>
-            );
-          }
-
-          return null;
-        })}
-      </G>
-    </Svg>
-  );
-}
 
 function renderPhotoAnnotationsForPdf(photoId, includedPhotoAnnotationsById) {
   if (!photoId || !includedPhotoAnnotationsById) return null;
@@ -140,7 +31,7 @@ function renderPhotoAnnotationsForPdf(photoId, includedPhotoAnnotationsById) {
   return (
     <Svg
       viewBox="0 0 1 1"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
       style={styles.photoOverlay}
     >
       <G>
