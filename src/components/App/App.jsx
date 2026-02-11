@@ -29,6 +29,8 @@ import Project from "../Project/Project";
 import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
+import ChangePassword from "../ChangePassword/ChangePassword";
+
 import {
   updateDiagram,
   createProduct,
@@ -118,20 +120,35 @@ function App() {
   function handleLogin(email, password) {
     console.log("logging in");
     setIsLoading(true);
+
     signin(email, password)
       .then((data) => {
         const token = data.token;
+
+        // always set token first so the change-password page has auth
         localStorage.setItem("jwt", token);
-        setAuthState({ token }); // <-- FIX
+        setAuthState({ token });
+
+        // if forced password change, STOP HERE
+        if (data.mustChangePassword) {
+          navigate("/change-password", { replace: true });
+          return null; // prevents the next .then from running
+        }
+
         return getUser(token);
       })
       .then((user) => {
+        if (!user) return; // <-- handles the mustChangePassword early return
+
         setCurrentUser(user);
         localStorage.setItem("currentUserId", user._id);
         console.log("heres the user: ", user);
+
         if (user.stripeSubscriptionId && user.stripeCustomerId) {
           navigate("/dashboard/projects");
-        } else navigate("/signup/cont/stripe");
+        } else {
+          navigate("/signup/cont/stripe");
+        }
       })
       .catch((err) => {
         setIsSignInErrorVisible(true);
@@ -314,6 +331,16 @@ function App() {
                 path="/signup"
                 element={<Signup handleSignupContinue={continueSignup} />}
               />
+              <Route
+                path="/change-password"
+                element={
+                  <ChangePassword
+                    setCurrentUser={setCurrentUser}
+                    setLoggedIn={setLoggedIn}
+                  />
+                }
+              />
+
               <Route
                 path="/signup/cont"
                 element={

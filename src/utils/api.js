@@ -25,7 +25,7 @@ export function deleteDiagram(projectId, diagramId, token) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   )
     .then(processServerResponse)
     .then((response) => {
@@ -128,7 +128,7 @@ export async function getProducts(token, scope /* "pricing" | undefined */) {
 
   // Your server returns an array already; normalize either way.
   const data = await res.json();
-  return Array.isArray(data) ? data : data?.products ?? [];
+  return Array.isArray(data) ? data : (data?.products ?? []);
 }
 
 export function createProduct(productData, token) {
@@ -251,7 +251,7 @@ export function fetchProjectPhotoBlob(
   projectId,
   photoId,
   token,
-  variant = "preview"
+  variant = "preview",
 ) {
   return fetch(
     BASE_URL +
@@ -261,7 +261,7 @@ export function fetchProjectPhotoBlob(
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   ).then(async (res) => {
     if (!res.ok) throw new Error(`photo fetch failed: ${res.status}`);
     return res.blob();
@@ -290,7 +290,7 @@ export function updateProjectPhotoAnnotations(
   projectId,
   photoId,
   token,
-  items
+  items,
 ) {
   const base = normBase(BASE_URL);
   return fetch(`${base}dashboard/projects/${projectId}/photos/${photoId}`, {
@@ -300,5 +300,21 @@ export function updateProjectPhotoAnnotations(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ items: Array.isArray(items) ? items : [] }),
+  }).then(processServerResponse);
+}
+
+export function changePassword({ newPassword, currentPassword }) {
+  const token = localStorage.getItem("jwt");
+
+  return fetch(BASE_URL + "users/change-password", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      newPassword,
+      currentPassword,
+    }),
   }).then(processServerResponse);
 }
