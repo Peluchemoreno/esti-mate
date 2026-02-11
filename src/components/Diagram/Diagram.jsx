@@ -166,10 +166,10 @@ function formatDownspoutName(sizeRaw, profileRaw) {
       corr
         ? "Corrugated"
         : /smooth/i.test(p)
-        ? "Smooth"
-        : /box/i.test(p)
-        ? "Box"
-        : p
+          ? "Smooth"
+          : /box/i.test(p)
+            ? "Box"
+            : p
     } Downspout`;
   }
   const m = s.match(/^(\d+)/);
@@ -219,7 +219,7 @@ function nameHasAny(n, tokens = []) {
 // kind: "end cap" | "strip miter" | "bay miter"
 function findGutterAccessoryTemplate(
   allProducts,
-  { profileKey, sizeInches, kind }
+  { profileKey, sizeInches, kind },
 ) {
   const sizeTok = inchesToken(sizeInches); // e.g., 5"
   const profNameTokens = nameTokensForProfile(profileKey); // e.g., ["k-style"] or ["half round", "half-round"]
@@ -313,7 +313,7 @@ function findDownspoutFitting(allProducts, { profileKey, dsSize, code, kind }) {
       // Match 2" or bare 2
       inchesRe = new RegExp(
         `(?:\\b${inchesSafe}"\\b|\\b${inchesSafe}\\b)`,
-        "i"
+        "i",
       );
     }
   }
@@ -393,7 +393,7 @@ function normalizeGutterKey(name = "") {
   let chunk = (cut >= 0 ? after.slice(0, cut) : after)
     .replace(
       /\b(alum(?:inum)?|copper|steel|gutter|seamless|paint(?:ed)?|color|white|black|bronze|brown|matte|textured|coil|sku|ft|pcs?)\b/gi,
-      " "
+      " ",
     )
     .replace(/\s+/g, " ")
     .trim();
@@ -425,7 +425,7 @@ function canvasToDataURLAsync(canvas, type = "image/png", quality) {
                   performance.measure(
                     "PDF/Canvas snapshot",
                     "PDF/Canvas snapshot:start",
-                    "PDF/Canvas snapshot:end"
+                    "PDF/Canvas snapshot:end",
                   );
                 } catch {}
               }
@@ -435,7 +435,7 @@ function canvasToDataURLAsync(canvas, type = "image/png", quality) {
             reader.readAsDataURL(blob);
           },
           type,
-          quality
+          quality,
         );
       } else {
         // Fallback (older Safari), still synchronous but rarely hit
@@ -446,7 +446,7 @@ function canvasToDataURLAsync(canvas, type = "image/png", quality) {
             performance.measure(
               "PDF/Canvas snapshot",
               "PDF/Canvas snapshot:start",
-              "PDF/Canvas snapshot:end"
+              "PDF/Canvas snapshot:end",
             );
           } catch {}
         }
@@ -459,7 +459,7 @@ function canvasToDataURLAsync(canvas, type = "image/png", quality) {
           performance.measure(
             "PDF/Canvas snapshot (error)",
             "PDF/Canvas snapshot:start",
-            "PDF/Canvas snapshot:end"
+            "PDF/Canvas snapshot:end",
           );
         } catch {}
       }
@@ -544,7 +544,7 @@ const Diagram = ({
               endY: el.endY,
             },
             x,
-            y
+            y,
           );
         } else if (el.kind === "free-square") {
           ok = hitTestFreeSquare(el, x, y);
@@ -912,7 +912,7 @@ const Diagram = ({
       } catch (e) {
         console.warn(
           "Diagram: catalog reload failed (will still re-render):",
-          e
+          e,
         );
       }
       // force a repaint at minimum
@@ -1049,7 +1049,7 @@ const Diagram = ({
       const bh = Math.max(1, bbox.height);
       const k = Math.min(
         (curW - 2 * PADDING_PX) / bw,
-        (curH - 2 * PADDING_PX) / bh
+        (curH - 2 * PADDING_PX) / bh,
       );
       if (exceeds && Number.isFinite(k) && k > 0 && k < 1_000) {
         // scale then center
@@ -1111,7 +1111,7 @@ const Diagram = ({
           if (!Number.isFinite(copy.runFeet)) {
             const px = calculateDistance(
               [copy.startX, copy.startY],
-              [copy.endX, copy.endY]
+              [copy.endX, copy.endY],
             );
             const ft =
               Number(px || 0) *
@@ -1249,7 +1249,7 @@ const Diagram = ({
           l.color ||
             l.currentProduct?.colorCode ||
             l.currentProduct?.color ||
-            "#000"
+            "#000",
         ),
       };
     };
@@ -1304,7 +1304,7 @@ const Diagram = ({
       (line.startY + line.endY) / 2,
     ];
     line.measurement = convertToFeet(
-      calculateDistance([line.startX, line.startY], [line.endX, line.endY])
+      calculateDistance([line.startX, line.startY], [line.endX, line.endY]),
     );
     if (isLineParallelToSide(line.startX, line.startY, line.endX, line.endY)) {
       line.isVertical = true;
@@ -1487,13 +1487,13 @@ const Diagram = ({
       ctx.fillText(
         `${measurement}'`,
         x,
-        y + (line.position === "top" ? -gridSize / 1.5 : gridSize * 1.5)
+        y + (line.position === "top" ? -gridSize / 1.5 : gridSize * 1.5),
       );
     } else if (line.isVertical) {
       ctx.fillText(
         `${measurement}'`,
         x + (line.position === "left" ? -gridSize / 0.75 : gridSize * 1.25),
-        y
+        y,
       );
     } else {
       ctx.fillText(`${measurement}'`, x, y - gridSize / 1.5);
@@ -1524,7 +1524,7 @@ const Diagram = ({
           x1 - w / 2 - padX,
           y1 - h - padY,
           w + padX * 2,
-          h + padY * 2
+          h + padY * 2,
         );
         ctx.restore();
       }
@@ -1637,7 +1637,7 @@ const Diagram = ({
         if (line.isSelected) {
           const handleR = Math.max(
             MIN_HANDLE_PX,
-            (typeof gridSize === "number" ? gridSize : 8) / 2
+            (typeof gridSize === "number" ? gridSize : 8) / 2,
           );
           ctx.setLineDash([]); // handles are solid
           ctx.fillStyle = "orange";
@@ -1713,7 +1713,7 @@ const Diagram = ({
       },
       feetNow,
       midX,
-      midY
+      midY,
     );
   }
 
@@ -1765,38 +1765,49 @@ const Diagram = ({
       );
     });
 
+    // ✅ Single, consistent DS color resolution (matches your edit branch intent)
+    const dsColor =
+      currentDownspout?.visual ||
+      currentDownspout?.color ||
+      currentDownspout?.colorCode ||
+      currentDownspout?.defaultColor ||
+      "#000";
+
     // If we came from clicking an existing DS box: update instead of creating a new line
-    // Diagram.jsx — inside addDownspout (edit branch)
     if (editingDownspoutIndex !== null) {
-      // Build the next lines snapshot with the edited DS baked in
       const next = lines.map((ln, idx) => {
         if (idx !== editingDownspoutIndex) return ln;
 
         const ds = { ...ln };
 
-        // Force uppercase sequence and update footage (measurement)
         ds.elbowSequence = String(
-          downspoutData.elbowSequence || ""
+          downspoutData.elbowSequence || "",
         ).toUpperCase();
         const tf = parseInt(downspoutData.totalFootage, 10);
         ds.totalFeet = isNaN(tf) ? 0 : tf;
-        ds.measurement = ds.totalFeet; // keep legacy readers happy
+        ds.measurement = ds.totalFeet;
 
-        // Map product/color exactly like create path
         ds.price = currentDownspout?.price || ds.price || 0;
-        ds.color = currentDownspout?.visual || ds.color || "#000";
 
-        // Keep these consistent with your stored DS shape
+        // ✅ FIX: use dsColor (not just visual)
+        ds.color = dsColor;
+
         ds.profile = downspoutData.profile;
         ds.downspoutSize = downspoutData.downspoutSize;
+
         ds.currentProduct = {
           price: currentDownspout?.price || 0,
           name: formatDownspoutName(
             downspoutData.downspoutSize,
-            downspoutData.profile
+            downspoutData.profile,
           ),
           description: currentDownspout?.description || "",
+
+          // ✅ Helpful for downstream renderers (PDF/key/etc) if they ever inspect currentProduct
+          color: dsColor,
+          _id: currentDownspout?._id,
         };
+
         ds.rainBarrel = downspoutData.rainBarrel;
         ds.splashBlock = downspoutData.splashBlock;
         ds.undergroundDrainage = downspoutData.undergroundDrainage;
@@ -1804,22 +1815,16 @@ const Diagram = ({
         return ds;
       });
 
-      // Commit the edit
       setLines(next);
-
-      // Close DS modal and clear edit state
       setIsDownspoutModalOpen(false);
       setEditingDownspoutIndex(null);
 
-      // Decide which modal to show based on real change vs baseline
       const currentHash = hashLines(next);
       const hasChanged = currentHash !== baselineHashRef.current;
 
       if (hasChanged && selectedDiagram?._id) {
-        // Existing diagram was modified -> show overwrite prompt
         setActiveModal("confirmDiagramOverwrite");
       } else {
-        // New diagram (no _id) or no material change -> return to canvas
         setActiveModal("diagram");
       }
       return;
@@ -1832,10 +1837,12 @@ const Diagram = ({
       endX: downspoutCoordinates[0],
       endY: downspoutCoordinates[1],
       midpoint: null,
-      // Persist both legacy measurement and canonical totalFeet for DS
       totalFeet: Number.parseInt(downspoutData.totalFootage, 10) || 0,
       measurement: Number.parseInt(downspoutData.totalFootage, 10) || 0,
-      color: currentDownspout?.color || "#000",
+
+      // ✅ FIX: this was the bug
+      color: dsColor,
+
       isSelected: false,
       isDownspout: true,
       profile: downspoutData.profile,
@@ -1846,16 +1853,19 @@ const Diagram = ({
         price: currentDownspout?.price || 0,
         name: formatDownspoutName(
           downspoutData.downspoutSize,
-          downspoutData.profile
+          downspoutData.profile,
         ),
         description: currentDownspout?.description || "",
+        color: dsColor,
+        _id: currentDownspout?._id,
       },
       rainBarrel: downspoutData.rainBarrel,
       splashBlock: downspoutData.splashBlock,
       undergroundDrainage: downspoutData.undergroundDrainage,
-      elbowBoxAngle: Math.PI / 4, // 45°, keeps your current “bottom-right-ish” vibe
-      elbowBoxRadius: gridSize * 5, // tweak as you like
+      elbowBoxAngle: Math.PI / 4,
+      elbowBoxRadius: gridSize * 5,
     };
+
     setLines((prev) => [...prev, formatted]);
   }
 
@@ -1903,7 +1913,7 @@ const Diagram = ({
       // Find the Splash Guard product from your catalog
       const prod =
         (Array.isArray(allProducts) ? allProducts : []).find((p) =>
-          /splash\s*guard/i.test(String(p?.name || ""))
+          /splash\s*guard/i.test(String(p?.name || "")),
         ) || null;
 
       // Resolve its display color (prefer explicit color fields from product)
@@ -1957,7 +1967,7 @@ const Diagram = ({
       const sameSpot =
         Math.hypot(
           selectCycleRef.current.x - x,
-          selectCycleRef.current.y - y
+          selectCycleRef.current.y - y,
         ) <= Math.max(6, gridSize * 0.25);
       const withinWindow = now - selectCycleRef.current.time < 800; // ms between clicks
 
@@ -1989,7 +1999,7 @@ const Diagram = ({
 
       // Mark selection
       setLines((prev) =>
-        prev.map((l, idx) => ({ ...l, isSelected: idx === hitIndex }))
+        prev.map((l, idx) => ({ ...l, isSelected: idx === hitIndex })),
       );
       setSelectedIndex(hitIndex);
 
@@ -2245,13 +2255,13 @@ const Diagram = ({
           currentLine.startX,
           currentLine.startY,
           currentLine.endX,
-          currentLine.endY
+          currentLine.endY,
         ) ||
         isLineParallelToTop(
           currentLine.startX,
           currentLine.startY,
           currentLine.endX,
-          currentLine.endY
+          currentLine.endY,
         )
       ) {
         setCurrentLine((prevLine) => ({
@@ -2415,8 +2425,8 @@ const Diagram = ({
       committed.measurement = convertToFeet(
         calculateDistance(
           [committed.startX, committed.startY],
-          [committed.endX, committed.endY]
-        )
+          [committed.endX, committed.endY],
+        ),
       );
 
       // --- STAMP (conservatively) based on the product currently selected ---
@@ -2427,7 +2437,7 @@ const Diagram = ({
           committed.isGutter = true;
           const px = distancePxOf(committed);
           committed.runFeet = roundToQuarterFeet(
-            feetFromPx(px, feetPerSquare, gridSize)
+            feetFromPx(px, feetPerSquare, gridSize),
           );
 
           // Do NOT override if already stamped on mousedown or previously edited
@@ -2456,7 +2466,7 @@ const Diagram = ({
       if (committed.isGutter) {
         const pxDist = calculateDistance(
           [committed.startX, committed.startY],
-          [committed.endX, committed.endY]
+          [committed.endX, committed.endY],
         );
         const ft =
           Number(pxDist || 0) *
@@ -2522,7 +2532,7 @@ const Diagram = ({
   function analyzeJoints(allLines) {
     const gutters = allLines
       .filter(
-        (L) => !L.isNote && !L.isDownspout && !L.isFreeMark && L.currentProduct
+        (L) => !L.isNote && !L.isDownspout && !L.isFreeMark && L.currentProduct,
       )
       .map((L) => ({
         L,
@@ -2600,7 +2610,7 @@ const Diagram = ({
           else
             b.custom.set(
               Math.round(ang),
-              (b.custom.get(Math.round(ang)) || 0) + 1
+              (b.custom.get(Math.round(ang)) || 0) + 1,
             );
         } else {
           const combo = [A.key, B.key].sort().join(" + ");
@@ -2611,7 +2621,7 @@ const Diagram = ({
           else
             b.custom.set(
               Math.round(ang),
-              (b.custom.get(Math.round(ang)) || 0) + 1
+              (b.custom.get(Math.round(ang)) || 0) + 1,
             );
         }
       });
@@ -2872,11 +2882,11 @@ const Diagram = ({
     const srcY = Math.max(0, Math.floor(boundingBox.minY * dpr));
     const srcW = Math.min(
       Math.floor((boundingBox.maxX - boundingBox.minX) * dpr),
-      canvas.width - srcX
+      canvas.width - srcX,
     );
     const srcH = Math.min(
       Math.floor((boundingBox.maxY - boundingBox.minY) * dpr),
-      canvas.height - srcY
+      canvas.height - srcY,
     );
 
     // ... setup tempCanvas ...
@@ -2913,11 +2923,11 @@ const Diagram = ({
       const vectorPossible = Array.isArray(lines) && lines.length > 0;
       if (vectorPossible) {
         console.info(
-          "[THUMBNAIL] VECTOR data available (lines present). Using RASTER path currently."
+          "[THUMBNAIL] VECTOR data available (lines present). Using RASTER path currently.",
         );
       } else {
         console.info(
-          "[THUMBNAIL] Falling back to RASTER thumbnail → PNG/JPEG."
+          "[THUMBNAIL] Falling back to RASTER thumbnail → PNG/JPEG.",
         );
         const missing = [];
         if (!Array.isArray(lines) || lines.length === 0)
@@ -2934,13 +2944,13 @@ const Diagram = ({
 
     setSelectedIndex(null);
     setLines((prev) =>
-      prev.map((l) => (l.isSelected ? { ...l, isSelected: false } : l))
+      prev.map((l) => (l.isSelected ? { ...l, isSelected: false } : l)),
     );
 
     const thumbnailDataUrl = await canvasToDataURLAsync(
       tempCanvas,
       "image/png",
-      0.92
+      0.92,
     );
 
     // --- PRICE + ACCESSORIES ---
@@ -2997,7 +3007,7 @@ const Diagram = ({
     // kind: "end cap" | "strip miter" | "bay miter" | "custom miter"
     const findGutterAccessoryTemplate = (
       allProducts,
-      { profileKey, sizeInches, kind }
+      { profileKey, sizeInches, kind },
     ) => {
       const sizeTok = inchesToken(sizeInches);
       const profTokens = nameTokensForProfile(profileKey);
@@ -3048,7 +3058,7 @@ const Diagram = ({
           (allProducts || []).find(
             (p) =>
               lower(p?.type) === "accessory" &&
-              lower(p?.name) === "custom miter"
+              lower(p?.name) === "custom miter",
           ) || null
         );
       };
@@ -3056,7 +3066,7 @@ const Diagram = ({
       // ---------------- End Caps ----------------
       Object.keys(analysisData.endCapsByProduct || {}).forEach((keyLabel) => {
         const endCapCount = Number(
-          analysisData.endCapsByProduct[keyLabel] || 0
+          analysisData.endCapsByProduct[keyLabel] || 0,
         );
         if (!endCapCount) return;
 
@@ -3180,10 +3190,10 @@ const Diagram = ({
                   degrees: angle,
                   sizeInches,
                 },
-                `Custom Miter (${angle}°)`
+                `Custom Miter (${angle}°)`,
               );
             }
-          }
+          },
         );
       });
 
@@ -3273,7 +3283,7 @@ const Diagram = ({
         const mapKey = `${sizeKey}|${profileKey}`;
 
         const { elbows, offsets } = parseElbowsAndOffsets(
-          line.elbowSequence || ""
+          line.elbowSequence || "",
         );
 
         if (!elbowCounts[mapKey]) elbowCounts[mapKey] = {};
@@ -3310,10 +3320,10 @@ const Diagram = ({
               /round/i.test(prod.name)
                 ? "Round"
                 : /smooth/i.test(prod.name)
-                ? "Smooth"
-                : /box/i.test(prod.name)
-                ? "Box"
-                : "Corrugated"
+                  ? "Smooth"
+                  : /box/i.test(prod.name)
+                    ? "Box"
+                    : "Corrugated"
             }${/round|box/i.test(prod.name) ? "" : ` ${code}`} Elbow`,
             quantity: Number(qty || 0),
             price: Number(prod.price || 0),
@@ -3346,7 +3356,7 @@ const Diagram = ({
                 caseIncludes(p.name, sizeKey) &&
                 caseIncludes(p.name, "offset") &&
                 (caseIncludes(p.name, `${inches}"`) ||
-                  caseIncludes(p.name, ` ${inches} `))
+                  caseIncludes(p.name, ` ${inches} `)),
             );
 
           if (!prod) return;
@@ -3356,10 +3366,10 @@ const Diagram = ({
               /round/i.test(prod.name)
                 ? "Round"
                 : /smooth/i.test(prod.name)
-                ? "Smooth"
-                : /box/i.test(prod.name)
-                ? "Box"
-                : "Corrugated"
+                  ? "Smooth"
+                  : /box/i.test(prod.name)
+                    ? "Box"
+                    : "Corrugated"
             } ${inches}" Offset`,
             quantity: Number(qty || 0),
             price: Number(prod.price || 0),
@@ -3605,7 +3615,7 @@ const Diagram = ({
           className="diagram__icon diagram__save"
           onClick={() => {
             setLines((prev) =>
-              prev.map((l) => (l.isSelected ? { ...l, isSelected: false } : l))
+              prev.map((l) => (l.isSelected ? { ...l, isSelected: false } : l)),
             );
             try {
               const nextHash = hashLines(lines);
@@ -3802,8 +3812,8 @@ const Diagram = ({
                       ? "dotted"
                       : "solid"
                     : currentLine.dashed
-                    ? "dotted"
-                    : "solid"
+                      ? "dotted"
+                      : "solid"
                 }
                 onChange={(e) => {
                   const val = e.target.value === "dotted";
@@ -4005,7 +4015,7 @@ export function exportDiagramAsSVG(lines, meta) {
 
   const out = [];
   out.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="geometricPrecision" vector-effect="non-scaling-stroke">`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="geometricPrecision" vector-effect="non-scaling-stroke">`,
   );
 
   // If you ever want a background like your canvas, uncomment:
@@ -4028,8 +4038,8 @@ export function exportDiagramAsSVG(lines, meta) {
       // Canvas baseline differs from SVG; this is "close enough" visually.
       out.push(
         `<text x="${x1}" y="${y1}" font-family="Arial" font-size="12" font-weight="700" fill="#000000" text-anchor="middle" dominant-baseline="middle">${esc(
-          l.noteText
-        )}</text>`
+          l.noteText,
+        )}</text>`,
       );
       continue;
     }
@@ -4038,7 +4048,7 @@ export function exportDiagramAsSVG(lines, meta) {
     if (l.isSplashGuard) {
       const r = Math.max(2, grid / 2.5);
       out.push(
-        `<circle cx="${x1}" cy="${y1}" r="${r}" fill="${stroke}" stroke="${stroke}" stroke-width="1" />`
+        `<circle cx="${x1}" cy="${y1}" r="${r}" fill="${stroke}" stroke="${stroke}" stroke-width="1" />`,
       );
       continue;
     }
@@ -4051,7 +4061,7 @@ export function exportDiagramAsSVG(lines, meta) {
 
       if (type === "line") {
         out.push(
-          `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"${dash} />`
+          `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"${dash} />`,
         );
         continue;
       }
@@ -4063,7 +4073,7 @@ export function exportDiagramAsSVG(lines, meta) {
         out.push(
           `<rect x="${x1 - half}" y="${
             y1 - half
-          }" width="${s}" height="${s}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash} />`
+          }" width="${s}" height="${s}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash} />`,
         );
         continue;
       }
@@ -4072,7 +4082,7 @@ export function exportDiagramAsSVG(lines, meta) {
         const r = Math.max(4, Number(l.size || grid * 1.5) / 2);
         const fill = l.isFilled ? stroke : "none";
         out.push(
-          `<circle cx="${x1}" cy="${y1}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash} />`
+          `<circle cx="${x1}" cy="${y1}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash} />`,
         );
         continue;
       }
@@ -4081,8 +4091,8 @@ export function exportDiagramAsSVG(lines, meta) {
       out.push(
         `<circle cx="${x1}" cy="${y1}" r="${Math.max(
           3,
-          grid / 3
-        )}" fill="${stroke}" />`
+          grid / 3,
+        )}" fill="${stroke}" />`,
       );
       continue;
     }
@@ -4095,22 +4105,22 @@ export function exportDiagramAsSVG(lines, meta) {
       out.push(
         `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
           y1 + d
-        }" stroke="${stroke}" stroke-width="2" />`
+        }" stroke="${stroke}" stroke-width="2" />`,
       );
       out.push(
         `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
           y1 + d
-        }" stroke="${stroke}" stroke-width="2" />`
+        }" stroke="${stroke}" stroke-width="2" />`,
       );
       out.push(
         `<line x1="${x1}" y1="${y1}" x2="${x1 - d}" y2="${
           y1 - d
-        }" stroke="${stroke}" stroke-width="2" />`
+        }" stroke="${stroke}" stroke-width="2" />`,
       );
       out.push(
         `<line x1="${x1}" y1="${y1}" x2="${x1 + d}" y2="${
           y1 - d
-        }" stroke="${stroke}" stroke-width="2" />`
+        }" stroke="${stroke}" stroke-width="2" />`,
       );
 
       // Box (matches your drawDownspoutBox coords + styling)
@@ -4120,7 +4130,7 @@ export function exportDiagramAsSVG(lines, meta) {
       const h = Number(l.downspoutBoxH ?? grid * 3.5);
 
       out.push(
-        `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#444444" stroke="${stroke}" stroke-width="2" />`
+        `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#444444" stroke="${stroke}" stroke-width="2" />`,
       );
 
       // Text (matches your fillText)
@@ -4134,8 +4144,8 @@ export function exportDiagramAsSVG(lines, meta) {
         `<text x="${x + w / 2}" y="${
           y + h / 2.3
         }" font-family="Arial" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${esc(
-          label1
-        )}</text>`
+          label1,
+        )}</text>`,
       );
 
       if (label2) {
@@ -4143,8 +4153,8 @@ export function exportDiagramAsSVG(lines, meta) {
           `<text x="${x + w / 2}" y="${
             y + (h * 2) / 3
           }" font-family="Arial" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${esc(
-            label2
-          )}</text>`
+            label2,
+          )}</text>`,
         );
       }
 
@@ -4155,7 +4165,7 @@ export function exportDiagramAsSVG(lines, meta) {
     const dashed = !!l.isDashed;
     const dash = dashed ? ` stroke-dasharray="${Math.max(2, sw * 2)}"` : "";
     out.push(
-      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"${dash} />`
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"${dash} />`,
     );
   }
 

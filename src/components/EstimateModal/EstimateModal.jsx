@@ -931,6 +931,8 @@ const EstimateModal = ({
   ]);
 
   // now it’s safe to define this: it references buildSavableItems + handleCloseModal
+  // inside EstimateModal.jsx
+
   const handleSaveAndClose = useCallback(async () => {
     try {
       const token = localStorage.getItem("jwt");
@@ -965,9 +967,48 @@ const EstimateModal = ({
             : [],
         },
         items,
-        estimateDate: estimateData.estimateDate,
+        estimateDate:
+          estimateData.estimateDate || new Date().toISOString().slice(0, 10),
         notes: estimateData.notes || "",
       };
+
+      // --------- DEV color trace (remove anytime) ---------
+      if (import.meta?.env?.DEV) {
+        const lines = Array.isArray(body?.diagram?.lines)
+          ? body.diagram.lines
+          : [];
+        const colors = lines
+          .map((l) => l?.color)
+          .filter(Boolean)
+          .map((c) => String(c).trim());
+        const uniq = Array.from(
+          new Set(colors.map((c) => c.toLowerCase())),
+        ).sort();
+
+        console.log(
+          "[save estimate] diagram lines:",
+          lines.length,
+          "colored:",
+          colors.length,
+          "uniqueColors:",
+          uniq.length,
+          uniq.slice(0, 30),
+        );
+        console.log(
+          "[save estimate] sample line colors:",
+          lines.slice(0, 10).map((l) => ({
+            kind: l?.isDownspout
+              ? "ds"
+              : l?.isSplashGuard
+                ? "sg"
+                : l?.isFreeMark
+                  ? "free"
+                  : "line",
+            color: l?.color,
+            product: l?.currentProduct?.name,
+          })),
+        );
+      }
 
       const res = await fetch(`${BASE_URL}api/estimates`, {
         method: "POST",

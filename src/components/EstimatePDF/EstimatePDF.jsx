@@ -220,6 +220,7 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
       const label =
         (l.currentProduct?.name && String(l.currentProduct.name)) ||
         "Splash Guard";
+
       const col = normalizeColor(
         l.color ||
           l.currentProduct?.color ||
@@ -255,15 +256,8 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
 
     // Gutter run
     if (l.currentProduct) {
-      console.log(l);
       const raw = String(l.currentProduct.name);
       const label = prettyGutter(raw);
-      const fallbackColor =
-        l.currentProduct?.colorCode ||
-        l.currentProduct?.visual ||
-        l.currentProduct?.color ||
-        l.color;
-
       const color = resolveDiagramLineColor(products, l);
 
       if (!uniq.has(label)) uniq.set(label, { label, color, shape: "square" });
@@ -281,6 +275,10 @@ function legendEntriesFromLines(selectedDiagram, products = []) {
 function resolveDiagramLineColor(products = [], l) {
   if (!l || l.isNote) return "#000";
 
+  // ✅ Source of truth: if the line already carries a color, ALWAYS use it.
+  // Only fall back to catalog/product inference for old diagrams that never stored per-line colors.
+  if (l.color) return normalizeColor(l.color);
+
   // Splash Guard
   if (l.isSplashGuard) {
     // If line has a product id/name, try that first
@@ -291,7 +289,7 @@ function resolveDiagramLineColor(products = [], l) {
     const sg = (Array.isArray(products) ? products : []).find((p) =>
       /splash\s*guard/i.test(String(p?.name || "")),
     );
-    return normalizeColor(sg ? productColor(sg) : l.color || "#000");
+    return normalizeColor(sg ? productColor(sg) : "#000");
   }
 
   // Downspouts
@@ -317,14 +315,13 @@ function resolveDiagramLineColor(products = [], l) {
       l.currentProduct?.visual ||
       l.currentProduct?.color ||
       l.gutterColor ||
-      l.color ||
       "#000";
 
     return normalizeColor(findGutterProductColor(products, raw, fallbackColor));
   }
 
-  // Free marks / anything else uses stored color
-  return normalizeColor(l.color || "#000");
+  // Free marks / anything else uses stored color (if present)
+  return normalizeColor("#000");
 }
 
 function normalizeColor(c) {
@@ -1273,6 +1270,27 @@ export default function EstimatePDF({
   jwt,
   includedPhotoMetaById,
 }) {
+  // --------- DEV color trace (remove anytime) ---------
+  useEffect(() => {
+    if (!import.meta?.env?.DEV) return;
+    const lines = Array.isArray(selectedDiagram?.lines)
+      ? selectedDiagram.lines
+      : [];
+    const colors = lines
+      .map((l) => l?.color)
+      .filter(Boolean)
+      .map((c) => String(c).trim());
+    const uniq = Array.from(new Set(colors.map((c) => c.toLowerCase()))).sort();
+    console.log(
+      "[EstimatePDF] lines:",
+      lines.length,
+      "colored:",
+      colors.length,
+      "uniqueColors:",
+      uniq.length,
+      uniq,
+    );
+  }, [selectedDiagram]);
   // ✅ Works in Vite, still supports older env style as fallback
   const resolvedApiBaseUrl =
     apiBaseUrl ||
