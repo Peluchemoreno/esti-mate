@@ -59,6 +59,7 @@ function App() {
     token: localStorage.getItem("jwt") || null,
   });
   const location = useLocation();
+  const [loggedIn, setLoggedIn] = useState(false);
   const showDiagram = location.pathname.startsWith("/dashboard");
 
   useEffect(() => {
