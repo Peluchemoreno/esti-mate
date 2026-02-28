@@ -119,7 +119,6 @@ function App() {
 
   // App.jsx — handleLogin
   function handleLogin(email, password) {
-    console.log("logging in");
     setIsLoading(true);
 
     signin(email, password)
