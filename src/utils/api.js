@@ -318,3 +318,60 @@ export function changePassword({ newPassword, currentPassword }) {
     }),
   }).then(processServerResponse);
 }
+
+// ------------------------------
+// Version B: Customers
+// ------------------------------
+
+// GET /dashboard/customers?query=
+export function searchCustomers(token, query) {
+  const base = normBase(BASE_URL);
+  const q = query ? encodeURIComponent(String(query)) : "";
+  const url = q
+    ? `${base}dashboard/customers?query=${q}`
+    : `${base}dashboard/customers`;
+
+  return fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }).then(processServerResponse);
+}
+
+// POST /dashboard/customers
+export function createCustomer(token, customer) {
+  const base = normBase(BASE_URL);
+  return fetch(`${base}dashboard/customers`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(customer || {}),
+  }).then(processServerResponse);
+}
+
+// GET /dashboard/customers/:id
+export function getCustomer(token, id) {
+  const base = normBase(BASE_URL);
+  return fetch(`${base}dashboard/customers/${id}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }).then(processServerResponse);
+}
+
+// PUT /dashboard/customers/:id
+export function updateCustomer(token, id, customer) {
+  const base = normBase(BASE_URL);
+  return fetch(`${base}dashboard/customers/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(customer || {}),
+  }).then(processServerResponse);
+}

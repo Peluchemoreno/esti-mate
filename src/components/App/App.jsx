@@ -30,6 +30,7 @@ import Diagram from "../Diagram/Diagram";
 import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
 import ChangePassword from "../ChangePassword/ChangePassword";
+import Customers from "../Customers/Customers";
 
 import {
   updateDiagram,
@@ -261,6 +262,7 @@ function App() {
                 path="/dashboard"
                 element={<Dashboard handleLogOut={handleLogOut} />}
               >
+                <Route path="customers" element={<Customers />} />
                 <Route
                   path="projects"
                   element={

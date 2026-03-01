@@ -1,16 +1,22 @@
 .modal {
   background-color: rgba(255, 255, 255, 0.568);
-  position: absolute;
+  position: fixed;
   top: 0;
   right: 0;
   bottom: 0;
   left: 0;
   z-index: 1;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   visibility: hidden;
   opacity: 0;
+
+  pointer-events: none;
+  overflow: auto;
+
   transition:
     opacity 0.2s ease,
     visibility 0.2s ease;
@@ -24,11 +30,17 @@
   bottom: 0;
   left: 0;
   z-index: 1001;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   visibility: visible;
   opacity: 1;
+
+  pointer-events: auto;
+  overflow: auto;
+
   transition:
     opacity 0.2s ease,
     visibility 0.2s ease;
@@ -36,24 +48,41 @@
 
 .create-project-form,
 .downspout-modal__form {
-  position: absolute;
-  top: 10%;
-  width: 80%;
+  position: relative;
+  margin: 24px auto;
+
+  width: min(520px, calc(100vw - 24px));
   max-width: 520px;
+
   box-shadow: 0 0 5px black;
   background-color: var(--black);
-  max-height: 700px;
+
+  max-height: calc(100vh - 48px);
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: none;
+
+  box-sizing: border-box;
 }
 
 .create-project-form__header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.create-project-form__body,
+.create-project-form__header {
+  padding: 20px;
+  box-sizing: border-box;
+}
+
 .project-name__input {
   width: 100%;
   margin-top: 10px;
+  box-sizing: border-box;
+  color: var(--white);
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: transparent;
 }
 
 .create-project-form__footer {
@@ -61,13 +90,11 @@
   justify-content: flex-end;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
   padding: 10px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.create-project-form__body,
-.create-project-form__header {
-  padding: 20px;
-}
-
+/* Restore original button styling + colors */
 .create-project-form__button_cancel,
 .create-project-form__button_create {
   border: none;
@@ -99,16 +126,11 @@
   margin: 0;
 }
 
-.project-name__input {
-  color: var(--white);
-  padding: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
 .create-project-form__project-info {
   padding: 20px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin: 0;
   padding-bottom: 20px;
   font-size: 14px;
@@ -134,14 +156,17 @@
   transition: transform 0.2s ease;
 }
 
+/* Optional-details accordion behavior (this was removed and made the dropdown "always open") */
 .create-project-form__body_extended {
   padding: 0 20px;
+  max-height: 1400px;
+  overflow: visible;
 }
 
 .create-project-form__body_not-extended {
+  padding: 0 20px;
   max-height: 0;
   overflow: hidden;
-  padding: 0 20px;
 }
 
 .create-project-form__body {
@@ -164,22 +189,16 @@
   margin-bottom: 30px;
 }
 
-.create-project-form__site-info-header {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  font-weight: normal;
-}
-
 .create-project-form__input {
   border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 5px;
   color: var(--white);
   margin-top: 5px;
+  background-color: transparent;
 }
 
 .create-project-form__input_disabled {
-  color: grey;
+  opacity: 0.7;
   user-select: none;
 }
 
@@ -191,11 +210,21 @@
 .create-project__label {
   font-weight: bold;
   font-size: 16px;
+  display: block;
 }
 
 .client-details__address-separator {
   display: flex;
   gap: 10px;
+  margin-top: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.client-details__address-separator input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .create-project-form__client-details-input_address-city,
@@ -225,5 +254,123 @@
   margin-bottom: 30px;
 }
 
-@media screen and (max-width: 650px) {
+/* --------- Customer typeahead UI (no color changes) --------- */
+.cp__suggestions {
+  margin-top: 6px;
+}
+
+.cp__suggestions-title {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.cp__suggestions-list {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.cp__suggestion {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  color: var(--white);
+}
+
+.cp__suggestion-name {
+  font-weight: 600;
+}
+
+.cp__suggestion-sub {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+.cp__quickcreate {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: clamp(12px, 2.5vw, 14px);
+}
+
+.cp__select {
+  height: 38px;
+  max-width: 160px;
+  background-color: var(--black);
+  color: var(--white);
+}
+
+.cp__manageCustomersBtn {
+  color: var(--white);
+  background-color: var(--blue-primary);
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.cp__btn {
+  height: 38px;
+  background-color: var(--blue-primary);
+  border: none;
+  color: var(--white);
+  border-radius: 5px;
+}
+
+.cp__error {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgb(249, 85, 85)
+}
+
+.cp__selected {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.cp__linkbtn {
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+/* Tight screens / foldables */
+@media screen and (max-width: 380px) {
+  .create-project-form,
+  .downspout-modal__form {
+    width: calc(100vw - 16px);
+    margin: 16px auto;
+    max-height: calc(100vh - 32px);
+  }
+
+  .client-details__address-separator {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .create-project-form__footer {
+    justify-content: stretch;
+  }
+
+  .create-project-form__footer button {
+    width: 100%;
+  }
+
+  /* prevent odd horizontal scroll from long inputs */
+  .create-project-form__body,
+  .create-project-form__body_extended,
+  .create-project-form__body_not-extended {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 }

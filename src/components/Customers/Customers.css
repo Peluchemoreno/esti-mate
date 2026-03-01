@@ -1,0 +1,191 @@
+.customers {
+  padding: 16px;
+  color: var(--white);
+}
+
+.customers__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.customers__title {
+  margin: 0 0 12px 0;
+}
+
+.customers__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.customers__panel {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Top row: search + new button */
+.customers__toprow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.customers__search {
+  flex: 1;
+  min-width: 220px;
+  box-sizing: border-box;
+}
+
+/* List */
+.customers__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+}
+
+.customers__row {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--white);
+  text-align: left;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.customers__row_active {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.customers__row_name {
+  font-weight: 600;
+}
+
+.customers__row_sub {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+/* Form */
+.customers__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.customers__formTitle {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.customers__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* Make inputs match CreateProjectModal look */
+.customers__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 5px;
+  color: var(--white);
+  background: transparent;
+}
+
+.customers__actions {
+  margin-top: 6px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Buttons: match CreateProjectModal colors (no new colors) */
+.customers__button {
+  border: none;
+  border-radius: 5px;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.customers__button_cancel {
+  border: 1px solid var(--white);
+  color: var(--white);
+  background-color: transparent;
+}
+
+.customers__button_create {
+  background-color: var(--blue-primary);
+  color: var(--white);
+}
+
+.customers__button_create:hover,
+.customers__button_cancel:hover {
+  background-color: var(--blue-secondary);
+}
+
+/* Disabled state */
+.customers__button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.customers__hint {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.customers__error {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* Mobile / foldables */
+@media screen and (max-width: 800px) {
+  .customers__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .customers__list {
+    max-height: 280px;
+  }
+}
+
+/* Tight screens: keep things from overflowing */
+@media screen and (max-width: 420px) {
+  .customers__toprow {
+    align-items: stretch;
+  }
+
+  .customers__search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .customers__actions {
+    justify-content: stretch;
+  }
+
+  .customers__actions .customers__button {
+    width: 100%;
+  }
+}

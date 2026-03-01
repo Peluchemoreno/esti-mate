@@ -13,7 +13,7 @@ export default function Dashboard({ handleLogOut }) {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined"
       ? window.matchMedia("(max-width: 650px)").matches
-      : false
+      : false,
   );
   const [isOpen, setIsOpen] = useState(false);
   const firstLinkRef = useRef(null);
@@ -55,13 +55,15 @@ export default function Dashboard({ handleLogOut }) {
           <Link to="projects" className="dashboard__brand">
             <img src={logo} alt="Esti-Mate" className="dashboard__logo" />
           </Link>
-
           {/* desktop links */}
           <Link to="projects" className="dashboard__link">
             Projects
           </Link>
           <Link to="products" className="dashboard__link">
             Products
+          </Link>
+          <Link to="customers" className="dashboard__link">
+            Customers
           </Link>
           <Link to="settings" className="dashboard__link">
             Settings
@@ -125,6 +127,15 @@ export default function Dashboard({ handleLogOut }) {
                 onClick={() => setIsOpen(false)}
               >
                 Products
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="customers"
+                className="dashboard__navlink"
+                onClick={() => setIsOpen(false)}
+              >
+                Customers
               </Link>
             </li>
             <li>
