@@ -499,7 +499,14 @@ export default function SavedEstimatesPanel({
                   currency: "USD",
                 })}
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
                 <button
                   onClick={() => openViewer(est)}
                   style={{
@@ -509,7 +516,9 @@ export default function SavedEstimatesPanel({
                     borderRadius: 6,
                     padding: "var(--panel-btn-pad-y) var(--panel-btn-pad-x)",
                     fontSize: "var(--panel-btn-font)",
-
+                    width: "100%",
+                    minWidth: 0,
+                    whiteSpace: "nowrap",
                     cursor: "pointer",
                   }}
                 >
@@ -531,6 +540,9 @@ export default function SavedEstimatesPanel({
                     border: "none",
                     padding: "var(--panel-btn-pad-y) var(--panel-btn-pad-x)",
                     fontSize: "var(--panel-btn-font)",
+                    width: "100%",
+                    minWidth: 0,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   Download
@@ -546,6 +558,9 @@ export default function SavedEstimatesPanel({
                     cursor: "pointer",
                     padding: "var(--panel-btn-pad-y) var(--panel-btn-pad-x)",
                     fontSize: "var(--panel-btn-font)",
+                    width: "100%",
+                    minWidth: 0,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   Delete

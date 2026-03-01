@@ -1408,16 +1408,25 @@ export default function EstimatePDF({
 
   const billToName = t(project?.billingName);
   const billToAddress = t(project?.billingAddress);
+  const billToEmail = t(project?.billingEmail);
   const billToPhone = t(project?.billingPrimaryPhone);
 
   const jobName = t(
-    project?.projectName || estimate?.projectSnapshot?.name || project?.name,
+    project?.siteName ||
+      project?.projectName ||
+      estimate?.projectSnapshot?.name ||
+      project?.name,
   );
+
   const jobAddress = t(
-    project?.projectAddress ||
+    project?.siteAddress ||
+      project?.projectAddress ||
       estimate?.projectSnapshot?.address ||
       project?.address,
   );
+
+  const jobEmail = t(project?.siteEmail);
+  const jobPhone = t(project?.sitePrimaryPhone);
 
   // Photo data-urls must be prepared in the browser. When this component is rendered
   // via `pdf(<EstimatePDF />).toBlob()`, the React-PDF renderer does NOT have DOM APIs
@@ -1597,10 +1606,11 @@ export default function EstimatePDF({
         {/* Bill To / Job Site */}
         <View style={[styles.section, { flexDirection: "row" }]}>
           <View style={styles.billTo}>
-            <Text style={styles.sectionTitle}>BILL TO</Text>
-            <Text>{billToName}</Text>
-            <Text>{billToAddress}</Text>
-            <Text>{billToPhone}</Text>
+            <Text>Bill To:</Text>
+            {!!billToName && <Text>{billToName}</Text>}
+            {!!billToAddress && <Text>{billToAddress}</Text>}
+            {!!billToEmail && <Text>{billToEmail}</Text>}
+            {!!billToPhone && <Text>{billToPhone}</Text>}
           </View>
 
           <View style={styles.jobSite}>

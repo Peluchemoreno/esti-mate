@@ -741,30 +741,40 @@ export default function Project({
 
           <div className="project__diagram-container">
             {diagramData.length > 0 ? (
-              diagramData.map((diagram) => (
-                <div className="project__drawing-container" key={diagram._id}>
-                  <div
-                    className={`${
-                      diagram._id === selectedDiagram._id
-                        ? "project__drawing_selected"
-                        : "project__drawing"
-                    }`}
-                    onClick={() => handleSelectDiagram(diagram)}
-                    style={{
-                      width: "200px",
-                      height: "200px",
-                      backgroundImage: `url(${diagram.imageData})`,
-                      backgroundSize: "200px",
-                      backgroundPosition: "center",
-                      backgroundRepeat: "no-repeat",
-                      borderRadius: "5px",
-                    }}
-                  />
-                  <p className="diagram__details">
-                    {formatDateTime(diagram.createdAt)}
-                  </p>
-                </div>
-              ))
+              diagramData.map((diagram) => {
+                // Prefer SVG (reliable across mobile/desktop). Fallback to raster thumbnail for legacy diagrams.
+                const previewUrl = diagram?.svg
+                  ? `data:image/svg+xml;utf8,${encodeURIComponent(diagram.svg)}`
+                  : diagram?.imageData;
+
+                return (
+                  <div className="project__drawing-container" key={diagram._id}>
+                    <div
+                      className={`${
+                        diagram._id === selectedDiagram._id
+                          ? "project__drawing_selected"
+                          : "project__drawing"
+                      }`}
+                      onClick={() => handleSelectDiagram(diagram)}
+                      style={{
+                        width: "200px",
+                        height: "200px",
+                        backgroundImage: previewUrl
+                          ? `url(${previewUrl})`
+                          : "none",
+                        backgroundSize: "contain", // <— IMPORTANT: don’t crop/clip the drawing
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        borderRadius: "5px",
+                        backgroundColor: "#111", // makes “empty” obvious, still matches your dark UI vibe
+                      }}
+                    />
+                    <p className="diagram__details">
+                      {formatDateTime(diagram.createdAt)}
+                    </p>
+                  </div>
+                );
+              })
             ) : (
               <p>No Diagrams</p>
             )}
@@ -777,13 +787,22 @@ export default function Project({
         onClose={closeModal}
         estimate={testData}
         project={{
+          // keep existing for backward-compat
           name: project?.projectName || project?.name || "",
           address: project?.siteAddress || project?.address || "",
           id: projectId || "",
+
+          // Billing (Bill To)
           billingName: project?.billingName || "",
           billingAddress: project?.billingAddress || "",
           billingEmail: project?.billingEmail || "",
           billingPrimaryPhone: project?.billingPrimaryPhone || "",
+
+          // Jobsite (Job Site)
+          siteName: project?.siteName || "",
+          siteAddress: project?.siteAddress || project?.address || "",
+          siteEmail: project?.siteEmail || "",
+          sitePrimaryPhone: project?.sitePrimaryPhone || "",
         }}
         selectedDiagram={selectedDiagram}
         setSelectedDiagram={setSelectedDiagram}

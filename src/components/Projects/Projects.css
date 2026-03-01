@@ -4,6 +4,15 @@
   margin-top: 10px;
 }
 
+/* Keep header controls from squeezing into tiny widths */
+.projects__header.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 .projects__header {
   margin-bottom: 30px;
 }
@@ -16,7 +25,7 @@
   border-radius: 5px;
   font-size: 14px;
   cursor: pointer;
-  transition: background-color .2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .header__create-project-button--disabled {
@@ -26,10 +35,11 @@
   color: var(--white);
   border-radius: 5px;
   font-size: 14px;
-  transition: background-color .2s ease;
+  transition: background-color 0.2s ease;
 }
 
-.header__create-project-button:hover, .header__search-projects-button:hover {
+.header__create-project-button:hover,
+.header__search-projects-button:hover {
   background-color: var(--blue-secondary);
 }
 
@@ -39,7 +49,7 @@
   cursor: pointer;
   color: var(--white);
   font-size: 14px;
-  transition: background-color .2s ease;
+  transition: background-color 0.2s ease;
   border-top-right-radius: 2px;
   border-bottom-right-radius: 2px;
 }
@@ -50,10 +60,16 @@
   font-size: 14px;
   border: 1px solid var(--white);
   border-top-right-radius: 0;
-  border-bottom-right-radius: 0;}
+  border-bottom-right-radius: 0;
+
+  /* prevent the input from collapsing too small */
+  min-width: 210px;
+  width: min(520px, 45vw);
+}
 
 .search-projects-label {
   display: flex;
+  max-width: 100%;
 }
 
 .search-icon {
@@ -61,19 +77,39 @@
   background-color: transparent;
 }
 
+/* Table spacing + readable sizing on all screens */
 .project__table {
   width: 100%;
   padding: 0 20px;
-  border-spacing: 40px;
+
+  /* 40px was the main culprit on small phones */
+  border-spacing: 28px 18px;
 }
+
 .project__table_project-name {
   text-align: left;
 }
 
+/* keep checkbox + label from shifting around */
 .checkbox {
   margin-right: 10px;
 }
 
+/* The columns that SHOULD NOT wrap */
+.project__owner-column,
+.project__created-column,
+.project__table-owner-column,
+.project__table-created-column {
+  white-space: nowrap;
+}
+
+/* The name column CAN wrap, but not in a janky way */
+.project__table_project-name span {
+  display: inline-block;
+  max-width: 56vw;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .project__table-created-column {
   text-align: center;
@@ -101,19 +137,47 @@
   font-size: 20px;
 }
 
-@media screen  and (max-width: 650px){
+@media screen and (max-width: 650px) {
+  /* Reduce desktop spacing that forces text to wrap */
   .project__table {
-    padding: 0;
+    padding: 0 10px;
+    border-spacing: 14px 14px;
+  }
+
+  /* Scale text slightly on narrow screens */
+  .project__table,
+  .project__table-row {
+    font-size: clamp(12px, 3.2vw, 14px);
+  }
+
+  /* Give Project Name more room */
+  .project__table_project-name span {
+    max-width: 48vw;
+  }
+
+  /* Stop search from shrinking into unusable size */
+  .header__search-projects {
+    width: 100%;
+    min-width: 0;
   }
 
   .checkbox {
-    margin-left: -15px;
+    margin-left: -10px;
   }
 
-  .project__table-created-column {
-    text-align: right;
-  }
+  .project__table-created-column,
   .project__created-column {
     text-align: right;
+  }
+}
+
+@media screen and (max-width: 380px) {
+  /* Super thin phones */
+  .project__table {
+    border-spacing: 10px 12px;
+  }
+
+  .projects__header-title {
+    margin-left: 10px;
   }
 }

@@ -2,6 +2,7 @@
   /* display: none; */
   visibility: hidden;
   opacity: 0;
+  pointer-events: none; /* ✅ key: hidden modal can't steal touch */
   position: fixed;
   top: 0;
   left: 0;
@@ -26,6 +27,7 @@
   visibility: visible;
   opacity: 1;
   transition: opacity .2s ease, visibility .2s ease;
+  pointer-events: auto; /* ✅ key: visible modal can receive touch */
   position: fixed;
   height: 100dvh;
   overflow: hidden;

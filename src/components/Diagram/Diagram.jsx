@@ -2663,6 +2663,10 @@ const Diagram = ({
     e.preventDefault();
     handleMouseUp(e);
   }
+  function hardUnlockScroll() {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
 
   // ======= Save diagram =======
   // ⬇️ drop in place of your current saveDiagram
@@ -3503,6 +3507,7 @@ const Diagram = ({
       addDiagramToProject(resolvedProjectId, token, data)
         .then((newDiagramData) => {
           handlePassDiagramData(newDiagramData);
+          hardUnlockScroll();
           closeModal();
         })
         .then(() => {
@@ -3518,6 +3523,7 @@ const Diagram = ({
         })
         .catch((err) => {
           console.error("Failed to save diagram:", err);
+          hardUnlockScroll();
           closeModal();
         });
     }
@@ -3530,6 +3536,7 @@ const Diagram = ({
       updateDiagram(resolvedProjectId, selectedDiagram._id, token, data)
         .then((newDiagramData) => {
           handlePassDiagramData(newDiagramData);
+          hardUnlockScroll();
           closeModal();
         })
         .then(() => {
