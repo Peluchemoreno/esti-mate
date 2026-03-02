@@ -56,7 +56,7 @@ export default function Dashboard({ handleLogOut }) {
           throw new Error("This is your first error!");
         }}
       >
-        Break the world
+        test
       </button>
     );
   }
@@ -69,7 +69,6 @@ export default function Dashboard({ handleLogOut }) {
             <img src={logo} alt="Esti-Mate" className="dashboard__logo" />
           </Link>
           {/* desktop links */}
-          <ErrorButton /> {/* this is to test sentry */}
           <Link to="projects" className="dashboard__link">
             Projects
           </Link>
@@ -83,7 +82,7 @@ export default function Dashboard({ handleLogOut }) {
             Settings
           </Link>
         </div>
-
+        <ErrorButton /> {/* this is to test sentry */}
         {/* desktop account */}
         <div className="dashboard__account-link" onClick={onLogout}>
           <p className="dashboard__account-email">{currentUser?.email}</p>
@@ -93,7 +92,6 @@ export default function Dashboard({ handleLogOut }) {
             className="dashboard__drop-down-icon"
           />
         </div>
-
         {/* mobile hamburger */}
         {isMobile && (
           <button
