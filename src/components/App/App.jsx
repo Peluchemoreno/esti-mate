@@ -38,6 +38,7 @@ import {
   addDiagramToProject,
 } from "../../utils/api";
 import SignupChoosePlan from "../SignupChoosePlan/SignupChoosePlan";
+import { sentrySetUser } from "../../sentry";
 
 function App() {
   const [tempUserData, setTempUserData] = useState({});
@@ -140,6 +141,7 @@ function App() {
       })
       .then((user) => {
         if (!user) return; // <-- handles the mustChangePassword early return
+        sentrySetUser(user);
 
         setCurrentUser(user);
         localStorage.setItem("currentUserId", user._id);
