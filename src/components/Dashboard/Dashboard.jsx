@@ -48,6 +48,19 @@ export default function Dashboard({ handleLogOut }) {
     navigate("/");
   };
 
+  // this is to test sentry //
+  function ErrorButton() {
+    return (
+      <button
+        onClick={() => {
+          throw new Error("This is your first error!");
+        }}
+      >
+        Break the world
+      </button>
+    );
+  }
+
   return (
     <div className="dashboard">
       <header className="dashboard__header">
@@ -56,6 +69,7 @@ export default function Dashboard({ handleLogOut }) {
             <img src={logo} alt="Esti-Mate" className="dashboard__logo" />
           </Link>
           {/* desktop links */}
+          <ErrorButton /> {/* this is to test sentry */}
           <Link to="projects" className="dashboard__link">
             Projects
           </Link>

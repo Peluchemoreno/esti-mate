@@ -1,3 +1,4 @@
+// main.jsx
 import * as Sentry from "@sentry/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -14,8 +15,8 @@ initSentry();
 
 const queryClient = new QueryClient();
 
-export default Sentry.withErrorBoundary(App, {
-  fallback: <div>Something went wrong.</div>,
+const AppWithSentry = Sentry.withErrorBoundary(App, {
+  fallback: <p>An error has occurred</p>,
 });
 
 createRoot(document.getElementById("root")).render(
@@ -23,7 +24,7 @@ createRoot(document.getElementById("root")).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ToastProvider>
-          <App />
+          <AppWithSentry />
         </ToastProvider>
       </BrowserRouter>
     </QueryClientProvider>

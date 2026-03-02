@@ -9,9 +9,14 @@ export function initSentry() {
 
   Sentry.init({
     dsn,
+    debug: true,
     environment: import.meta.env.VITE_APP_ENV || import.meta.env.MODE,
+    sendDefaultPii: true,
     release: import.meta.env.VITE_APP_VERSION,
-    integrations: [new BrowserTracing()],
+    integrations: [new BrowserTracing(), Sentry.replayIntegration()],
+    enableLogs: true,
+    replaysOnErrorSampleRate: 1.0,
+    replaysSessionSampleRate: 0.1,
     tracesSampleRate: 0.1, // start low in prod
   });
 }
