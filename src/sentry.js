@@ -13,7 +13,7 @@ export function initSentry() {
     environment: import.meta.env.VITE_APP_ENV || import.meta.env.MODE,
     sendDefaultPii: true,
     release: import.meta.env.VITE_APP_VERSION,
-    integrations: [new BrowserTracing(), Sentry.replayIntegration()],
+    integrations: [new BrowserTracing()],
     enableLogs: true,
     replaysOnErrorSampleRate: 1.0,
     replaysSessionSampleRate: 0.1,
