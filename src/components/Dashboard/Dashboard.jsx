@@ -53,7 +53,7 @@ export default function Dashboard({ handleLogOut }) {
     return (
       <button
         onClick={() => {
-          throw new Error("This is your first error!");
+          throw new Error("This is your first ehahlerror!");
         }}
       >
         test
