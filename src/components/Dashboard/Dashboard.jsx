@@ -48,12 +48,13 @@ export default function Dashboard({ handleLogOut }) {
     navigate("/");
   };
 
-  // this is to test sentry //
   function ErrorButton() {
     return (
       <button
         onClick={() => {
-          throw new Error("This is your first error!");
+          console.log("clicked test button");
+          Sentry.captureException(new Error("Sentry test: manual capture"));
+          alert("Sent Sentry test event. Check Sentry dashboard.");
         }}
       >
         test
