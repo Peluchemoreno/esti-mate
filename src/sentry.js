@@ -1,5 +1,4 @@
 import * as Sentry from "@sentry/react";
-import { BrowserTracing } from "@sentry/tracing";
 
 export function initSentry() {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
@@ -13,7 +12,6 @@ export function initSentry() {
     environment: import.meta.env.VITE_APP_ENV || import.meta.env.MODE,
     sendDefaultPii: true,
     release: import.meta.env.VITE_APP_VERSION,
-    integrations: [new BrowserTracing()],
     enableLogs: true,
     replaysOnErrorSampleRate: 1.0,
     replaysSessionSampleRate: 0.1,
