@@ -163,6 +163,14 @@ export default function Dashboard({ handleLogOut }) {
                 Settings
               </Link>
             </li>
+
+            {currentUser.email === "jmcdmoreno19@aol.com" ? (
+              <li>
+                <Link to="/admin" className="dashboard__link">
+                  Admin
+                </Link>
+              </li>
+            ) : null}
           </ul>
 
           <button
