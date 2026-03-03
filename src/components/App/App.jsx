@@ -31,6 +31,7 @@ import DisablePullToRefresh from "../DisablePullToRefresh/DisablePullToRefresh";
 import SignupContinued from "../SignupContinued/SignupContinued";
 import ChangePassword from "../ChangePassword/ChangePassword";
 import Customers from "../Customers/Customers";
+import AdminAccountState from "../AdminAccountState/AdminAccountState";
 
 import {
   updateDiagram,
@@ -259,6 +260,7 @@ function App() {
           <div className="page">
             <Routes>
               <Route path="*" element={<PageNotFound />} />
+              <Route path="/admin" element={<AdminAccountState />} />
               <Route path="/" element={<LandingPage />} />
               <Route
                 path="/dashboard"
