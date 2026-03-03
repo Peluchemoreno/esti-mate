@@ -25,10 +25,7 @@ export default function AdminAccountState() {
 
     setLoading(true);
     try {
-      /* const url = `https://api.tryestimate.io/admin/account-state?email=${encodeURIComponent(
-        trimmed,
-      )}`; */
-      const url = `http://localhost:4000/admin/account-state?email=${encodeURIComponent(
+      const url = `https://api.tryestimate.io/admin/account-state?email=${encodeURIComponent(
         trimmed,
       )}`;
 
