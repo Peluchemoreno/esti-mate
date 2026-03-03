@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import BackButton from "../BackButton/BackButton";
 
 export default function AdminAccountState() {
   const [email, setEmail] = useState("");
@@ -66,6 +67,7 @@ export default function AdminAccountState() {
 
   return (
     <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
+      <BackButton to="/dashboard/projects" style={{ marginBottom: 20 }} />
       <h1 style={{ marginBottom: 8 }}>Admin: Account State</h1>
       <p style={{ marginTop: 0, opacity: 0.8 }}>
         Looks up a user by email and shows Stripe + subscription state.

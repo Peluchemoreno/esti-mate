@@ -81,6 +81,11 @@ export default function Dashboard({ handleLogOut }) {
           <Link to="settings" className="dashboard__link">
             Settings
           </Link>
+          {currentUser.email === "jmcdmoreno19@aol.com" ? (
+            <Link to="/admin" className="dashboard__link">
+              Admin
+            </Link>
+          ) : null}
         </div>
         {/* desktop account */}
         <div className="dashboard__account-link" onClick={onLogout}>
