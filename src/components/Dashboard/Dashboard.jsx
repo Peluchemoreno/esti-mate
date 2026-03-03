@@ -48,18 +48,7 @@ export default function Dashboard({ handleLogOut }) {
     navigate("/");
   };
 
-  // this is to test sentry //
-  function ErrorButton() {
-    return (
-      <button
-        onClick={() => {
-          throw new Error("This is your first ehahlerror!");
-        }}
-      >
-        test
-      </button>
-    );
-  }
+  const isAdmin = currentUser?.email === "jmcdmoreno19@aol.com";
 
   return (
     <div className="dashboard">
@@ -68,6 +57,7 @@ export default function Dashboard({ handleLogOut }) {
           <Link to="projects" className="dashboard__brand">
             <img src={logo} alt="Esti-Mate" className="dashboard__logo" />
           </Link>
+
           {/* desktop links */}
           <Link to="projects" className="dashboard__link">
             Projects
@@ -81,12 +71,14 @@ export default function Dashboard({ handleLogOut }) {
           <Link to="settings" className="dashboard__link">
             Settings
           </Link>
-          {currentUser.email === "jmcdmoreno19@aol.com" ? (
+
+          {isAdmin ? (
             <Link to="/admin" className="dashboard__link">
               Admin
             </Link>
           ) : null}
         </div>
+
         {/* desktop account */}
         <div className="dashboard__account-link" onClick={onLogout}>
           <p className="dashboard__account-email">{currentUser?.email}</p>
@@ -96,6 +88,7 @@ export default function Dashboard({ handleLogOut }) {
             className="dashboard__drop-down-icon"
           />
         </div>
+
         {/* mobile hamburger */}
         {isMobile && (
           <button
@@ -164,9 +157,13 @@ export default function Dashboard({ handleLogOut }) {
               </Link>
             </li>
 
-            {currentUser.email === "jmcdmoreno19@aol.com" ? (
+            {isAdmin ? (
               <li>
-                <Link to="/admin" className="dashboard__link">
+                <Link
+                  to="/admin"
+                  className="dashboard__navlink"
+                  onClick={() => setIsOpen(false)}
+                >
                   Admin
                 </Link>
               </li>

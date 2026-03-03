@@ -4,8 +4,13 @@ import BackButton from "../BackButton/BackButton";
 export default function AdminAccountState() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
   const [error, setError] = useState("");
+  const [resetError, setResetError] = useState("");
+
   const [result, setResult] = useState(null);
+  const [tempPassword, setTempPassword] = useState("");
 
   async function handleLookup(e) {
     e.preventDefault();
@@ -46,7 +51,6 @@ export default function AdminAccountState() {
       }
 
       if (!res.ok) {
-        // Normalize common shapes
         const msg =
           data?.error?.message ||
           data?.error ||
@@ -62,6 +66,84 @@ export default function AdminAccountState() {
       setError(err?.message || "Request failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    setResetError("");
+    setTempPassword("");
+
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setResetError("Enter an email first.");
+      return;
+    }
+
+    const token = localStorage.getItem("jwt");
+    if (!token) {
+      setResetError("No JWT found in localStorage.jwt. Log in first.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const res = await fetch(
+        "https://api.tryestimate.io/users/admin/reset-user-password",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: trimmed.toLowerCase() }),
+        },
+      );
+
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+
+      if (!res.ok) {
+        const msg =
+          data?.error?.message ||
+          data?.error ||
+          data?.message ||
+          `Request failed (${res.status})`;
+        setResetError(`${res.status}: ${msg}`);
+        return;
+      }
+
+      // Support a few common response shapes
+      const pw =
+        data?.temporaryPassword ||
+        data?.tempPassword ||
+        data?.password ||
+        data?.value;
+
+      if (!pw) {
+        setResetError(
+          "Reset succeeded but no temp password was returned. Check backend response.",
+        );
+        return;
+      }
+
+      setTempPassword(pw);
+    } catch (err) {
+      setResetError(err?.message || "Reset failed");
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
+  async function copyTempPassword() {
+    try {
+      await navigator.clipboard.writeText(tempPassword);
+    } catch {
+      // If clipboard fails (rare), user can still manually select/copy
     }
   }
 
@@ -84,6 +166,74 @@ export default function AdminAccountState() {
           {loading ? "Loading..." : "Lookup"}
         </button>
       </form>
+
+      {/* Reset password panel */}
+      <div
+        style={{
+          marginTop: 14,
+          padding: 14,
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.15)",
+          background: "rgba(17, 24, 39, 0.35)",
+        }}
+      >
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={handleResetPassword}
+            disabled={resetLoading}
+            style={{ padding: "10px 14px" }}
+          >
+            {resetLoading ? "Resetting..." : "Generate Temporary Password"}
+          </button>
+
+          {tempPassword ? (
+            <button
+              type="button"
+              onClick={copyTempPassword}
+              style={{ padding: "10px 14px" }}
+            >
+              Copy Password
+            </button>
+          ) : null}
+        </div>
+
+        {resetError ? (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 12,
+              border: "1px solid #f0b4b4",
+              background: "#fff5f5",
+            }}
+          >
+            <strong>Error:</strong> {resetError}
+          </div>
+        ) : null}
+
+        {tempPassword ? (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(0,0,0,0.25)",
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+              Temporary password:
+            </div>
+            <code style={{ fontSize: 16, wordBreak: "break-all" }}>
+              {tempPassword}
+            </code>
+            <div style={{ marginTop: 8, opacity: 0.8, fontSize: 12 }}>
+              Share this with the user. They should change it immediately after
+              logging in.
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {error && (
         <div
@@ -178,7 +328,6 @@ export default function AdminAccountState() {
               padding: 20,
               borderRadius: 12,
               border: "1px solid #e5e7eb",
-
               marginBottom: 20,
             }}
           >
