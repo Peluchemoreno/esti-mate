@@ -368,6 +368,29 @@ export default function AdminAccountState() {
               <strong>Has Subscription:</strong>{" "}
               {result.summary.hasSubscription ? "✅ Yes" : "❌ No"}
             </div>
+            <div>
+              <strong>Will cancel at period end:</strong>{" "}
+              {result.summary.willCancelAtPeriodEnd ? "⚠️ YES" : "No"}
+            </div>
+
+            <div>
+              <strong>Cancel date:</strong>{" "}
+              {result.summary.cancelAt
+                ? new Date(result.summary.cancelAt).toLocaleString()
+                : "—"}
+            </div>
+
+            <div>
+              <strong>Current period end:</strong>{" "}
+              {result.summary.currentPeriodEnd
+                ? new Date(result.summary.currentPeriodEnd).toLocaleString()
+                : "—"}
+            </div>
+
+            <div>
+              <strong>Stripe status:</strong>{" "}
+              {result.summary.stripeStatus || "—"}
+            </div>
           </div>
         </div>
       )}
