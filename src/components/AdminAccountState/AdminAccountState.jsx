@@ -12,6 +12,69 @@ export default function AdminAccountState() {
   const [result, setResult] = useState(null);
   const [tempPassword, setTempPassword] = useState("");
 
+  const [stripeCustomers, setStripeCustomers] = useState([]);
+  const [stripeCustomersLoading, setStripeCustomersLoading] = useState(false);
+  const [stripeCustomersError, setStripeCustomersError] = useState("");
+  const [stripeCustomersHasMore, setStripeCustomersHasMore] = useState(false);
+  const [stripeCustomersCursor, setStripeCustomersCursor] = useState(null);
+
+  async function loadStripeCustomers({ reset = false } = {}) {
+    setStripeCustomersError("");
+
+    const token = localStorage.getItem("jwt");
+    if (!token) {
+      setStripeCustomersError(
+        "No JWT found in localStorage.jwt. Log in first.",
+      );
+      return;
+    }
+
+    setStripeCustomersLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "25");
+      if (!reset && stripeCustomersCursor) {
+        params.set("starting_after", stripeCustomersCursor);
+      }
+
+      const res = await fetch(
+        `https://api.tryestimate.io/admin/stripe-customers?${params.toString()}`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+
+      if (!res.ok) {
+        const msg =
+          data?.error?.message ||
+          data?.error ||
+          data?.message ||
+          `Request failed (${res.status})`;
+        throw new Error(`${res.status}: ${msg}`);
+      }
+
+      const nextCustomers = Array.isArray(data.customers) ? data.customers : [];
+      setStripeCustomers((prev) =>
+        reset ? nextCustomers : [...prev, ...nextCustomers],
+      );
+      setStripeCustomersHasMore(!!data.page?.has_more);
+      setStripeCustomersCursor(data.page?.next_starting_after || null);
+    } catch (e) {
+      setStripeCustomersError(e?.message || "Failed to load Stripe customers");
+    } finally {
+      setStripeCustomersLoading(false);
+    }
+  }
+
   async function handleLookup(e) {
     e.preventDefault();
     setError("");
@@ -391,6 +454,129 @@ export default function AdminAccountState() {
               <strong>Stripe status:</strong>{" "}
               {result.summary.stripeStatus || "—"}
             </div>
+          </div>
+          <div
+            style={{
+              marginTop: 20,
+              padding: 20,
+              borderRadius: 12,
+              border: "1px solid #e5e7eb",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>Stripe Customers</h3>
+
+              <button
+                type="button"
+                onClick={() => loadStripeCustomers({ reset: true })}
+                disabled={stripeCustomersLoading}
+                style={{ padding: "8px 12px" }}
+              >
+                {stripeCustomersLoading
+                  ? "Loading..."
+                  : stripeCustomers.length
+                    ? "Refresh"
+                    : "Load"}
+              </button>
+
+              {stripeCustomers.length ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStripeCustomers([]);
+                    setStripeCustomersCursor(null);
+                    setStripeCustomersHasMore(false);
+                    setStripeCustomersError("");
+                  }}
+                  style={{ padding: "8px 12px" }}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+
+            {stripeCustomersError ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  border: "1px solid #f0b4b4",
+                  background: "#fff5f5",
+                }}
+              >
+                <strong>Error:</strong> {stripeCustomersError}
+              </div>
+            ) : null}
+
+            {stripeCustomers.length ? (
+              <div style={{ marginTop: 12, overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: 8 }}>Email</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Name</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>
+                        Customer ID
+                      </th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Created</th>
+                      <th style={{ textAlign: "left", padding: 8 }}>
+                        Delinquent
+                      </th>
+                      <th style={{ textAlign: "left", padding: 8 }}>Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stripeCustomers.map((c) => (
+                      <tr key={c.id} style={{ borderTop: "1px solid #e5e7eb" }}>
+                        <td style={{ padding: 8 }}>{c.email || "—"}</td>
+                        <td style={{ padding: 8 }}>{c.name || "—"}</td>
+                        <td style={{ padding: 8 }}>
+                          <code>{c.id}</code>
+                        </td>
+                        <td style={{ padding: 8 }}>
+                          {c.created
+                            ? new Date(c.created).toLocaleString()
+                            : "—"}
+                        </td>
+                        <td style={{ padding: 8 }}>
+                          {c.delinquent ? "⚠️" : "No"}
+                        </td>
+                        <td style={{ padding: 8 }}>
+                          {c.livemode ? "LIVE" : "TEST"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {stripeCustomersHasMore ? (
+                  <button
+                    type="button"
+                    onClick={() => loadStripeCustomers({ reset: false })}
+                    disabled={stripeCustomersLoading}
+                    style={{ marginTop: 12, padding: "10px 14px" }}
+                  >
+                    {stripeCustomersLoading ? "Loading..." : "Load more"}
+                  </button>
+                ) : (
+                  <div style={{ marginTop: 12, opacity: 0.8 }}>
+                    No more results.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ marginTop: 10, opacity: 0.8 }}>
+                Click <strong>Load</strong> to fetch the most recent Stripe
+                customers.
+              </div>
+            )}
           </div>
         </div>
       )}
