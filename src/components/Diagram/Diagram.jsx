@@ -781,18 +781,31 @@ const Diagram = ({
         ? listedProducts
         : filteredProducts;
 
+    const seen = new Set();
+
     return (sourceProducts || [])
       .filter((p) => {
         const name = String(p?.name || "").toLowerCase();
         const type = String(p?.type || p?.category || "").toLowerCase();
 
-        // legacy prod behavior: only gutter run products belong in toolbar
         return (
           p?.listed !== false && (type === "gutter" || name.includes("gutter"))
         );
       })
+      .filter((p) => {
+        const key = String(p?.name || "")
+          .trim()
+          .toLowerCase();
+
+        if (!key) return false;
+        if (seen.has(key)) return false;
+
+        seen.add(key);
+        return true;
+      })
       .map((p) => catalogItemToTool(p));
   }, [listedProducts, filteredProducts]);
+
   const drawTools = useMemo(() => {
     return catalogTools.filter((t) => t.uiBehavior === "draw");
   }, [catalogTools]);
@@ -1204,8 +1217,19 @@ const Diagram = ({
           copy.totalFeet = isNaN(tf) ? 0 : tf;
           // Keep measurement equal to totalFeet for DS so UI that reads `measurement` still works
           copy.measurement = copy.totalFeet;
+        } else if (copy.isGutter || copy.currentProduct) {
+          // Preserve saved measured footage across desktop/mobile opens.
+          // Do NOT drop measurement here, because scaled coordinates can cause
+          // measurement drift when reopening on different screen sizes.
+          const savedFeetValue = Number(
+            copy.runFeet ?? copy.measurement ?? l.runFeet ?? l.measurement ?? 0,
+          );
+
+          if (Number.isFinite(savedFeetValue) && savedFeetValue > 0) {
+            copy.runFeet = savedFeetValue;
+            copy.measurement = savedFeetValue;
+          }
         } else {
-          // For gutters/free-lines, drop cached measurement to force recompute
           copy.measurement = undefined;
         }
 
@@ -1818,7 +1842,11 @@ const Diagram = ({
     // Derive fresh label position & feet from snapped endpoints
     const midX = (x1 + x2) / 2;
     const midY = (y1 + y2) / 2;
-    const feetNow = convertToFeet(calculateDistance([x1, y1], [x2, y2]));
+    const storedFeet = Number(line.runFeet ?? line.measurement);
+    const feetNow =
+      Number.isFinite(storedFeet) && storedFeet > 0
+        ? storedFeet
+        : convertToFeet(calculateDistance([x1, y1], [x2, y2]));
     placeMeasurement(
       {
         ...line,
