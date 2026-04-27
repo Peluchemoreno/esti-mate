@@ -1,7 +1,7 @@
 // src/contexts/ProductsContext.jsx
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getProducts } from "../utils/api";
+import { getCatalogItems, getProducts } from "../utils/api";
 
 const ProductsContext = createContext(null);
 
@@ -9,7 +9,7 @@ export function ProductsProvider({ children }) {
   const queryClient = useQueryClient();
   const [products, setProducts] = useState([]);
   const [version, setVersion] = useState(
-    () => Number(localStorage.getItem("catalogVersion")) || 0
+    () => Number(localStorage.getItem("catalogVersion")) || 0,
   );
   const [loading, setLoading] = useState(false);
 
@@ -21,8 +21,17 @@ export function ProductsProvider({ children }) {
         setProducts([]);
         return;
       }
-      const list = await getProducts(token, "listed");
-      setProducts(Array.isArray(list) ? list : []);
+      // here I'm manually combining the catalog items with the products list to show the catalog items in the UI immediately, without waiting for the products endpoint to be updated with the new items. This is a temporary measure until we have a more robust solution for syncing the catalog and products..
+
+      const legacyProducts = await getProducts(token, "listed");
+      const catalogItems = await getCatalogItems(token);
+
+      const combined = [
+        ...(Array.isArray(legacyProducts) ? legacyProducts : []),
+        ...(Array.isArray(catalogItems) ? catalogItems : []),
+      ];
+
+      setProducts(combined);
     } finally {
       setLoading(false);
     }
@@ -71,7 +80,7 @@ export function ProductsProvider({ children }) {
 
   const value = useMemo(
     () => ({ products, reload, loading, version, signalCatalogUpdated }),
-    [products, loading, version]
+    [products, loading, version],
   );
 
   return (

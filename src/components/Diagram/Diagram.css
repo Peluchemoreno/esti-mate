@@ -121,7 +121,7 @@
 .diagram__grid-settings {
   position: absolute;
   background-color: black;
-  top: 30px;
+  top: 15%;
   left: 5px;
   padding: 10px;
 }
@@ -138,3 +138,195 @@
     height: 100svh;
     width: 100vw;
   }
+  
+  .diagram__toolbar {
+  position: absolute;
+  left: 10px;
+  right: 52px;
+  top: 8px;
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(12, 12, 14, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  scrollbar-width: none;
+}
+
+.diagram__toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.diagram__toolbar-section {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 6px;
+  min-width: max-content;
+}
+
+.diagram__toolbar-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-left: 2px;
+}
+
+.diagram__toolbar-row {
+  display: flex;
+  gap: 6px;
+}
+
+.diagram__tool-button {
+  min-width: 78px;
+  max-width: 132px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.diagram__tool-button_active {
+  background: var(--blue-primary);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.diagram__tool-button_assembly {
+  border-color: rgba(25, 195, 125, 0.45);
+}
+
+.diagram__tool-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.diagram__tool-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media screen and (max-width: 650px) {
+  .diagram__toolbar {
+    left: 8px;
+    right: 46px;
+    top: 8px;
+    padding: 7px;
+    gap: 8px;
+  }
+
+  .diagram__tool-button {
+    min-width: 74px;
+    max-width: 112px;
+    min-height: 36px;
+    font-size: 11px;
+    padding: 7px 9px;
+  }
+}
+
+.diagram__floating-panel {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  z-index: 11;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(12, 12, 14, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
+}
+
+.diagram__free-tools-panel {
+  top: 25% !important;
+  
+}
+
+.diagram__grid-settings {
+  top: 92px;
+}
+
+.diagram__panel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.diagram__panel-label {
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.8;
+}
+
+.diagram__panel-select,
+.diagram__panel-input {
+  min-height: 36px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #171719;
+  color: #fff;
+  padding: 7px 9px;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.diagram__panel-input {
+  width: 90px;
+}
+
+.diagram__color-row {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.diagram__color-button {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.diagram__color-button_active {
+  border: 2px solid #fff;
+}
+
+.diagram__color-button_inactive {
+  border: 1px solid #666;
+}
+
+@media screen and (min-width: 651px) {
+  .diagram__floating-panel {
+    left: 12px;
+    right: auto;
+    max-width: 420px;
+  }
+
+  .diagram__free-tools-panel,
+  .diagram__grid-settings {
+    top: 94px;
+  }
+}

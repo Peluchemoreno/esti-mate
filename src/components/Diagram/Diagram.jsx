@@ -20,6 +20,10 @@ import { OverwriteDiagramModal } from "../OverwriteDiagramModal/OverwriteDiagram
 import { AnnotationModal } from "../AnnotationModal/AnnotationModal";
 import { useProductsCatalog } from "../../contexts/ProductsContext";
 import { useProductsListed, useProductsPricing } from "../../hooks/useProducts";
+import {
+  catalogItemToTool,
+  isCatalogItemDrawable,
+} from "../../utils/catalogToolAdapter";
 
 // ---- fixed palette used by free tools ----
 const COMMON_COLORS = [
@@ -91,29 +95,107 @@ const newId = () =>
 
 const titleCase = (s = "") => s.replace(/\b\w/g, (c) => c.toUpperCase());
 
-function productFromToolName(toolValue, allProducts) {
-  if (!toolValue || !Array.isArray(allProducts)) return null;
-  // your <select> uses product.name as value for priced tools
-  const p = allProducts.find((x) => String(x?.name) === String(toolValue));
-  return p || null;
+function normalizeProductForLine(product) {
+  if (!product) return null;
+
+  const raw = product.raw || product;
+
+  const color =
+    raw?.drawingDefaults?.color ||
+    product?.color ||
+    raw?.visual ||
+    raw?.colorCode ||
+    raw?.color ||
+    raw?.defaultColor ||
+    "#000000";
+
+  const price = Number(
+    raw?.pricing?.unitPrice ??
+      product?.pricing?.unitPrice ??
+      raw?.price ??
+      product?.price ??
+      0,
+  );
+
+  return {
+    ...raw,
+    _id: raw?._id || raw?.id || product?.id,
+    id: raw?._id || raw?.id || product?.id,
+    name: raw?.name || product?.label || product?.value || "Catalog Item",
+    price,
+    color,
+    colorCode: raw?.colorCode || color,
+    visual: raw?.visual || color,
+    drawingDefaults: {
+      ...(raw?.drawingDefaults || {}),
+      color,
+    },
+    pricing: {
+      ...(raw?.pricing || {}),
+      unitPrice: price,
+    },
+    uiBehavior: raw?.uiBehavior || product?.uiBehavior || "draw",
+    toolGroup: raw?.toolGroup || product?.toolGroup || "general",
+    assembly: raw?.assembly ||
+      product?.assembly || { enabled: false, type: "none" },
+    measurementFamily:
+      raw?.measurementFamily || product?.measurementFamily || "line",
+    drawingToolFamily:
+      raw?.drawingToolFamily || product?.drawingToolFamily || "line",
+  };
 }
 
-function applyGutterMetadata(lineDraft, toolValue, allProducts) {
-  // If the current tool is a priced gutter product, stamp metadata onto the line
-  const prod = productFromToolName(toolValue, allProducts);
+function productFromToolName(toolValue, allProducts, activeTool = null) {
+  if (activeTool?.raw || activeTool?.id) {
+    return normalizeProductForLine(activeTool);
+  }
+
+  if (!toolValue || !Array.isArray(allProducts)) return null;
+
+  const p = allProducts.find((x) => String(x?.name) === String(toolValue));
+  return normalizeProductForLine(p);
+}
+
+function applyCatalogToolMetadata(
+  lineDraft,
+  activeTool,
+  toolValue,
+  allProducts,
+) {
+  const prod = productFromToolName(toolValue, allProducts, activeTool);
   if (!prod) return lineDraft;
 
-  const isGutter = /gutter/i.test(String(prod.name || ""));
-  if (!isGutter) return lineDraft;
+  const isGutter =
+    /gutter/i.test(String(prod.name || "")) ||
+    String(prod.category || "").toLowerCase() === "gutters" ||
+    String(prod.toolGroup || "").toLowerCase() === "gutters" ||
+    String(prod.assembly?.type || "")
+      .toLowerCase()
+      .includes("gutter");
 
   return {
     ...lineDraft,
-    isGutter: true,
-    // freeze the product & derived tokens on the line
     currentProduct: prod,
+    productId: prod._id || prod.id || null,
+    color:
+      prod.drawingDefaults?.color || prod.visual || prod.color || "#000000",
+
+    isGutter,
+
+    catalogItemId: prod._id || prod.id || null,
+    catalogSource: "businessCatalog",
+    uiBehavior: prod.uiBehavior || activeTool?.uiBehavior || "draw",
+    toolGroup: prod.toolGroup || activeTool?.toolGroup || "general",
+    assembly: prod.assembly ||
+      activeTool?.assembly || { enabled: false, type: "none" },
+
+    measurementFamily:
+      prod.measurementFamily || activeTool?.measurementFamily || "line",
+    drawingToolFamily:
+      prod.drawingToolFamily || activeTool?.drawingToolFamily || "line",
+
     profileKey: prod.profile || lineDraft.profileKey || "",
     sizeInches: prod.size || lineDraft.sizeInches || "",
-    color: lineDraft.color || prod.color || prod.colorCode || lineDraft.color,
   };
 }
 
@@ -513,6 +595,7 @@ const Diagram = ({
       : listedProducts;
 
   const boxClickRef = useRef({ x: 0, y: 0, index: null });
+  const dragOriginRef = useRef(null);
 
   // Cycle-through selection when clicking stacked elements
   const selectCycleRef = useRef({
@@ -692,6 +775,25 @@ const Diagram = ({
     });
   }, [allProducts]);
 
+  const catalogTools = useMemo(() => {
+    if (!allProducts) return [];
+    let filteredProducts = allProducts
+      .filter(isCatalogItemDrawable)
+      .map((p) => catalogItemToTool(p));
+
+    // console.log(filteredProducts);
+
+    return filteredProducts;
+  }, [allProducts]);
+
+  const drawTools = useMemo(() => {
+    return catalogTools.filter((t) => t.uiBehavior === "draw");
+  }, [catalogTools]);
+
+  const assemblyTools = useMemo(() => {
+    return catalogTools.filter((t) => t.uiBehavior === "assembly");
+  }, [catalogTools]);
+
   const queryClient = useQueryClient();
   const [, force] = useState(0);
   useEffect(() => {
@@ -726,6 +828,8 @@ const Diagram = ({
   useEffect(() => {}, []);
   // canvas + state
   const canvasRef = useRef(null);
+
+  const [activeTool, setActiveTool] = useState(null);
 
   const [tool, setTool] = useState(""); // dropdown selection
   const [isDrawing, setIsDrawing] = useState(false);
@@ -1452,13 +1556,17 @@ const Diagram = ({
 
   // ======= Product helpers =======
   function currentProductFromTool() {
-    return filteredProducts.find((p) => p.name === tool);
+    return productFromToolName(tool, allProducts, activeTool);
   }
 
   function productColor(p) {
-    // prefer explicit color, then visual, then template defaultColor, then black
     return (
-      p?.colorCode ?? p?.visual ?? p?.color ?? p?.defaultColor ?? "#000000"
+      p?.drawingDefaults?.color ??
+      p?.visual ??
+      p?.colorCode ??
+      p?.color ??
+      p?.defaultColor ??
+      "#000000"
     );
   }
 
@@ -1983,10 +2091,10 @@ const Diagram = ({
 
       const stack = selectCycleRef.current.stack;
       if (!stack.length) {
-        // Clear selection if nothing hit
         setLines((prev) => prev.map((l) => ({ ...l, isSelected: false })));
         setSelectedIndex(null);
         setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
+        dragOriginRef.current = null;
         return;
       }
 
@@ -2038,6 +2146,18 @@ const Diagram = ({
           dragMode = "move";
         }
       }
+
+      dragOriginRef.current = {
+        pointerX: x,
+        pointerY: y,
+        index: hitIndex,
+        mode: dragMode,
+        end,
+        line:
+          typeof structuredClone === "function"
+            ? structuredClone(el)
+            : JSON.parse(JSON.stringify(el)),
+      };
 
       setDragging({ mode: dragMode, end, lastX: x, lastY: y });
       return;
@@ -2136,7 +2256,13 @@ const Diagram = ({
       isVertical: false,
       isHorizontal: false,
     };
-    const stamped = applyGutterMetadata(baseDraft, tool, allProducts);
+    const stamped = applyCatalogToolMetadata(
+      baseDraft,
+      activeTool,
+      tool,
+      allProducts,
+    );
+
     setCurrentLine(stamped);
     setIsDrawing(true);
   }
@@ -2149,45 +2275,51 @@ const Diagram = ({
     const sy = snap(y);
 
     // --- SELECTION / MOVEMENT HANDLING ---
-    if (
-      tool === "select" &&
-      dragging.mode !== "none" &&
-      selectedIndex !== null
-    ) {
-      const dx = x - dragging.lastX;
-      const dy = y - dragging.lastY;
+    if (tool === "select" && dragging.mode !== "none") {
+      const origin = dragOriginRef.current;
+
+      if (!origin || origin.index == null) {
+        return;
+      }
+
+      const dragIndex = origin.index;
+
+      const dx = sx - snap(origin.pointerX);
+      const dy = sy - snap(origin.pointerY);
 
       setLines((prev) => {
         const next = [...prev];
-        const el = next[selectedIndex];
-        if (!el) return prev;
+        const original = origin.line;
+        if (!original) return prev;
 
+        const el = { ...original };
+        if (!next[dragIndex]) return prev;
         if (el.isNote) {
-          el.startX += dx;
-          el.startY += dy;
+          el.startX = original.startX + dx;
+          el.startY = original.startY + dy;
           el.endX = el.startX;
           el.endY = el.startY;
         } else if (el.isDownspout) {
           if (dragging.mode === "move-box") {
-            const angle = Math.atan2(y - el.startY, x - el.startX);
+            const angle = Math.atan2(y - original.startY, x - original.startX);
             el.elbowBoxAngle = angle;
             el.elbowBoxRadius =
-              typeof el.elbowBoxRadius === "number"
-                ? el.elbowBoxRadius
+              typeof original.elbowBoxRadius === "number"
+                ? original.elbowBoxRadius
                 : gridSize * 4;
           } else {
-            el.startX += dx;
-            el.startY += dy;
+            el.startX = original.startX + dx;
+            el.startY = original.startY + dy;
             el.endX = el.startX;
             el.endY = el.startY;
           }
         } else if (el.isFreeMark) {
           if (el.kind === "free-line") {
             if (dragging.mode === "move") {
-              el.startX += dx;
-              el.startY += dy;
-              el.endX += dx;
-              el.endY += dy;
+              el.startX = original.startX + dx;
+              el.startY = original.startY + dy;
+              el.endX = original.endX + dx;
+              el.endY = original.endY + dy;
             } else if (dragging.mode === "drag-end") {
               if (dragging.end === "start") {
                 el.startX = sx;
@@ -2198,24 +2330,22 @@ const Diagram = ({
               }
             }
           } else if (el.kind === "free-square") {
-            el.startX += dx;
-            el.startY += dy;
-            el.endX += dx;
-            el.endY += dy;
+            el.startX = original.startX + dx;
+            el.startY = original.startY + dy;
+            el.endX = original.endX + dx;
+            el.endY = original.endY + dy;
           } else if (el.kind === "free-circle") {
-            // ✅ Splash guard movement (circle)
-            el.centerX += dx;
-            el.centerY += dy;
-            // keep legacy startX/startY in sync for hit detection
+            el.centerX = snap(original.centerX + dx);
+            el.centerY = snap(original.centerY + dy);
             el.startX = el.centerX;
             el.startY = el.centerY;
           }
         } else {
           if (dragging.mode === "move") {
-            el.startX += dx;
-            el.startY += dy;
-            el.endX += dx;
-            el.endY += dy;
+            el.startX = original.startX + dx;
+            el.startY = original.startY + dy;
+            el.endX = original.endX + dx;
+            el.endY = original.endY + dy;
           } else if (dragging.mode === "drag-end") {
             if (dragging.end === "start") {
               el.startX = sx;
@@ -2225,8 +2355,14 @@ const Diagram = ({
               el.endY = sy;
             }
           }
+
           updateLineComputedProps(el);
         }
+
+        next[dragIndex] = {
+          ...el,
+          isSelected: true,
+        };
 
         return next;
       });
@@ -2286,6 +2422,7 @@ const Diagram = ({
   }
 
   function handleMouseUp() {
+    dragOriginRef.current = null;
     // open modal if we "clicked" the DS box (not dragged it)
     if (tool === "select" && dragging.mode === "move-box") {
       const { x, y } = boxClickRef.current;
@@ -2431,33 +2568,41 @@ const Diagram = ({
 
       // --- STAMP (conservatively) based on the product currently selected ---
       if (prod) {
-        const isGutterProd = /gutter/i.test(String(prod.name || ""));
+        const isGutterProd =
+          /gutter/i.test(String(prod.name || "")) ||
+          String(prod.category || "").toLowerCase() === "gutters" ||
+          String(prod.toolGroup || "").toLowerCase() === "gutters" ||
+          String(prod.assembly?.type || "")
+            .toLowerCase()
+            .includes("gutter");
 
         if (isGutterProd) {
           committed.isGutter = true;
+
           const px = distancePxOf(committed);
           committed.runFeet = roundToQuarterFeet(
             feetFromPx(px, feetPerSquare, gridSize),
           );
 
-          // Do NOT override if already stamped on mousedown or previously edited
           if (!committed.currentProduct) committed.currentProduct = prod;
           if (!committed.profileKey) committed.profileKey = prod.profile || "";
           if (!committed.sizeInches) committed.sizeInches = prod.size || "";
 
-          // Only paint color if not already set
-          const colorFrom = committed.currentProduct || prod || null;
+          committed.productId =
+            committed.productId || prod._id || prod.id || null;
+          committed.price = Number(prod.price ?? prod.pricing?.unitPrice ?? 0);
           committed.color =
-            productColor(colorFrom) || committed.color || "#000";
+            productColor(committed.currentProduct || prod) || "#000000";
         } else {
-          // Non-gutter priced tool: you may still want to bind the product,
-          // but do not flag as gutter or touch profile/size
           if (!committed.currentProduct) committed.currentProduct = prod;
-          if (!committed.color) committed.color = productColor(prod) || "black";
+
+          committed.productId =
+            committed.productId || prod._id || prod.id || null;
+          committed.price = Number(prod.price ?? prod.pricing?.unitPrice ?? 0);
+          committed.color = productColor(prod) || committed.color || "#000000";
         }
       } else {
-        // No tool product selected; ensure there's at least some color
-        if (!committed.color) committed.color = "black";
+        if (!committed.color) committed.color = "#000000";
       }
 
       // --- compute any derived props that might rely on meta (runFeet, flags, etc.) ---
@@ -2974,7 +3119,6 @@ const Diagram = ({
     });
 
     const analysis = analyzeJoints(lines);
-    console.log("analysis: ", analysis);
     const endcapMiterData = {
       endCapsByProduct: analysis.endCapsByProduct,
       mitersByProduct: analysis.mitersByProduct,
@@ -3673,7 +3817,7 @@ const Diagram = ({
           onClick={() => {}}
         />
 
-        <select
+        {/*  <select
           value={tool}
           onChange={handleToolSelectChange}
           className="diagram__select-product"
@@ -3694,39 +3838,195 @@ const Diagram = ({
           <option value="note">Notation</option>
           <option value="splashGuard">Splash Guard / Valley Shield</option>
           <option value="freeLine">Free Line</option>
-        </select>
+        </select */}
+        {/* <div
+          style={{
+            display: "flex",
+            overflowX: "auto",
+            gap: "8px",
+            padding: "8px",
+            borderBottom: "1px solid #ddd",
+            background: "#fff",
+          }}
+        >
+          {drawTools.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                setTool(item.value);
+                setActiveTool(item);
+              }}
+              style={{
+                minWidth: "90px",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                background: tool === item.value ? "#1976d2" : "#f7f7f7",
+                color: tool === item.value ? "white" : "black",
+                fontSize: "14px",
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => {
+              setTool("downspout");
+              setActiveTool(null);
+            }}
+            style={{
+              minWidth: "90px",
+              padding: "10px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              background: tool === "downspout" ? "#1976d2" : "#f7f7f7",
+              color: tool === "downspout" ? "white" : "black",
+              fontSize: "14px",
+            }}
+          >
+            Downspout
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTool("select");
+              setActiveTool(null);
+            }}
+            style={{
+              minWidth: "90px",
+              padding: "10px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              background: tool === "select" ? "#1976d2" : "#f7f7f7",
+              color: tool === "select" ? "white" : "black",
+              fontSize: "14px",
+            }}
+          >
+            Select
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTool("note");
+              setActiveTool(null);
+            }}
+            style={{
+              minWidth: "90px",
+              padding: "10px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              background: tool === "note" ? "#1976d2" : "#f7f7f7",
+              color: tool === "note" ? "white" : "black",
+              fontSize: "14px",
+            }}
+          >
+            Note
+          </button>
+        </div> */}
+        <div className="diagram__toolbar">
+          <div className="diagram__toolbar-section">
+            <div className="diagram__toolbar-label">Actions</div>
+
+            <div className="diagram__toolbar-row">
+              {[
+                { value: "select", label: "Select" },
+                { value: "downspout", label: "Downspout" },
+                { value: "note", label: "Note" },
+                { value: "freeLine", label: "Free Draw" },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => {
+                    setTool(item.value);
+                    setActiveTool(null);
+                  }}
+                  className={
+                    tool === item.value
+                      ? "diagram__tool-button diagram__tool-button_active"
+                      : "diagram__tool-button"
+                  }
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {drawTools.length > 0 && (
+            <div className="diagram__toolbar-section">
+              <div className="diagram__toolbar-label">Draw Items</div>
+
+              <div className="diagram__toolbar-row">
+                {drawTools.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setTool(item.value);
+                      setActiveTool(item);
+                    }}
+                    className={
+                      tool === item.value
+                        ? "diagram__tool-button diagram__tool-button_active"
+                        : "diagram__tool-button"
+                    }
+                  >
+                    <span
+                      className="diagram__tool-swatch"
+                      style={{ backgroundColor: item.color || "#000" }}
+                    />
+                    <span className="diagram__tool-text">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {assemblyTools.length > 0 && (
+            <div className="diagram__toolbar-section">
+              <div className="diagram__toolbar-label">Assemblies</div>
+
+              <div className="diagram__toolbar-row">
+                {assemblyTools.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setTool(item.value);
+                      setActiveTool(item);
+                    }}
+                    className={
+                      tool === item.value
+                        ? "diagram__tool-button diagram__tool-button_active diagram__tool-button_assembly"
+                        : "diagram__tool-button diagram__tool-button_assembly"
+                    }
+                  >
+                    <span
+                      className="diagram__tool-swatch"
+                      style={{ backgroundColor: item.color || "#000" }}
+                    />
+                    <span className="diagram__tool-text">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {(tool === "freeLine" ||
           (selectedIndex !== null && lines[selectedIndex]?.isFreeMark)) && (
-          <div
-            style={{
-              position: "absolute",
-              top: 64,
-              left: 12,
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "rgba(18,18,20,0.95)", // dark background
-              color: "#eaeaea",
-              boxShadow: "0 10px 20px rgba(0,0,0,0.35)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              alignItems: "center",
-              zIndex: 10000,
-              border: "1px solid rgba(255,255,255,0.07)",
-            }}
-          >
+          <div className="diagram__floating-panel diagram__free-tools-panel">
             {/* Shape (with filled/hollow choices baked in) */}
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 12,
-              }}
-            >
+            <label className="diagram__floating-panel-row">
               <span>Shape</span>
               <select
+                className="diagram__panel-select"
                 value={(() => {
                   const src =
                     selectedIndex !== null && lines[selectedIndex]?.isFreeMark
@@ -3822,6 +4122,7 @@ const Diagram = ({
                       ? "dotted"
                       : "solid"
                 }
+                className="diagram__panel-select"
                 onChange={(e) => {
                   const val = e.target.value === "dotted";
                   if (
@@ -3856,7 +4157,7 @@ const Diagram = ({
             {/* Color swatches */}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 12 }}>Color</span>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div lassName="diagram__color-row">
                 {COMMON_COLORS.map((c) => {
                   const selectedColor =
                     selectedIndex !== null && lines[selectedIndex]?.isFreeMark
@@ -3905,7 +4206,7 @@ const Diagram = ({
         )}
 
         {(lines?.length ?? 0) === 0 && (
-          <div className="diagram__grid-settings">
+          <div className="diagram__floating-panel diagram__grid-settings">
             <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span>Grid square size (px):</span>
               <input
@@ -3918,6 +4219,7 @@ const Diagram = ({
                   setGridSize(v);
                 }}
                 style={{ width: 90, padding: "4px 6px", color: "white" }}
+                className="diagram__panel-input"
               />
             </label>
 
@@ -3933,6 +4235,7 @@ const Diagram = ({
                   setFeetPerSquare(v);
                 }}
                 style={{ width: 90, padding: "4px 6px", color: "white" }}
+                className="diagram__panel-input"
               />
             </label>
           </div>

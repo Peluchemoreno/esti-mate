@@ -653,9 +653,10 @@ const styles = StyleSheet.create({
   cell: { fontSize: 10 },
 
   amountDueWrap: {
-    marginTop: 16,
+    marginTop: "auto",
     flexDirection: "row",
     justifyContent: "flex-end",
+    marginBottom: 20,
   },
   amountBox: {
     borderWidth: 1,
@@ -1290,6 +1291,7 @@ export default function EstimatePDF({
       uniq.length,
       uniq,
     );
+    console.log(project);
   }, [selectedDiagram]);
   // ✅ Works in Vite, still supports older env style as fallback
   const resolvedApiBaseUrl =

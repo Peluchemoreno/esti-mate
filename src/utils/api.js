@@ -2,6 +2,64 @@ import { responsiveFontSizes } from "@mui/material";
 import { processServerResponse } from "./constants";
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+export function getCatalogItems(token, filters = {}) {
+  const params = new URLSearchParams();
+
+  if (filters.trade) params.set("trade", filters.trade);
+  if (filters.category) params.set("category", filters.category);
+  if (filters.measurementFamily) {
+    params.set("measurementFamily", filters.measurementFamily);
+  }
+  if (filters.drawingToolFamily) {
+    params.set("drawingToolFamily", filters.drawingToolFamily);
+  }
+  if (filters.isActive === true) params.set("isActive", "true");
+  if (filters.isActive === false) params.set("isActive", "false");
+
+  const qs = params.toString();
+  const url = BASE_URL + `dashboard/catalog${qs ? `?${qs}` : ""}`;
+
+  return fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+  }).then(processServerResponse);
+}
+
+export function createCatalogItem(itemData, token) {
+  return fetch(BASE_URL + "dashboard/catalog", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(itemData),
+  }).then(processServerResponse);
+}
+
+export function updateCatalogItem(itemId, itemData, token) {
+  return fetch(BASE_URL + `dashboard/catalog/${itemId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(itemData),
+  }).then(processServerResponse);
+}
+
+export function deleteCatalogItem(itemId, token) {
+  return fetch(BASE_URL + `dashboard/catalog/${itemId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+  }).then(processServerResponse);
+}
+
 export function deleteProject(projectId, token) {
   return fetch(BASE_URL + `dashboard/projects/${projectId}`, {
     method: "DELETE",

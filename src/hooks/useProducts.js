@@ -1,6 +1,6 @@
 // src/hooks/useProducts.js
 import { useQuery } from "@tanstack/react-query";
-import { getProducts } from "../utils/api";
+import { getProducts, getCatalogItems } from "../utils/api";
 import { useProductsCatalog } from "../contexts/ProductsContext";
 
 // Shared token getter
@@ -25,7 +25,14 @@ export function useProductsListed() {
     queryKey: ["products", "listed", version],
     queryFn: async () => {
       if (!token) return [];
-      return await getProducts(token, "ui"); // default (listed-only)
+      // here I'm manually combining the catalog items with the products list to show the catalog items in the UI immediately, without waiting for the products endpoint to be updated with the new items. This is a temporary measure until we have a more robust solution for syncing the catalog and products..
+      const catalogItems = await getCatalogItems(token);
+      const list = await getProducts(token, "listed");
+
+      return [
+        ...(Array.isArray(list) ? list : []),
+        ...(Array.isArray(catalogItems) ? catalogItems : []),
+      ];
     },
     enabled: !!token,
     refetchOnMount: "always",
@@ -48,7 +55,14 @@ export function useProductsPricing() {
     queryKey: ["products", "pricing", version],
     queryFn: async () => {
       if (!token) return [];
-      return await getProducts(token, "pricing");
+
+      const legacyProducts = await getProducts(token, "pricing");
+      const catalogItems = await getCatalogItems(token);
+
+      return [
+        ...(Array.isArray(legacyProducts) ? legacyProducts : []),
+        ...(Array.isArray(catalogItems) ? catalogItems : []),
+      ];
     },
     enabled: !!token,
     refetchOnMount: "always",

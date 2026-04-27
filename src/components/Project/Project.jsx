@@ -324,6 +324,7 @@ export default function Project({
       setMobileDiagramActive(true);
     }
     setActiveModal("diagram");
+    console.log("OPENING DIAGRAM", activeModal);
   }
 
   function editDiagram(diagram) {

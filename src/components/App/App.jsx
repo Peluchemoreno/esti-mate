@@ -32,6 +32,7 @@ import SignupContinued from "../SignupContinued/SignupContinued";
 import ChangePassword from "../ChangePassword/ChangePassword";
 import Customers from "../Customers/Customers";
 import AdminAccountState from "../AdminAccountState/AdminAccountState";
+import CatalogManager from "../CatalogManager/CatalogManager";
 
 import {
   updateDiagram,
@@ -146,7 +147,6 @@ function App() {
 
         setCurrentUser(user);
         localStorage.setItem("currentUserId", user._id);
-        console.log("heres the user: ", user);
 
         if (user.stripeSubscriptionId && user.stripeCustomerId) {
           navigate("/dashboard/projects");
@@ -312,6 +312,7 @@ function App() {
                     />
                   }
                 />
+                <Route path="catalog" element={<CatalogManager />} />
                 <Route
                   path="settings"
                   element={

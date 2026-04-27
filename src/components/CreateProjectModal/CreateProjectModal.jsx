@@ -257,6 +257,9 @@ export default function CreateProjectModal({
                       setCustomerResults([]);
                       setBillingName(c.name || "");
                       setSiteName(c.name || "");
+                      setBillingPrimaryPhone(c.phone || "");
+                      setBillingEmail(c.email || "");
+                      console.log("selected customer", c);
                     }}
                   >
                     <div className="cp__suggestion-name">{c.name}</div>

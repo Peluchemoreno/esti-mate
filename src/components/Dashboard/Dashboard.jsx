@@ -65,6 +65,9 @@ export default function Dashboard({ handleLogOut }) {
           <Link to="products" className="dashboard__link">
             Products
           </Link>
+          {/* <Link to="catalog" className="dashboard__link">
+            Catalog
+          </Link> */}
           <Link to="customers" className="dashboard__link">
             Customers
           </Link>
