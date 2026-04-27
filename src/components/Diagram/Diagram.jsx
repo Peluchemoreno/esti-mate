@@ -776,16 +776,23 @@ const Diagram = ({
   }, [allProducts]);
 
   const catalogTools = useMemo(() => {
-    if (!allProducts) return [];
-    let filteredProducts = allProducts
-      .filter(isCatalogItemDrawable)
+    const sourceProducts =
+      listedProducts && listedProducts.length
+        ? listedProducts
+        : filteredProducts;
+
+    return (sourceProducts || [])
+      .filter((p) => {
+        const name = String(p?.name || "").toLowerCase();
+        const type = String(p?.type || p?.category || "").toLowerCase();
+
+        // legacy prod behavior: only gutter run products belong in toolbar
+        return (
+          p?.listed !== false && (type === "gutter" || name.includes("gutter"))
+        );
+      })
       .map((p) => catalogItemToTool(p));
-
-    // console.log(filteredProducts);
-
-    return filteredProducts;
-  }, [allProducts]);
-
+  }, [listedProducts, filteredProducts]);
   const drawTools = useMemo(() => {
     return catalogTools.filter((t) => t.uiBehavior === "draw");
   }, [catalogTools]);
