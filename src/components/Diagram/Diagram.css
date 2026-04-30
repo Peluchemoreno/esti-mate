@@ -1,36 +1,30 @@
 .diagram {
-  /* display: none; */
   visibility: hidden;
   opacity: 0;
-  pointer-events: none; /* ✅ key: hidden modal can't steal touch */
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
+  pointer-events: none;
+   position: fixed;
+   inset: 0; 
+   width: 100vw;
+   height: var(--diagram-vh, 100dvh);
   background-color: black;
   box-sizing: border-box;
   transition: opacity .2s ease, visibility .2s ease;
 }
 
 .diagram__canvas {
+  display: block;
   box-sizing: border-box;
-  width: 100%;
+  width: 100vw;
+  height: var(--diagram-vh, 100dvh);
   background-color: #dfdfdf;
-  height: 100dvh;
   touch-action: none;
   -ms-touch-action: none;
 }
 
 .diagram_visible {
-  /* display: block; */
   visibility: visible;
   opacity: 1;
-  transition: opacity .2s ease, visibility .2s ease;
-  pointer-events: auto; /* ✅ key: visible modal can receive touch */
-  position: fixed;
-  height: 100dvh;
-  overflow: hidden;
+  pointer-events: auto;
   z-index: 999;
 }
 
@@ -102,7 +96,6 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 100svh;
   width: 100vw;
 }
 
@@ -130,12 +123,10 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 100svh;
     width: 100vw;
   }
 
   .diagram__canvas {
-    height: 100svh;
     width: 100vw;
   }
   

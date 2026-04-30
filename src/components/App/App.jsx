@@ -229,6 +229,19 @@ function App() {
   }
 
   function closeModal() {
+    const isDiagramFlow = [
+      "diagram",
+      "downspout",
+      "selectedLine",
+      "confirmDiagramOverwrite",
+      "note",
+    ].includes(activeModal);
+    if (isDiagramFlow) {
+      setSelectedDiagram({});
+      setCurrentDiagram({});
+      setOriginalDiagram({});
+      setMobileDiagramActive(false);
+    }
     // Only nuke selection when the diagram modal is closing
     if (activeModal === "confirmDiagramOverwrite") {
       setSelectedDiagram({}); // <-- clear Project page selection

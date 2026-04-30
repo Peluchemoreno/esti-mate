@@ -732,27 +732,57 @@ const Diagram = ({
     }
   }, [activeModal]);
 
-  // Observe container size + window zoom
   useEffect(() => {
     if (activeModal !== "diagram") return;
+
+    function setDiagramViewportHeight() {
+      const height = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--diagram-vh", `${height}px`);
+    }
+
+    setDiagramViewportHeight();
+
+    window.visualViewport?.addEventListener("resize", setDiagramViewportHeight);
+    window.visualViewport?.addEventListener("scroll", setDiagramViewportHeight);
+    window.addEventListener("resize", setDiagramViewportHeight);
+
+    return () => {
+      window.visualViewport?.removeEventListener(
+        "resize",
+        setDiagramViewportHeight,
+      );
+      window.visualViewport?.removeEventListener(
+        "scroll",
+        setDiagramViewportHeight,
+      );
+      window.removeEventListener("resize", setDiagramViewportHeight);
+      document.documentElement.style.removeProperty("--diagram-vh");
+    };
+  }, [activeModal]);
+
+  useEffect(() => {
+    if (activeModal !== "diagram") return;
+
     const el = canvasRef.current?.parentElement;
     if (!el) return;
 
-    const ro = new ResizeObserver(() => {
+    const resizeAndDraw = () => {
       setCanvasSize();
-      drawScene();
-    });
+      requestAnimationFrame(drawScene);
+    };
+
+    const ro = new ResizeObserver(resizeAndDraw);
     ro.observe(el);
 
-    const onWin = () => {
-      setCanvasSize();
-      drawScene();
-    };
-    window.addEventListener("resize", onWin);
+    window.addEventListener("resize", resizeAndDraw);
+    window.visualViewport?.addEventListener("resize", resizeAndDraw);
+
+    resizeAndDraw();
 
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", onWin);
+      window.removeEventListener("resize", resizeAndDraw);
+      window.visualViewport?.removeEventListener("resize", resizeAndDraw);
     };
   }, [activeModal]);
 
@@ -4324,8 +4354,8 @@ const Diagram = ({
         <canvas
           ref={canvasRef}
           className="diagram__canvas"
-          width={window.innerWidth}
-          height={window.innerHeight}
+          /*  width={window.innerWidth}
+          height={window.innerHeight} */
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
