@@ -567,7 +567,7 @@ const Diagram = ({
 }) => {
   // ------- Constants for UX fidelity on phones -------
   const MIN_HANDLE_PX = 6; // CSS pixels minimum for handles
-  const PADDING_PX = 24; // auto-fit padding
+  const PADDING_PX = 70; // auto-fit padding
   // Products (context first, then API)
   // ✅ Call hooks once at top-level, never conditionally
   const { data: pricingProducts = [], isLoading, error } = useProductsPricing(); // ALL items
@@ -1094,6 +1094,8 @@ const Diagram = ({
     const metaIn = selectedDiagram?.meta || {};
     const savedW = Number(metaIn.canvasW) || curW;
     const savedH = Number(metaIn.canvasH) || curH;
+    const alreadyFittedToThisCanvas =
+      metaIn.fitCanvasW === curW && metaIn.fitCanvasH === curH;
     const savedGrid = Number(metaIn.gridSize) || gridSize;
     const savedFeet = Number(metaIn.feetPerSquare) || feetPerSquare;
     // keep state if meta provided, else retain current state
@@ -1168,7 +1170,14 @@ const Diagram = ({
       const overTop = bbox.top < -0.1 * curH;
       const overRight = bbox.right > 1.1 * curW;
       const overBottom = bbox.bottom > 1.1 * curH;
-      const exceeds = overLeft || overTop || overRight || overBottom;
+      const canvasChangedALot =
+        Math.abs(curW - savedW) / savedW > 0.15 ||
+        Math.abs(curH - savedH) / savedH > 0.15;
+
+      const exceeds =
+        !alreadyFittedToThisCanvas &&
+        (overLeft || overTop || overRight || overBottom || canvasChangedALot);
+
       const bw = Math.max(1, bbox.width);
       const bh = Math.max(1, bbox.height);
       const k = Math.min(
@@ -1201,7 +1210,7 @@ const Diagram = ({
           return copy;
         });
         // VERY IMPORTANT: scale gridSize by the same k to preserve px-per-foot
-        setGridSize((g) => Math.max(1, g * k));
+        // setGridSize((g) => Math.max(1, g * k));
       }
     }
 
@@ -1217,18 +1226,6 @@ const Diagram = ({
           copy.totalFeet = isNaN(tf) ? 0 : tf;
           // Keep measurement equal to totalFeet for DS so UI that reads `measurement` still works
           copy.measurement = copy.totalFeet;
-        } else if (copy.isGutter || copy.currentProduct) {
-          // Preserve saved measured footage across desktop/mobile opens.
-          // Do NOT drop measurement here, because scaled coordinates can cause
-          // measurement drift when reopening on different screen sizes.
-          const savedFeetValue = Number(
-            copy.runFeet ?? copy.measurement ?? l.runFeet ?? l.measurement ?? 0,
-          );
-
-          if (Number.isFinite(savedFeetValue) && savedFeetValue > 0) {
-            copy.runFeet = savedFeetValue;
-            copy.measurement = savedFeetValue;
-          }
         } else {
           copy.measurement = undefined;
         }
@@ -1441,6 +1438,9 @@ const Diagram = ({
     line.measurement = convertToFeet(
       calculateDistance([line.startX, line.startY], [line.endX, line.endY]),
     );
+    if (line.isGutter || line.currentProduct) {
+      line.runFeet = line.measurement;
+    }
     if (isLineParallelToSide(line.startX, line.startY, line.endX, line.endY)) {
       line.isVertical = true;
       line.isHorizontal = false;
@@ -1842,11 +1842,9 @@ const Diagram = ({
     // Derive fresh label position & feet from snapped endpoints
     const midX = (x1 + x2) / 2;
     const midY = (y1 + y2) / 2;
-    const storedFeet = Number(line.runFeet ?? line.measurement);
-    const feetNow =
-      Number.isFinite(storedFeet) && storedFeet > 0
-        ? storedFeet
-        : convertToFeet(calculateDistance([x1, y1], [x2, y2]));
+
+    const feetNow = convertToFeet(calculateDistance([x1, y1], [x2, y2]));
+
     placeMeasurement(
       {
         ...line,
@@ -2832,20 +2830,27 @@ const Diagram = ({
 
   // --- Touch → Mouse delegators so mobile can draw & commit ---
   function handleTouchStart(e) {
-    e.preventDefault(); // keep the page from scrolling
+    // e.preventDefault(); // keep the page from scrolling
     handleMouseDown(e); // your getCanvasCoords already reads touches
   }
   function handleTouchMove(e) {
-    e.preventDefault();
+    // e.preventDefault();
     handleMouseMove(e);
   }
   function handleTouchEnd(e) {
-    e.preventDefault();
+    // e.preventDefault();
     handleMouseUp(e);
   }
   function hardUnlockScroll() {
     document.body.style.overflow = "";
     document.documentElement.style.overflow = "";
+  }
+
+  function unlockPageScroll() {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+    document.body.style.touchAction = "";
+    document.documentElement.style.touchAction = "";
   }
 
   // ======= Save diagram =======
@@ -3590,6 +3595,8 @@ const Diagram = ({
     const metaViewport = {
       canvasW: Math.round(rect.width),
       canvasH: Math.round(rect.height),
+      fitCanvasW: Math.round(rect.width),
+      fitCanvasH: Math.round(rect.height),
       gridSize,
       feetPerSquare,
     };
@@ -3656,6 +3663,31 @@ const Diagram = ({
     // Convenient data-url form for <img src="..."> when you want it
     const svgDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
+    const linesForSave = lines.map((line) => {
+      if (line.isNote || line.isFreeMark) return line;
+
+      if (line.isDownspout) {
+        return {
+          ...line,
+          measurement: Number(line.totalFeet ?? line.measurement ?? 0),
+          totalFeet: Number(line.totalFeet ?? line.measurement ?? 0),
+        };
+      }
+
+      if (line.currentProduct || line.isGutter) {
+        const measurement = convertToFeet(
+          calculateDistance([line.startX, line.startY], [line.endX, line.endY]),
+        );
+
+        return {
+          ...line,
+          measurement,
+          runFeet: measurement,
+        };
+      }
+
+      return line;
+    });
     const data = {
       lines: [...lines],
       imageData: thumbnailDataUrl,
@@ -3781,6 +3813,8 @@ const Diagram = ({
             // hard unlock scroll (in case parent modal state is out of sync)
             document.body.style.overflow = "";
             document.documentElement.style.overflow = "";
+            unlockPageScroll();
+            hardUnlockScroll();
             closeModal();
             setSelectedDiagram({});
             setLines([]);
@@ -3963,7 +3997,18 @@ const Diagram = ({
             Note
           </button>
         </div> */}
-        <div className="diagram__toolbar">
+        <div
+          className="diagram__toolbar"
+          style={{
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            touchAction: "pan-x",
+            overscrollBehaviorX: "contain",
+          }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <div className="diagram__toolbar-section">
             <div className="diagram__toolbar-label">Actions</div>
 
