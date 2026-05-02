@@ -755,10 +755,11 @@ export default function Project({
             {diagramData.length > 0 ? (
               diagramData.map((diagram) => {
                 // Prefer SVG (reliable across mobile/desktop). Fallback to raster thumbnail for legacy diagrams.
-                const previewUrl = diagram?.svg
-                  ? `data:image/svg+xml;utf8,${encodeURIComponent(diagram.svg)}`
-                  : diagram?.imageData;
-
+                const previewUrl = diagram?.imageData
+                  ? diagram.imageData
+                  : diagram?.svg
+                    ? `data:image/svg+xml;utf8,${encodeURIComponent(diagram.svg)}`
+                    : null;
                 return (
                   <div className="project__drawing-container" key={diagram._id}>
                     <div

@@ -1173,13 +1173,21 @@ const Diagram = ({
       ...scaleLine(l),
     }));
 
-    // Keep the measuring scale exactly as saved.
-    // Do NOT multiply savedGrid by screen/canvas scaling.
-    // Canvas coordinates may scale visually, but feet-per-square should stay stable.
+    // If coordinates are scaled to fit this screen,
+    // the visual grid must scale by the same average factor.
+    // Otherwise measurements explode on bigger screens.
     if (metaIn && (metaIn.gridSize || metaIn.feetPerSquare)) {
-      if (savedGrid !== gridSize) setGridSize(savedGrid);
-      if (savedFeet !== feetPerSquare) setFeetPerSquare(savedFeet);
+      const desiredGrid = Math.max(1, savedGrid * kAvg);
+
+      if (Math.abs(desiredGrid - gridSize) > 0.1) {
+        setGridSize(desiredGrid);
+      }
+
+      if (savedFeet !== feetPerSquare) {
+        setFeetPerSquare(savedFeet);
+      }
     }
+
     // ----- Auto-fit once if content exceeds canvas by >10% -----
     const bbox = contentBBox(withIds);
     if (!bbox.empty) {
