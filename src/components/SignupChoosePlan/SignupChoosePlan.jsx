@@ -19,11 +19,22 @@ export default function SignupPlans() {
       <h2>Choose Your Plan</h2>
       <div className="plans">
         <div className="plan" onClick={() => choose("basic")}>
-          <h3>Basic Estimate Package</h3>
+          <h3>Field Estimator Plan</h3>
           <p>14-day free trial, then $79.99/month</p>
+          <small>
+            Built for gutter contractors, sales reps, and estimators.
+          </small>
+
           <ul>
-            <li>Basic features</li>
-            <li>Unlimited projects</li>
+            <li>Unlimited gutter estimates</li>
+            <li>Jobsite diagram tool for gutters and downspouts</li>
+            <li>Automatic footage and accessory calculations</li>
+            <li>Miters, end caps, elbows, and offsets included</li>
+            <li>Custom product pricing and colors</li>
+            <li>Upload job photos and notes</li>
+            <li>Professional PDF estimates for customers</li>
+            <li>Save customers, projects, and past estimates</li>
+            <li>Works on phone, tablet, and desktop</li>
             <li>Email support</li>
           </ul>
         </div>
