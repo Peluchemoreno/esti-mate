@@ -5,6 +5,7 @@ import logo from "../../assets/estimate-nobackground-blue.png";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import dropdown from "../../assets/icons/drop-down.svg";
 import hamburgerIcon from "../../assets/icons/hamburgermenu.svg";
+import OnboardingChecklist from "../../onboarding/OnboardingChecklist";
 
 export default function Dashboard({ handleLogOut }) {
   const currentUser = useContext(CurrentUserContext);
@@ -185,6 +186,7 @@ export default function Dashboard({ handleLogOut }) {
         </nav>
       )}
 
+      <OnboardingChecklist />
       <Outlet />
     </div>
   );

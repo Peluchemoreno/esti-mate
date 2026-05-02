@@ -55,6 +55,7 @@ export default function Projects({
       <header className="projects__header header">
         <button
           onClick={openCreateProjectModal}
+          data-onboarding="create-project-button"
           className={
             payWallBlocked
               ? "header__create-project-button--disabled"

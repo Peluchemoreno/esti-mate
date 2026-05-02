@@ -41,6 +41,9 @@ import {
 } from "../../utils/api";
 import SignupChoosePlan from "../SignupChoosePlan/SignupChoosePlan";
 import { sentrySetUser } from "../../sentry";
+import { OnboardingProvider } from "../../onboarding/OnboardingContext";
+import { useOnboarding } from "../../onboarding/OnboardingContext";
+import { trackOnboardingEvent } from "../../utils/auth";
 
 function App() {
   const [tempUserData, setTempUserData] = useState({});
@@ -223,32 +226,49 @@ function App() {
 
   function handleCreateProjectSubmit(projectData) {
     const token = localStorage.getItem("jwt");
-    createProject(projectData, token).then((data) => {
+
+    createProject(projectData, token).then(async (data) => {
       setProjects([data.data, ...projects]);
+
+      try {
+        const tracked = await trackOnboardingEvent(
+          "project_created",
+          {
+            projectId: data?.data?._id || null,
+            projectName: data?.data?.projectName || null,
+          },
+          token,
+        );
+
+        if (tracked?.onboarding) {
+          setCurrentUser((prev) => ({
+            ...(prev || {}),
+            onboarding: tracked.onboarding,
+          }));
+        }
+      } catch (err) {
+        console.warn("Failed to track project_created:", err);
+      }
     });
   }
 
   function closeModal() {
-    const isDiagramFlow = [
-      "diagram",
-      "downspout",
-      "selectedLine",
-      "confirmDiagramOverwrite",
-      "note",
-    ].includes(activeModal);
-    if (isDiagramFlow) {
+    const isFullDiagramClose = activeModal === "diagram";
+
+    if (isFullDiagramClose) {
       setSelectedDiagram({});
       setCurrentDiagram({});
       setOriginalDiagram({});
       setMobileDiagramActive(false);
     }
-    // Only nuke selection when the diagram modal is closing
+
     if (activeModal === "confirmDiagramOverwrite") {
-      setSelectedDiagram({}); // <-- clear Project page selection
-      setCurrentDiagram({}); // <-- clear editor diagram
-      setOriginalDiagram({}); // optional: keeps your diff/overwrite logic clean
-      setMobileDiagramActive(false); // if you use the mobile editor
+      setSelectedDiagram({});
+      setCurrentDiagram({});
+      setOriginalDiagram({});
+      setMobileDiagramActive(false);
     }
+
     setActiveModal("");
   }
 
@@ -268,140 +288,163 @@ function App() {
 
   return (
     <CurrentUserContext.Provider value={currentUser}>
-      <ProductsProvider>
-        <>
-          <div className="page">
-            <Routes>
-              <Route path="*" element={<PageNotFound />} />
-              <Route path="/admin" element={<AdminAccountState />} />
-              <Route path="/" element={<LandingPage />} />
-              <Route
-                path="/dashboard"
-                element={<Dashboard handleLogOut={handleLogOut} />}
-              >
-                <Route path="customers" element={<Customers />} />
+      <OnboardingProvider
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+      >
+        <ProductsProvider>
+          <>
+            <div className="page">
+              <Routes>
+                <Route path="*" element={<PageNotFound />} />
+                <Route path="/admin" element={<AdminAccountState />} />
+                <Route path="/" element={<LandingPage />} />
                 <Route
-                  path="projects"
-                  element={
-                    <Projects
-                      closeModal={closeModal}
-                      activeModal={activeModal}
-                      setActiveModal={setActiveModal}
-                      handleCreateProjectSubmit={handleCreateProjectSubmit}
-                      projects={projects}
-                      setProjects={setProjects}
-                    />
-                  }
-                />
-                <Route
-                  path="projects/:projectId"
-                  element={
-                    <Project
-                      activeModal={activeModal}
-                      setActiveModal={setActiveModal}
-                      projects={projects}
-                      setMobileDiagramActive={setMobileDiagramActive}
-                      isMobile={isMobile}
-                      setCurrentProjectId={setCurrentProjectId}
-                      diagrams={diagrams} // Pass diagrams state as a prop
-                      setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
-                      handleEditDiagram={handleEditDiagram}
-                      closeModal={closeModal}
-                      currentDiagram={currentDiagram}
-                      currentUser={currentUser}
-                      setSelectedDiagram={setSelectedDiagram}
-                      selectedDiagram={selectedDiagram}
-                    />
-                  }
-                />
+                  path="/dashboard"
+                  element={<Dashboard handleLogOut={handleLogOut} />}
+                >
+                  <Route path="customers" element={<Customers />} />
+                  <Route
+                    path="projects"
+                    element={
+                      <Projects
+                        closeModal={closeModal}
+                        activeModal={activeModal}
+                        setActiveModal={setActiveModal}
+                        handleCreateProjectSubmit={handleCreateProjectSubmit}
+                        projects={projects}
+                        setProjects={setProjects}
+                      />
+                    }
+                  />
+                  <Route
+                    path="projects/:projectId"
+                    element={
+                      <Project
+                        activeModal={activeModal}
+                        setActiveModal={setActiveModal}
+                        projects={projects}
+                        setMobileDiagramActive={setMobileDiagramActive}
+                        isMobile={isMobile}
+                        setCurrentProjectId={setCurrentProjectId}
+                        diagrams={diagrams} // Pass diagrams state as a prop
+                        setDiagrams={setDiagrams} // Pass setDiagrams to allow updates
+                        handleEditDiagram={handleEditDiagram}
+                        closeModal={closeModal}
+                        currentDiagram={currentDiagram}
+                        currentUser={currentUser}
+                        setSelectedDiagram={setSelectedDiagram}
+                        selectedDiagram={selectedDiagram}
+                      />
+                    }
+                  />
 
+                  <Route
+                    path="products"
+                    element={
+                      <Products
+                        activeModal={activeModal}
+                        setActiveModal={setActiveModal}
+                        closeModal={closeModal}
+                      />
+                    }
+                  />
+                  <Route path="catalog" element={<CatalogManager />} />
+                  <Route
+                    path="settings"
+                    element={
+                      <Settings
+                        currentUser={currentUser}
+                        setCurrentUser={setCurrentUser}
+                      />
+                    }
+                  />
+                </Route>
                 <Route
-                  path="products"
+                  path="/signin"
                   element={
-                    <Products
-                      activeModal={activeModal}
-                      setActiveModal={setActiveModal}
-                      closeModal={closeModal}
+                    <Signin
+                      handleLogin={handleLogin}
+                      isLoading={isLoading}
+                      isSignInErrorVisible={isSignInErrorVisible}
+                      setIsSignInErrorVisible={setIsSignInErrorVisible}
                     />
                   }
                 />
-                <Route path="catalog" element={<CatalogManager />} />
                 <Route
-                  path="settings"
+                  path="/signup"
+                  element={<Signup handleSignupContinue={continueSignup} />}
+                />
+                <Route
+                  path="/change-password"
                   element={
-                    <Settings
-                      currentUser={currentUser}
+                    <ChangePassword
                       setCurrentUser={setCurrentUser}
+                      setLoggedIn={setLoggedIn}
                     />
                   }
                 />
-              </Route>
-              <Route
-                path="/signin"
-                element={
-                  <Signin
-                    handleLogin={handleLogin}
-                    isLoading={isLoading}
-                    isSignInErrorVisible={isSignInErrorVisible}
-                    setIsSignInErrorVisible={setIsSignInErrorVisible}
-                  />
-                }
-              />
-              <Route
-                path="/signup"
-                element={<Signup handleSignupContinue={continueSignup} />}
-              />
-              <Route
-                path="/change-password"
-                element={
-                  <ChangePassword
-                    setCurrentUser={setCurrentUser}
-                    setLoggedIn={setLoggedIn}
-                  />
-                }
-              />
 
-              <Route
-                path="/signup/cont"
-                element={
-                  <SignupContinued
-                    userData={userData}
-                    setUserData={setUserData}
-                    handleLogin={handleLogin}
-                    handleSignUp={handleSignUp}
-                    setTempUserData={setTempUserData}
-                    setTempLogo={setTempLogo}
-                    isLoading={isLoading}
-                    isSignInErrorVisible={isSignInErrorVisible}
-                  />
-                }
-              />
-              <Route
-                path="/signup/cont/stripe"
-                element={
-                  <SignupChoosePlan
-                    tempLogo={tempLogo}
-                    tempUserData={tempUserData}
-                  />
-                }
-              />
-              <Route path="/checkout/return" element={<CheckoutReturn />} />
-              <Route
-                path="/checkout/embedded"
-                element={
-                  <Stripe
-                    token={authState.token || localStorage.getItem("jwt")}
-                  />
-                }
-              />
-              <Route path="/billing/success" element={<BillingSuccess />} />
-              <Route path="/billing/cancelled" element={<BillingCancelled />} />
-            </Routes>
-            {showDiagram && (
-              <>
-                {mobileDiagramActive ? (
-                  <>
-                    <DisablePullToRefresh />
+                <Route
+                  path="/signup/cont"
+                  element={
+                    <SignupContinued
+                      userData={userData}
+                      setUserData={setUserData}
+                      handleLogin={handleLogin}
+                      handleSignUp={handleSignUp}
+                      setTempUserData={setTempUserData}
+                      setTempLogo={setTempLogo}
+                      isLoading={isLoading}
+                      isSignInErrorVisible={isSignInErrorVisible}
+                    />
+                  }
+                />
+                <Route
+                  path="/signup/cont/stripe"
+                  element={
+                    <SignupChoosePlan
+                      tempLogo={tempLogo}
+                      tempUserData={tempUserData}
+                    />
+                  }
+                />
+                <Route path="/checkout/return" element={<CheckoutReturn />} />
+                <Route
+                  path="/checkout/embedded"
+                  element={
+                    <Stripe
+                      token={authState.token || localStorage.getItem("jwt")}
+                    />
+                  }
+                />
+                <Route path="/billing/success" element={<BillingSuccess />} />
+                <Route
+                  path="/billing/cancelled"
+                  element={<BillingCancelled />}
+                />
+              </Routes>
+              {showDiagram && (
+                <>
+                  {mobileDiagramActive ? (
+                    <>
+                      <DisablePullToRefresh />
+                      <Diagram
+                        activeModal={activeModal}
+                        closeModal={closeModal}
+                        isMobile={isMobile}
+                        currentProjectId={currentProjectId}
+                        updateDiagram={updateDiagram}
+                        addDiagramToProject={addDiagramToProject}
+                        handlePassDiagramData={handlePassDiagramData}
+                        selectedDiagram={currentDiagram}
+                        originalDiagram={originalDiagram}
+                        setSelectedDiagram={setCurrentDiagram}
+                        setActiveModal={setActiveModal}
+                        diagrams={diagrams}
+                      />
+                    </>
+                  ) : (
                     <Diagram
                       activeModal={activeModal}
                       closeModal={closeModal}
@@ -411,33 +454,18 @@ function App() {
                       addDiagramToProject={addDiagramToProject}
                       handlePassDiagramData={handlePassDiagramData}
                       selectedDiagram={currentDiagram}
-                      originalDiagram={originalDiagram}
                       setSelectedDiagram={setCurrentDiagram}
+                      originalDiagram={originalDiagram}
                       setActiveModal={setActiveModal}
                       diagrams={diagrams}
                     />
-                  </>
-                ) : (
-                  <Diagram
-                    activeModal={activeModal}
-                    closeModal={closeModal}
-                    isMobile={isMobile}
-                    currentProjectId={currentProjectId}
-                    updateDiagram={updateDiagram}
-                    addDiagramToProject={addDiagramToProject}
-                    handlePassDiagramData={handlePassDiagramData}
-                    selectedDiagram={currentDiagram}
-                    setSelectedDiagram={setCurrentDiagram}
-                    originalDiagram={originalDiagram}
-                    setActiveModal={setActiveModal}
-                    diagrams={diagrams}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        </>
-      </ProductsProvider>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        </ProductsProvider>
+      </OnboardingProvider>
     </CurrentUserContext.Provider>
   );
 }

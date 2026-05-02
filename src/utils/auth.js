@@ -142,3 +142,17 @@ export function updateUserInfo(userInfo, token) {
       return data;
     });
 }
+
+export function trackOnboardingEvent(eventName, metadata = {}, token) {
+  return fetch(BASE_URL + "users/me/onboarding/event", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      eventName,
+      metadata,
+    }),
+  }).then(processServerResponse);
+}

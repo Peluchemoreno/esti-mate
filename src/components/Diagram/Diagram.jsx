@@ -24,6 +24,7 @@ import {
   catalogItemToTool,
   isCatalogItemDrawable,
 } from "../../utils/catalogToolAdapter";
+import { useOnboarding } from "../../onboarding/OnboardingContext";
 
 // ---- fixed palette used by free tools ----
 const COMMON_COLORS = [
@@ -573,6 +574,7 @@ const Diagram = ({
   const { data: pricingProducts = [], isLoading, error } = useProductsPricing(); // ALL items
   // which downspout we are editing via the modal (null = adding a new one)
   const [editingDownspoutIndex, setEditingDownspoutIndex] = useState(null);
+  const { track } = useOnboarding();
 
   const { data: listedProducts = [] } = useProductsListed(); // fallback (optional)
 
@@ -1287,7 +1289,19 @@ const Diagram = ({
   }, [activeModal, selectedDiagram?._id]);
 
   useEffect(() => {
-    if (activeModal === "diagram") drawScene();
+    const diagramVisible = [
+      "diagram",
+      "downspout",
+      "selectedLine",
+      "confirmDiagramOverwrite",
+      "note",
+    ].includes(activeModal);
+
+    if (!diagramVisible) return;
+
+    requestAnimationFrame(() => {
+      drawScene();
+    });
   }, [activeModal, currentLine, lines, isDrawing]);
 
   // --- stable diagram hashing (only fields that define "meaningful change") ---
@@ -2059,6 +2073,14 @@ const Diagram = ({
     };
 
     setLines((prev) => [...prev, formatted]);
+    setIsDownspoutModalOpen(false);
+    setEditingDownspoutIndex(null);
+    setActiveModal("diagram");
+
+    requestAnimationFrame(() => {
+      setCanvasSize();
+      drawScene();
+    });
   }
 
   function addNote(note) {
@@ -2073,9 +2095,16 @@ const Diagram = ({
       note,
       color: "black",
     };
-    setLines((prev) => [...prev, n]);
-  }
 
+    setLines((prev) => [...prev, n]);
+    setEditingNoteIndex(null);
+    setActiveModal("diagram");
+
+    requestAnimationFrame(() => {
+      setCanvasSize();
+      drawScene();
+    });
+  }
   // ======= Pointer handlers =======
   function handleMouseDown(e) {
     if (isDownspoutModalOpen) return;
@@ -3764,11 +3793,21 @@ const Diagram = ({
     };
 
     console.log("saving data: ", data);
-
     function handleAddDiagramToProject() {
       addDiagramToProject(resolvedProjectId, token, data)
-        .then((newDiagramData) => {
+        .then(async (newDiagramData) => {
           handlePassDiagramData(newDiagramData);
+
+          try {
+            await track("diagram_saved", {
+              projectId: resolvedProjectId,
+              lineCount: Array.isArray(data?.lines) ? data.lines.length : 0,
+              totalFootage: data?.totalFootage || null,
+            });
+          } catch (err) {
+            console.warn("Failed to track diagram_saved:", err);
+          }
+
           hardUnlockScroll();
           closeModal();
         })
@@ -3796,8 +3835,21 @@ const Diagram = ({
         return;
       }
       updateDiagram(resolvedProjectId, selectedDiagram._id, token, data)
-        .then((newDiagramData) => {
+        .then(async (newDiagramData) => {
           handlePassDiagramData(newDiagramData);
+
+          try {
+            await track("diagram_saved", {
+              projectId: resolvedProjectId,
+              diagramId: selectedDiagram._id,
+              lineCount: Array.isArray(data?.lines) ? data.lines.length : 0,
+              totalFootage: data?.totalFootage || null,
+              overwrite: true,
+            });
+          } catch (err) {
+            console.warn("Failed to track diagram_saved:", err);
+          }
+
           hardUnlockScroll();
           closeModal();
         })
@@ -3884,6 +3936,7 @@ const Diagram = ({
           src={saveIcon}
           alt="save diagram"
           className="diagram__icon diagram__save"
+          data-onboarding="diagram-save-button"
           onClick={() => {
             setLines((prev) =>
               prev.map((l) => (l.isSelected ? { ...l, isSelected: false } : l)),

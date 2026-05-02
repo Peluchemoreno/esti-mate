@@ -5,6 +5,7 @@ import { computeAccessoriesFromLines } from "../../utils/priceResolver";
 import { Svg, Line } from "@react-pdf/renderer";
 import { useToast } from "../Toast/Toast";
 import PhotoThumbWithAnnotations from "../Photos/PhotoThumbWithAnnotations";
+import { useOnboarding } from "../../onboarding/OnboardingContext";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -309,6 +310,7 @@ const EstimateModal = ({
   const [logoUrl, setLogoUrl] = useState(null);
   const [notesSaved, setNotesSaved] = useState(false);
   const [pricingCatalog, setPricingCatalog] = useState(null);
+  const { track } = useOnboarding();
 
   // immutable meta (auto-only)
   const [estimateData, setEstimateData] = useState({
@@ -1025,6 +1027,18 @@ const EstimateModal = ({
       }
 
       // notify the SavedEstimatesPanel to refresh
+      try {
+        await track("estimate_created", {
+          projectId: project?._id || project?.id || null,
+          diagramId: selectedDiagram?._id || selectedDiagram?.id || null,
+          estimateNumber: estimateData?.estimateNumber || null,
+          itemCount: Array.isArray(body?.items) ? body.items.length : 0,
+        });
+      } catch (err) {
+        console.warn("Failed to track estimate_created:", err);
+      }
+
+      // notify the SavedEstimatesPanel to refresh
       window.dispatchEvent(new Event("estimate-created"));
 
       handleCloseModal();
@@ -1309,6 +1323,7 @@ const EstimateModal = ({
 
         <button
           onClick={handleSaveAndClose}
+          data-onboarding="save-estimate-button"
           style={{
             padding: "8px 14px",
             borderRadius: 8,
@@ -1761,7 +1776,7 @@ const EstimateModal = ({
                 </div>
               </div>
             ) : null}
-            <div style={{ marginTop: 12 }}>
+            {/* <div style={{ marginTop: 12 }}>
               {pdfUrl && estimateData?.estimateNumber ? (
                 <a
                   href={pdfUrl}
@@ -1786,7 +1801,7 @@ const EstimateModal = ({
                   Preparing PDF…
                 </button>
               )}
-            </div>
+            </div> */}
           </div>
         )}
       </div>

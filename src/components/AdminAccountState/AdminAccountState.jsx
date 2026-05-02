@@ -17,6 +17,7 @@ export default function AdminAccountState() {
   const [stripeCustomersError, setStripeCustomersError] = useState("");
   const [stripeCustomersHasMore, setStripeCustomersHasMore] = useState(false);
   const [stripeCustomersCursor, setStripeCustomersCursor] = useState(null);
+  const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/?$/, "/");
 
   async function loadStripeCustomers({ reset = false } = {}) {
     setStripeCustomersError("");
@@ -38,7 +39,7 @@ export default function AdminAccountState() {
       }
 
       const res = await fetch(
-        `https://api.tryestimate.io/admin/stripe-customers?${params.toString()}`,
+        `${API_BASE}admin/stripe-customers?${params.toString()}`,
         {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
@@ -94,10 +95,9 @@ export default function AdminAccountState() {
 
     setLoading(true);
     try {
-      const url = `https://api.tryestimate.io/admin/account-state?email=${encodeURIComponent(
+      const url = `${API_BASE}admin/account-state?email=${encodeURIComponent(
         trimmed,
       )}`;
-
       const res = await fetch(url, {
         method: "GET",
         headers: {
@@ -150,18 +150,14 @@ export default function AdminAccountState() {
 
     setResetLoading(true);
     try {
-      const res = await fetch(
-        "https://api.tryestimate.io/users/admin/reset-user-password",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: trimmed.toLowerCase() }),
+      const res = await fetch(`${API_BASE}users/admin/reset-user-password`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      );
-
+        body: JSON.stringify({ email: trimmed.toLowerCase() }),
+      });
       const text = await res.text();
       let data;
       try {
@@ -305,6 +301,7 @@ export default function AdminAccountState() {
             padding: 12,
             border: "1px solid #f0b4b4",
             background: "#fff5f5",
+            color: "#c53030",
           }}
         >
           <strong>Error:</strong> {error}
@@ -350,6 +347,89 @@ export default function AdminAccountState() {
               }}
             >
               {result.summary.subscriptionStatus?.toUpperCase()}
+            </div>
+          </div>
+
+          {/* === ONBOARDING STATUS === */}
+          <div
+            style={{
+              marginTop: 16,
+              padding: 16,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(17, 24, 39, 0.35)",
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>Onboarding</h2>
+
+            <div style={{ display: "grid", gap: 8 }}>
+              <div>
+                <strong>Flow:</strong>{" "}
+                {result?.onboarding?.activeFlow || "none"}
+              </div>
+
+              <div>
+                <strong>Checklist:</strong>{" "}
+                {result?.onboarding?.completedStepsCount || 0}/
+                {result?.onboarding?.totalSteps || 0} complete
+              </div>
+
+              <div>
+                <strong>First win:</strong>{" "}
+                {result?.onboarding?.firstWinCompletedAt
+                  ? `Completed ${new Date(
+                      result.onboarding.firstWinCompletedAt,
+                    ).toLocaleString()}`
+                  : "Not completed"}
+              </div>
+
+              <div>
+                <strong>Last event:</strong>{" "}
+                {result?.onboarding?.lastEventName || "none"}
+              </div>
+
+              <div>
+                <strong>Last onboarding activity:</strong>{" "}
+                {result?.onboarding?.lastEventAt
+                  ? new Date(result.onboarding.lastEventAt).toLocaleString()
+                  : "none"}
+              </div>
+
+              <div>
+                <strong>Completed steps:</strong>
+                <pre
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    background: "rgba(0,0,0,0.25)",
+                    padding: 10,
+                    borderRadius: 8,
+                  }}
+                >
+                  {JSON.stringify(
+                    result?.onboarding?.completedStepIds || [],
+                    null,
+                    2,
+                  )}
+                </pre>
+              </div>
+
+              <div>
+                <strong>Completed events:</strong>
+                <pre
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    background: "rgba(0,0,0,0.25)",
+                    padding: 10,
+                    borderRadius: 8,
+                  }}
+                >
+                  {JSON.stringify(
+                    result?.onboarding?.completedEventNames || [],
+                    null,
+                    2,
+                  )}
+                </pre>
+              </div>
             </div>
           </div>
 

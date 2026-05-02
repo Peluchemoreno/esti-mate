@@ -21,6 +21,7 @@ import {
 } from "../../utils/api";
 import EstimateModal from "../EstimateModal/EstimateModal";
 import { useProductsPricing } from "../../hooks/useProducts";
+import { useOnboarding } from "../../onboarding/OnboardingContext";
 
 export default function Project({
   projects,
@@ -76,6 +77,7 @@ export default function Project({
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
   const [annotatorPhotoId, setAnnotatorPhotoId] = useState(null);
   const [photoAnnotationsById, setPhotoAnnotationsById] = useState({});
+  const { track } = useOnboarding();
 
   function openAnnotator(photoId) {
     if (!photoId) return;
@@ -323,7 +325,15 @@ export default function Project({
     if (isMobile) {
       setMobileDiagramActive(true);
     }
+
     setActiveModal("diagram");
+
+    track("diagram_opened", {
+      projectId,
+    }).catch((err) => {
+      console.warn("Failed to track diagram_opened:", err);
+    });
+
     console.log("OPENING DIAGRAM", activeModal);
   }
 
@@ -550,6 +560,7 @@ export default function Project({
                   window.scrollTo(0, 0);
                 }}
                 className="project__body-create-diagram-button create-button"
+                data-onboarding="open-diagram-button"
               >
                 Create Diagram
               </button>
