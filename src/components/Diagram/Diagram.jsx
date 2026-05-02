@@ -2241,12 +2241,17 @@ const Diagram = ({
         }
       } else if (el.isFreeMark) {
         if (el.kind === "free-line") {
-          // allow moving the whole line; endpoints handled by line hit-test
-          dragMode = "move";
+          const h = hitTestLine(el, x, y);
+
+          if (h?.hit === "start" || h?.hit === "end") {
+            dragMode = "drag-end";
+            end = h.hit; // "start" | "end"
+          } else {
+            dragMode = "move";
+          }
         } else if (el.kind === "free-square") {
           dragMode = "move-free-square";
         } else if (el.kind === "free-circle") {
-          // Splash Guard path -> free-circle, filled
           dragMode = "move-free-circle";
         }
       } else {
@@ -2433,15 +2438,25 @@ const Diagram = ({
               el.startY = original.startY + dy;
               el.endX = original.endX + dx;
               el.endY = original.endY + dy;
-            } else if (dragging.mode === "drag-end") {
+            }
+
+            if (dragging.mode === "drag-end") {
               if (dragging.end === "start") {
                 el.startX = sx;
                 el.startY = sy;
-              } else {
+              }
+
+              if (dragging.end === "end") {
                 el.endX = sx;
                 el.endY = sy;
               }
             }
+
+            // Keep these so hit testing and rendering stay stable
+            el.midpoint = [
+              (el.startX + el.endX) / 2,
+              (el.startY + el.endY) / 2,
+            ];
           } else if (el.kind === "free-square") {
             el.startX = original.startX + dx;
             el.startY = original.startY + dy;
@@ -2592,7 +2607,7 @@ const Diagram = ({
 
     // Free tool commit
     // Free tool commit
-    if (tool === "freeLine") {
+    if (tool === "freeLine" && isDrawing) {
       const c = currentLine;
       if (!c) {
         setIsDrawing(false);
@@ -2628,6 +2643,14 @@ const Diagram = ({
 
       setIsDrawing(false);
       setLineLength(0);
+      setCurrentLine((prev) => ({
+        ...prev,
+        id: null,
+        startX: 0,
+        startY: 0,
+        endX: 0,
+        endY: 0,
+      }));
       return;
     }
 
