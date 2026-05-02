@@ -8,10 +8,10 @@ export default function Settings({ currentUser, setCurrentUser }) {
   const [token, setToken] = useState("");
   const [companyName, setCompanyName] = useState(currentUser.companyName);
   const [companyAddress, setCompanyAddress] = useState(
-    currentUser.companyAddress
+    currentUser.companyAddress,
   );
   const [companyPhoneNumber, setCompanyPhoneNumber] = useState(
-    currentUser.companyPhone
+    currentUser.companyPhone,
   );
   const [logoFile, setLogoFile] = useState(null);
   const [dummyState, setDummyState] = useState(false);
@@ -25,7 +25,7 @@ export default function Settings({ currentUser, setCurrentUser }) {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       if (!res.ok) {
         alert("Could not open billing portal");
@@ -79,7 +79,7 @@ export default function Settings({ currentUser, setCurrentUser }) {
       getCompanyLogo(currentUser._id, token)
         .then((url) => {
           setLogoUrl(url);
-          "Fetched logo:", url;
+          ("Fetched logo:", url);
         })
         .catch((err) => {
           console.error("Failed to load logo:", err.message);
@@ -145,6 +145,31 @@ export default function Settings({ currentUser, setCurrentUser }) {
             </button>
           </div>
         </form>
+        <div className="settings__billing-card">
+          <h4>Billing</h4>
+
+          <p>Plan: {currentUser?.subscriptionPlan || "free"}</p>
+
+          <p>Status: {currentUser?.subscriptionStatus || "disabled"}</p>
+
+          {currentUser?.subscriptionStatus === "trialing" &&
+            currentUser?.subscription?.trialEnd && (
+              <p>
+                Trial ends:{" "}
+                {new Date(
+                  currentUser.subscription.trialEnd,
+                ).toLocaleDateString()}
+              </p>
+            )}
+
+          {currentUser?.subscription?.cancelAtPeriodEnd && (
+            <p>
+              Your subscription is set to cancel at the end of the billing
+              period.
+            </p>
+          )}
+        </div>
+
         <ManageBillingButton token={token} />
       </div>
     </div>

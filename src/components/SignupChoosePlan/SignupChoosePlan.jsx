@@ -20,7 +20,7 @@ export default function SignupPlans() {
       <div className="plans">
         <div className="plan" onClick={() => choose("basic")}>
           <h3>Basic Estimate Package</h3>
-          <p>$79.99/month</p>
+          <p>14-day free trial, then $79.99/month</p>
           <ul>
             <li>Basic features</li>
             <li>Unlimited projects</li>

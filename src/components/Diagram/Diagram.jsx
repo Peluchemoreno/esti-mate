@@ -580,6 +580,8 @@ const Diagram = ({
   // which annotation (note) is being edited; null means "creating"
   const [editingNoteIndex, setEditingNoteIndex] = useState(null);
 
+  const lastHydratedDiagramIdRef = useRef(null); // track last hydrated diagram ID to avoid redundant hydration
+
   // click-vs-drag detection for notes (like you already do for downspout box)
   const noteClickRef = useRef({ x: 0, y: 0, index: null });
   // Scroll-lock state (must persist across renders)
@@ -725,40 +727,6 @@ const Diagram = ({
 
     didInitDiagram.current = true; // mark initialized for this open
   }, [activeModal]); // keep dep list tight
-
-  useEffect(() => {
-    if (activeModal !== "diagram") {
-      didInitDiagram.current = false;
-    }
-  }, [activeModal]);
-
-  useEffect(() => {
-    if (activeModal !== "diagram") return;
-
-    function setDiagramViewportHeight() {
-      const height = window.visualViewport?.height || window.innerHeight;
-      document.documentElement.style.setProperty("--diagram-vh", `${height}px`);
-    }
-
-    setDiagramViewportHeight();
-
-    window.visualViewport?.addEventListener("resize", setDiagramViewportHeight);
-    window.visualViewport?.addEventListener("scroll", setDiagramViewportHeight);
-    window.addEventListener("resize", setDiagramViewportHeight);
-
-    return () => {
-      window.visualViewport?.removeEventListener(
-        "resize",
-        setDiagramViewportHeight,
-      );
-      window.visualViewport?.removeEventListener(
-        "scroll",
-        setDiagramViewportHeight,
-      );
-      window.removeEventListener("resize", setDiagramViewportHeight);
-      document.documentElement.style.removeProperty("--diagram-vh");
-    };
-  }, [activeModal]);
 
   useEffect(() => {
     if (activeModal !== "diagram") return;
@@ -1043,7 +1011,6 @@ const Diagram = ({
     // grid first
     drawGrid(ctx);
 
-    // existing committed lines (never preview)
     (lines || []).forEach((L) => drawLine(ctx, L, { isPreview: false }));
 
     // in-progress line (preview = true -> may render green)
@@ -1108,15 +1075,32 @@ const Diagram = ({
 
   // hydrate lines when a diagram is selected
   useEffect(() => {
+    if (activeModal !== "diagram") return;
+
+    const diagramId = selectedDiagram?._id || selectedDiagram?.id || null;
+
+    const hasLines = Array.isArray(selectedDiagram?.lines);
+
+    if (!diagramId || !hasLines) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
+    setCanvasSize();
+    const rectNow = canvas.getBoundingClientRect();
+    if (rectNow.width < 20 || rectNow.height < 20) {
+      requestAnimationFrame(() => {
+        setCanvasSize();
+        drawScene();
+      });
+    }
+
+    const rect = rectNow;
     const curW = Math.max(1, Math.round(rect.width));
     const curH = Math.max(1, Math.round(rect.height));
 
@@ -1287,6 +1271,11 @@ const Diagram = ({
 
     // draw the scaled content exactly as your code does now
     setLines(withIds);
+    lastHydratedDiagramIdRef.current = diagramId;
+    requestAnimationFrame(() => {
+      setCanvasSize();
+      drawScene();
+    });
 
     // If you’re using the baseline-hash to decide overwrite prompts, reset it here
     if (
@@ -1295,7 +1284,7 @@ const Diagram = ({
     ) {
       baselineHashRef.current = hashLines(withIds);
     }
-  }, [selectedDiagram]);
+  }, [activeModal, selectedDiagram?._id]);
 
   useEffect(() => {
     if (activeModal === "diagram") drawScene();
@@ -1315,6 +1304,38 @@ const Diagram = ({
       .trim()
       .toLowerCase();
   }
+
+  useEffect(() => {
+    if (activeModal !== "diagram") return;
+
+    let raf = 0;
+
+    function syncViewportAndCanvas() {
+      const height = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--diagram-vh", `${height}px`);
+
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        setCanvasSize();
+        drawScene();
+      });
+    }
+
+    syncViewportAndCanvas();
+
+    window.visualViewport?.addEventListener("resize", syncViewportAndCanvas);
+    window.addEventListener("resize", syncViewportAndCanvas);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.visualViewport?.removeEventListener(
+        "resize",
+        syncViewportAndCanvas,
+      );
+      window.removeEventListener("resize", syncViewportAndCanvas);
+      document.documentElement.style.removeProperty("--diagram-vh");
+    };
+  }, [activeModal, selectedDiagram]);
 
   /**
    * Build a normalized snapshot of what matters to the diagram:
@@ -3909,12 +3930,12 @@ const Diagram = ({
           }}
         />
 
-        <img
+        {/* <img
           src={itemsIcon}
           alt="select product"
           className="diagram__icon diagram__items"
           onClick={() => {}}
-        />
+        /> */}
 
         {/*  <select
           value={tool}
