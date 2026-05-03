@@ -584,6 +584,13 @@ const Diagram = ({
 
   const lastHydratedDiagramIdRef = useRef(null); // track last hydrated diagram ID to avoid redundant hydration
 
+  const displayTransformRef = useRef({
+    diagramId: null,
+    sx: 1,
+    sy: 1,
+    kAvg: 1,
+    baseMeta: null,
+  });
   // click-vs-drag detection for notes (like you already do for downspout box)
   const noteClickRef = useRef({ x: 0, y: 0, index: null });
   // Scroll-lock state (must persist across renders)
@@ -1067,13 +1074,35 @@ const Diagram = ({
       setTool(filteredProducts[0].name);
     }
   }, [filteredProducts, tool]);
+
   const metaIn = selectedDiagram?.meta || {};
-  const savedGrid = Number(metaIn.gridSize) || gridSize;
-  const savedFeet = Number(metaIn.feetPerSquare) || feetPerSquare;
-  // Do not push raw savedGrid directly; we must match the geometric scale below.
-  if (metaIn && (metaIn.gridSize || metaIn.feetPerSquare)) {
-    if (savedFeet !== feetPerSquare) setFeetPerSquare(savedFeet);
-  }
+
+  useEffect(() => {
+    const diagramVisible = [
+      "diagram",
+      "downspout",
+      "selectedLine",
+      "confirmDiagramOverwrite",
+      "note",
+    ].includes(activeModal);
+
+    if (diagramVisible) return;
+
+    didInitDiagram.current = false;
+    lastHydratedDiagramIdRef.current = null;
+
+    displayTransformRef.current = {
+      diagramId: null,
+      sx: 1,
+      sy: 1,
+      kAvg: 1,
+      baseMeta: null,
+    };
+
+    setSelectedIndex(null);
+    setIsDrawing(false);
+    setDragging({ mode: "none", end: null, lastX: 0, lastY: 0 });
+  }, [activeModal]);
 
   // hydrate lines when a diagram is selected
   useEffect(() => {
@@ -1084,6 +1113,7 @@ const Diagram = ({
     const hasLines = Array.isArray(selectedDiagram?.lines);
 
     if (!diagramId || !hasLines) return;
+    if (lastHydratedDiagramIdRef.current === diagramId) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -1246,11 +1276,29 @@ const Diagram = ({
       .map((l) => {
         const copy = { ...l, midpoint: undefined };
         if (copy.isDownspout) {
-          // Preserve or backfill totalFeet for downspouts
           const tf = Number(copy.totalFeet ?? copy.measurement ?? 0);
-          copy.totalFeet = isNaN(tf) ? 0 : tf;
-          // Keep measurement equal to totalFeet for DS so UI that reads `measurement` still works
+          copy.totalFeet = Number.isFinite(tf) ? tf : 0;
           copy.measurement = copy.totalFeet;
+        } else if (copy.isGutter || copy.currentProduct) {
+          const savedMeasurement = Number(copy.runFeet ?? copy.measurement);
+
+          if (Number.isFinite(savedMeasurement) && savedMeasurement > 0) {
+            copy.measurement = savedMeasurement;
+            copy.runFeet = savedMeasurement;
+          } else {
+            const px = calculateDistance(
+              [copy.startX, copy.startY],
+              [copy.endX, copy.endY],
+            );
+
+            const displayGrid = Math.max(1, savedGrid * kAvg);
+            const ft =
+              Number(px || 0) *
+              (Number(savedFeet || 1) / Number(displayGrid || 1));
+
+            copy.measurement = Math.round(ft);
+            copy.runFeet = copy.measurement;
+          }
         } else {
           copy.measurement = undefined;
         }
@@ -1263,18 +1311,6 @@ const Diagram = ({
           if (!copy.profileKey && l.profileKey) copy.profileKey = l.profileKey;
           if (!copy.sizeInches && l.sizeInches) copy.sizeInches = l.sizeInches;
           if (!copy.color && l.color) copy.color = l.color;
-
-          // Recompute runFeet ONLY if missing or not finite, using saved meta scale
-          if (!Number.isFinite(copy.runFeet)) {
-            const px = calculateDistance(
-              [copy.startX, copy.startY],
-              [copy.endX, copy.endY],
-            );
-            const ft =
-              Number(px || 0) *
-              (Number(savedFeet || 1) / Number(savedGrid || 1));
-            copy.runFeet = Math.round(ft);
-          }
         }
 
         return copy;
